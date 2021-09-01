@@ -1,0 +1,97 @@
+name: Build and test
+
+on: [push, pull_request]
+
+jobs:
+  win64:
+    name: Build Win64
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Install latest rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          default: true
+          override: true
+
+      - name: Build
+        run: cargo build --release
+
+  win32:
+    name: Build Win32
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Install latests rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          target: i686-pc-windows-msvc
+          default: true
+          override: true
+      
+      - name: Build
+        run: cargo build --release
+
+  osx:
+    name: Build OS-X
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Insall latests rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          default: true
+          override: true
+
+      - name: Build
+        run: cargo build --release
+
+  linux:
+    name: Build & Test Linux
+    runs-on: ubuntu-20.04
+
+    services:
+      sqlserver:
+        image: mcr.microsoft.com/mssql/server:2017-latest-ubuntu
+        ports:
+        - 1433:1433
+      env:
+        ACCEPT_EULA: Y
+        SA_PASSWORD: My@Test@Password1
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Install latest rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          default: true
+          override: true
+      - name: Build
+        run: cargo build --release
+      - name: Install ODBC Drivers
+        run: |
+          curl https://packages.microsoft.com/keys/microsoft.asc | apt-key add -
+          curl https://packages.microsoft.com/config/ubuntu/20.04/prod.list > /etc/apt/sources.list.d/mssql-release.list
+          apt-get update
+          ACCEPT_EULA=Y apt-get install -y msodbcsql17
+          ln -s /opt/microsoft/msodbcsql17/lib64/libmsodbcsql-17.*.so.* /opt/microsoft/msodbcsql17/lib64/libmsodbcsql-17.so
+        shell: sudo bash {0}
+      - name: Print odbcinst.ini
+        run: cat /etc/odbcinst.ini
+      - name: Test
+        run: cargo test --release
