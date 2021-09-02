@@ -6,10 +6,9 @@ use odbc2arrow::{
     arrow::{
         array::Float64Array,
         datatypes::{DataType, Field, Schema},
-        record_batch::RecordBatch,
     },
     odbc_api::{
-        buffers::{BufferDescription, BufferKind, ColumnarRowSet, Item},
+        buffers::{BufferDescription, BufferKind, ColumnarRowSet},
         sys::{AttrConnectionPooling, AttrCpMatch},
         Connection, Cursor, Environment,
     },
@@ -53,7 +52,6 @@ fn fetch_64bit_floating_point() {
 
     // Now that we have a cursor, we want to iterate over its rows and fill an arrow batch with it.
     let arrow_schema = Schema::new(vec![Field::new("a", DataType::Float64, false)]);
-    let mut data = Vec::new();
 
     // Setup ODBC buffer to bind to cursor
     let max_rows = 100;
@@ -70,14 +68,8 @@ fn fetch_64bit_floating_point() {
         cursor: row_set_cursor,
     };
 
-    // Batch for batch copy values from ODBC buffer into values
-    let odbc_batch = reader.cursor.fetch().unwrap().unwrap();
-    let column_view = odbc_batch.column(0);
-    let slice = f64::as_slice(column_view).unwrap();
-    data.extend_from_slice(slice);
-
-    let array = Float64Array::from(data);
-    let arrow_batch = RecordBatch::try_new(reader.schema, vec![Arc::new(array)]).unwrap();
+    // Batch for batch copy values from ODBC buffer into arrow batches
+    let arrow_batch = reader.next().unwrap().unwrap();
 
     // Assert that the correct values are found within the arrow batch
     let array_vals = arrow_batch
@@ -106,7 +98,6 @@ fn prepared_query() {
 
     // Now that we have a cursor, we want to iterate over its rows and fill an arrow batch with it.
     let arrow_schema = Schema::new(vec![Field::new("a", DataType::Float64, false)]);
-    let mut data = Vec::new();
 
     // Setup ODBC buffer to bind to cursor
     let max_rows = 100;
@@ -123,14 +114,8 @@ fn prepared_query() {
         cursor: row_set_cursor,
     };
 
-    // Batch for batch copy values from ODBC buffer into values
-    let odbc_batch = reader.cursor.fetch().unwrap().unwrap();
-    let column_view = odbc_batch.column(0);
-    let slice = f64::as_slice(column_view).unwrap();
-    data.extend_from_slice(slice);
-
-    let array = Float64Array::from(data);
-    let arrow_batch = RecordBatch::try_new(reader.schema, vec![Arc::new(array)]).unwrap();
+    // Batch for batch copy values from ODBC buffer into arrow batches
+    let arrow_batch = reader.next().unwrap().unwrap();
 
     // Assert that the correct values are found within the arrow batch
     let array_vals = arrow_batch
