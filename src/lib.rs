@@ -70,9 +70,12 @@ impl<C: Cursor> OdbcReader<C> {
                     OdbcDataType::Decimal { precision, scale } => todo!(),
                     OdbcDataType::Integer => todo!(),
                     OdbcDataType::SmallInt => todo!(),
-                    OdbcDataType::Float => ArrowDataType::Float32,
-                    OdbcDataType::Real => todo!(),
-                    OdbcDataType::Double => ArrowDataType::Float64,
+                    OdbcDataType::Real | OdbcDataType::Float { precision: 0..=24 } => {
+                        ArrowDataType::Float32
+                    }
+                    OdbcDataType::Float { precision: _ } | OdbcDataType::Double => {
+                        ArrowDataType::Float64
+                    }
                     OdbcDataType::Varchar { length } => todo!(),
                     OdbcDataType::WVarchar { length } => todo!(),
                     OdbcDataType::LongVarchar { length } => todo!(),

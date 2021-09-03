@@ -36,7 +36,7 @@ fn fetch_32bit_floating_point() {
 
     // Setup a table on the database with some floats (so we can fetch them)
     let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
-    setup_empty_table(&conn, table_name, &["FLOAT NOT NULL"]).unwrap();
+    setup_empty_table(&conn, table_name, &["REAL NOT NULL"]).unwrap();
     let sql = format!("INSERT INTO {} (a) VALUES (1),(2),(3)", table_name);
     conn.execute(&sql, ()).unwrap();
 
@@ -138,7 +138,7 @@ fn prepared_query() {
 
     // Setup a table on the database with some floats (so we can fetch them)
     let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
-    setup_empty_table(&conn, table_name, &["FLOAT NOT NULL"]).unwrap();
+    setup_empty_table(&conn, table_name, &["REAL NOT NULL"]).unwrap();
     let sql = format!("INSERT INTO {} (a) VALUES (1),(2),(3)", table_name);
     conn.execute(&sql, ()).unwrap();
 
