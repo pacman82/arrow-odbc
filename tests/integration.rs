@@ -1,12 +1,8 @@
-use std::sync::Arc;
-
+use arrow::array::{Float32Array, Int64Array};
 use lazy_static::lazy_static;
 
 use odbc_arrow::{
-    arrow::{
-        array::Float64Array,
-        datatypes::{DataType, Field, Schema},
-    },
+    arrow::array::Float64Array,
     odbc_api::{
         sys::{AttrConnectionPooling, AttrCpMatch},
         Connection, Environment,
@@ -34,6 +30,39 @@ lazy_static! {
     };
 }
 
+#[test]
+fn fetch_32bit_floating_point() {
+    let table_name = function_name!().rsplit_once(':').unwrap().1;
+
+    // Setup a table on the database with some floats (so we can fetch them)
+    let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
+    setup_empty_table(&conn, table_name, &["FLOAT NOT NULL"]).unwrap();
+    let sql = format!("INSERT INTO {} (a) VALUES (1),(2),(3)", table_name);
+    conn.execute(&sql, ()).unwrap();
+
+    // Query column with values to get a cursor
+    let sql = format!("SELECT a FROM {}", table_name);
+    let cursor = conn.execute(&sql, ()).unwrap().unwrap();
+
+    // Now that we have a cursor, we want to iterate over its rows and fill an arrow batch with it.
+
+    // Batches will contain at most 100 entries.
+    let max_batch_size = 100;
+
+    let mut reader = OdbcReader::new(cursor, max_batch_size).unwrap();
+
+    // Batch for batch copy values from ODBC buffer into arrow batches
+    let arrow_batch = reader.next().unwrap().unwrap();
+
+    // Assert that the correct values are found within the arrow batch
+    let array_vals = arrow_batch
+        .column(0)
+        .as_any()
+        .downcast_ref::<Float32Array>()
+        .unwrap();
+    assert_eq!([1., 2., 3.], array_vals.values());
+}
+
 /// Fill a record batch with non nullable `f64` directly from the datasource
 #[test]
 fn fetch_64bit_floating_point() {
@@ -50,12 +79,11 @@ fn fetch_64bit_floating_point() {
     let cursor = conn.execute(&sql, ()).unwrap().unwrap();
 
     // Now that we have a cursor, we want to iterate over its rows and fill an arrow batch with it.
-    let arrow_schema = Schema::new(vec![Field::new("a", DataType::Float64, false)]);
 
     // Batches will contain at most 100 entries.
     let max_batch_size = 100;
 
-    let mut reader = OdbcReader::new(cursor, max_batch_size, Arc::new(arrow_schema));
+    let mut reader = OdbcReader::new(cursor, max_batch_size).unwrap();
 
     // Batch for batch copy values from ODBC buffer into arrow batches
     let arrow_batch = reader.next().unwrap().unwrap();
@@ -69,14 +97,48 @@ fn fetch_64bit_floating_point() {
     assert_eq!([1., 2., 3.], array_vals.values());
 }
 
-/// Like [`fetch_64bit_floating_point`], but utilizing a prepared query instead of a one shot.
+/// Fill a record batch with non nullable `i64` directly from the datasource
+#[test]
+fn fetch_64bit_integer() {
+    let table_name = function_name!().rsplit_once(':').unwrap().1;
+
+    // Setup a table on the database with some floats (so we can fetch them)
+    let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
+    setup_empty_table(&conn, table_name, &["BIGINT NOT NULL"]).unwrap();
+    let sql = format!("INSERT INTO {} (a) VALUES (1),(2),(3)", table_name);
+    conn.execute(&sql, ()).unwrap();
+
+    // Query column with values to get a cursor
+    let sql = format!("SELECT a FROM {}", table_name);
+    let cursor = conn.execute(&sql, ()).unwrap().unwrap();
+
+    // Now that we have a cursor, we want to iterate over its rows and fill an arrow batch with it.
+
+    // Batches will contain at most 100 entries.
+    let max_batch_size = 100;
+
+    let mut reader = OdbcReader::new(cursor, max_batch_size).unwrap();
+
+    // Batch for batch copy values from ODBC buffer into arrow batches
+    let arrow_batch = reader.next().unwrap().unwrap();
+
+    // Assert that the correct values are found within the arrow batch
+    let array_vals = arrow_batch
+        .column(0)
+        .as_any()
+        .downcast_ref::<Int64Array>()
+        .unwrap();
+    assert_eq!([1, 2, 3], array_vals.values());
+}
+
+/// Like [`fetch_32bit_floating_point`], but utilizing a prepared query instead of a one shot.
 #[test]
 fn prepared_query() {
     let table_name = function_name!().rsplit_once(':').unwrap().1;
 
     // Setup a table on the database with some floats (so we can fetch them)
     let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
-    setup_empty_table(&conn, table_name, &["DOUBLE PRECISION NOT NULL"]).unwrap();
+    setup_empty_table(&conn, table_name, &["FLOAT NOT NULL"]).unwrap();
     let sql = format!("INSERT INTO {} (a) VALUES (1),(2),(3)", table_name);
     conn.execute(&sql, ()).unwrap();
 
@@ -86,13 +148,12 @@ fn prepared_query() {
     let cursor = prepared.execute(()).unwrap().unwrap();
 
     // Now that we have a cursor, we want to iterate over its rows and fill an arrow batch with it.
-    let arrow_schema = Schema::new(vec![Field::new("a", DataType::Float64, false)]);
 
     // Batches will contain at most 100 entries.
     let max_batch_size = 100;
 
     // Instantiate reader with Arrow schema and ODBC cursor
-    let mut reader = OdbcReader::new(cursor, max_batch_size, Arc::new(arrow_schema));
+    let mut reader = OdbcReader::new(cursor, max_batch_size).unwrap();
 
     // Batch for batch copy values from ODBC buffer into arrow batches
     let arrow_batch = reader.next().unwrap().unwrap();
@@ -101,7 +162,7 @@ fn prepared_query() {
     let array_vals = arrow_batch
         .column(0)
         .as_any()
-        .downcast_ref::<Float64Array>()
+        .downcast_ref::<Float32Array>()
         .unwrap();
     assert_eq!([1., 2., 3.], array_vals.values());
 }

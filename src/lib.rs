@@ -1,13 +1,16 @@
-use std::{marker::PhantomData, sync::Arc};
+use std::{convert::TryInto, marker::PhantomData, sync::Arc};
 
 use arrow::{
     array::{ArrayRef, PrimitiveBuilder},
-    datatypes::{ArrowPrimitiveType, DataType as ArrowDataType, Field, Float64Type, SchemaRef},
+    datatypes::{
+        ArrowPrimitiveType, DataType as ArrowDataType, Field, Float32Type, Float64Type, Int64Type,
+        Schema, SchemaRef,
+    },
     record_batch::RecordBatch,
 };
 use odbc_api::{
     buffers::{AnyColumnView, BufferDescription, ColumnarRowSet, Item},
-    Cursor, RowSetCursor,
+    ColumnDescription, Cursor, DataType as OdbcDataType, RowSetCursor,
 };
 
 // Rexport odbc_api and arrow to make it easier for downstream crates to depend to avoid version
@@ -23,15 +26,82 @@ pub use odbc_api;
 /// statement handles (recommened then using one shot queries, to have an easier life with the
 /// borrow checker).
 pub struct OdbcReader<C: Cursor> {
+    /// Must contain one item for each field in [`Self::schema`]. Encapsulates all the column type
+    /// specific decisions which go into filling an Arrow array from an ODBC data source.
     column_strategies: Vec<Box<dyn ColumnStrategy>>,
     /// Arrow schema describing the arrays we want to fill from the Odbc data source.
     schema: SchemaRef,
     /// Odbc cursor with a bound buffer we repeatedly fill with the batches send to us by the data
-    /// source.
+    /// source. One column buffer must be bound for each element in column_strategies.
     cursor: RowSetCursor<C, ColumnarRowSet>,
 }
 
 impl<C: Cursor> OdbcReader<C> {
+    /// Construct a new `OdbcReader` instance. This constructor infers the Arrow schema from the
+    /// metadata of the cursor. If you want to set it explicitly use [`Self::with_arrow_schema`].
+    ///
+    /// # Parameters
+    ///
+    /// * `cursor`: ODBC cursor used to fetch batches from the data source. The constructor will
+    ///   bind buffers to this cursor in order to perform bulk fetches from the source. This is
+    ///   usually faster than fetching results row by row as it saves roundtrips to the database.
+    ///   The type of these buffers will be inferred from the arrow schema. Not every arrow type is
+    ///   supported though.
+    /// * `max_batch_size`: Maximum batch size requested from the datasource.
+    pub fn new(cursor: C, max_batch_size: usize) -> Result<Self, odbc_api::Error> {
+        // Get number of columns from result set. We know it to contain at least one column,
+        // otherwise it would not have been created.
+        let num_cols: u16 = cursor.num_result_cols()?.try_into().unwrap();
+        let mut fields = Vec::new();
+
+        for index in 0..num_cols {
+            let mut column_description = ColumnDescription::default();
+            cursor.describe_col(index + 1, &mut column_description)?;
+
+            let field = Field::new(
+                &column_description
+                    .name_to_string()
+                    .expect("Column name must be representable in utf8"),
+                match column_description.data_type {
+                    OdbcDataType::Unknown => todo!(),
+                    OdbcDataType::Char { length } => todo!(),
+                    OdbcDataType::WChar { length } => todo!(),
+                    OdbcDataType::Numeric { precision, scale } => todo!(),
+                    OdbcDataType::Decimal { precision, scale } => todo!(),
+                    OdbcDataType::Integer => todo!(),
+                    OdbcDataType::SmallInt => todo!(),
+                    OdbcDataType::Float => ArrowDataType::Float32,
+                    OdbcDataType::Real => todo!(),
+                    OdbcDataType::Double => ArrowDataType::Float64,
+                    OdbcDataType::Varchar { length } => todo!(),
+                    OdbcDataType::WVarchar { length } => todo!(),
+                    OdbcDataType::LongVarchar { length } => todo!(),
+                    OdbcDataType::LongVarbinary { length } => todo!(),
+                    OdbcDataType::Date => todo!(),
+                    OdbcDataType::Time { precision } => todo!(),
+                    OdbcDataType::Timestamp { precision } => todo!(),
+                    OdbcDataType::BigInt => ArrowDataType::Int64,
+                    OdbcDataType::TinyInt => todo!(),
+                    OdbcDataType::Bit => todo!(),
+                    OdbcDataType::Varbinary { length } => todo!(),
+                    OdbcDataType::Binary { length } => todo!(),
+                    OdbcDataType::Other {
+                        data_type,
+                        column_size,
+                        decimal_digits,
+                    } => todo!(),
+                },
+                column_description.could_be_nullable(),
+            );
+
+            fields.push(field)
+        }
+
+        let schema = Arc::new(Schema::new(fields));
+        let odbc_reader = Self::with_arrow_schema(cursor, max_batch_size, schema);
+        Ok(odbc_reader)
+    }
+
     /// Construct a new `OdbcReader instance.
     ///
     /// # Parameters
@@ -44,7 +114,7 @@ impl<C: Cursor> OdbcReader<C> {
     /// * `max_batch_size`: Maximum batch size requested from the datasource.
     /// * `schema`: Arrow schema. Describes the type of the Arrow Arrays in the record batches, but
     ///    is also used to determine CData type requested from the data source.
-    pub fn new(cursor: C, max_batch_size: usize, schema: SchemaRef) -> Self {
+    pub fn with_arrow_schema(cursor: C, max_batch_size: usize, schema: SchemaRef) -> Self {
         let column_strategies: Vec<Box<dyn ColumnStrategy>> = schema
             .fields()
             .iter()
@@ -127,6 +197,20 @@ where
     }
 }
 
+fn odbc_batch_to_arrow_columns(
+    column_strategies: &[Box<dyn ColumnStrategy>],
+    batch: &ColumnarRowSet,
+) -> Vec<ArrayRef> {
+    column_strategies
+        .iter()
+        .enumerate()
+        .map(|(index, strat)| {
+            let column_view = batch.column(index);
+            strat.fill_arrow_array(column_view)
+        })
+        .collect()
+}
+
 fn choose_column_strategy(field: &Field) -> Box<dyn ColumnStrategy> {
     match field.data_type() {
         ArrowDataType::Null => todo!(),
@@ -134,20 +218,14 @@ fn choose_column_strategy(field: &Field) -> Box<dyn ColumnStrategy> {
         ArrowDataType::Int8 => todo!(),
         ArrowDataType::Int16 => todo!(),
         ArrowDataType::Int32 => todo!(),
-        ArrowDataType::Int64 => todo!(),
+        ArrowDataType::Int64 => primitive_arrow_type_startegy::<Int64Type>(field.is_nullable()),
         ArrowDataType::UInt8 => todo!(),
         ArrowDataType::UInt16 => todo!(),
         ArrowDataType::UInt32 => todo!(),
         ArrowDataType::UInt64 => todo!(),
         ArrowDataType::Float16 => todo!(),
-        ArrowDataType::Float32 => todo!(),
-        ArrowDataType::Float64 => {
-            if field.is_nullable() {
-                todo!()
-            } else {
-                Box::new(NonNullDirectStrategy::<Float64Type>::new())
-            }
-        }
+        ArrowDataType::Float32 => primitive_arrow_type_startegy::<Float32Type>(field.is_nullable()),
+        ArrowDataType::Float64 => primitive_arrow_type_startegy::<Float64Type>(field.is_nullable()),
         ArrowDataType::Timestamp(_, _) => todo!(),
         ArrowDataType::Date32 => todo!(),
         ArrowDataType::Date64 => todo!(),
@@ -170,16 +248,14 @@ fn choose_column_strategy(field: &Field) -> Box<dyn ColumnStrategy> {
     }
 }
 
-fn odbc_batch_to_arrow_columns(
-    column_strategies: &[Box<dyn ColumnStrategy>],
-    batch: &ColumnarRowSet,
-) -> Vec<ArrayRef> {
-    column_strategies
-        .iter()
-        .enumerate()
-        .map(|(index, strat)| {
-            let column_view = batch.column(index);
-            strat.fill_arrow_array(column_view)
-        })
-        .collect()
+fn primitive_arrow_type_startegy<T>(nullable: bool) -> Box<dyn ColumnStrategy>
+where
+    T: ArrowPrimitiveType,
+    T::Native: Item,
+{
+    if nullable {
+        todo!()
+    } else {
+        Box::new(NonNullDirectStrategy::<T>::new())
+    }
 }
