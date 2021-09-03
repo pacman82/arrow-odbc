@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use lazy_static::lazy_static;
 
-use odbc2arrow::{
+use odbc_arrow::{
     arrow::{
         array::Float64Array,
         datatypes::{DataType, Field, Schema},
