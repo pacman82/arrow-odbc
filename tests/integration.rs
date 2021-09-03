@@ -8,9 +8,8 @@ use odbc_arrow::{
         datatypes::{DataType, Field, Schema},
     },
     odbc_api::{
-        buffers::{BufferDescription, BufferKind, ColumnarRowSet},
         sys::{AttrConnectionPooling, AttrCpMatch},
-        Connection, Cursor, Environment,
+        Connection, Environment,
     },
     OdbcReader,
 };
@@ -53,20 +52,10 @@ fn fetch_64bit_floating_point() {
     // Now that we have a cursor, we want to iterate over its rows and fill an arrow batch with it.
     let arrow_schema = Schema::new(vec![Field::new("a", DataType::Float64, false)]);
 
-    // Setup ODBC buffer to bind to cursor
-    let max_rows = 100;
-    let description = [BufferDescription {
-        kind: BufferKind::F64,
-        nullable: false,
-    }];
-    let row_set_buffer = ColumnarRowSet::new(max_rows, description.iter().copied());
-    let row_set_cursor = cursor.bind_buffer(row_set_buffer).unwrap();
+    // Batches will contain at most 100 entries.
+    let max_batch_size = 100;
 
-    // Instantiate reader with Arrow schema and ODBC cursor
-    let mut reader = OdbcReader {
-        schema: Arc::new(arrow_schema),
-        cursor: row_set_cursor,
-    };
+    let mut reader = OdbcReader::new(cursor, max_batch_size, Arc::new(arrow_schema));
 
     // Batch for batch copy values from ODBC buffer into arrow batches
     let arrow_batch = reader.next().unwrap().unwrap();
@@ -99,20 +88,11 @@ fn prepared_query() {
     // Now that we have a cursor, we want to iterate over its rows and fill an arrow batch with it.
     let arrow_schema = Schema::new(vec![Field::new("a", DataType::Float64, false)]);
 
-    // Setup ODBC buffer to bind to cursor
-    let max_rows = 100;
-    let description = [BufferDescription {
-        kind: BufferKind::F64,
-        nullable: false,
-    }];
-    let row_set_buffer = ColumnarRowSet::new(max_rows, description.iter().copied());
-    let row_set_cursor = cursor.bind_buffer(row_set_buffer).unwrap();
+    // Batches will contain at most 100 entries.
+    let max_batch_size = 100;
 
     // Instantiate reader with Arrow schema and ODBC cursor
-    let mut reader = OdbcReader {
-        schema: Arc::new(arrow_schema),
-        cursor: row_set_cursor,
-    };
+    let mut reader = OdbcReader::new(cursor, max_batch_size, Arc::new(arrow_schema));
 
     // Batch for batch copy values from ODBC buffer into arrow batches
     let arrow_batch = reader.next().unwrap().unwrap();
