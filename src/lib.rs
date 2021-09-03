@@ -1,12 +1,12 @@
-use std::sync::Arc;
+use std::{marker::PhantomData, sync::Arc};
 
 use arrow::{
-    array::{ArrayRef, Float64Builder},
-    datatypes::{DataType as ArrowDataType, Field, SchemaRef},
+    array::{ArrayRef, PrimitiveBuilder},
+    datatypes::{ArrowPrimitiveType, DataType as ArrowDataType, Field, Float64Type, SchemaRef},
     record_batch::RecordBatch,
 };
 use odbc_api::{
-    buffers::{AnyColumnView, BufferDescription, BufferKind, ColumnarRowSet, Item},
+    buffers::{AnyColumnView, BufferDescription, ColumnarRowSet, Item},
     Cursor, RowSetCursor,
 };
 
@@ -90,22 +90,38 @@ where
 }
 
 trait ColumnStrategy {
-    fn buffer_description(&self) -> BufferDescription {
-        BufferDescription {
-            kind: BufferKind::F64,
-            nullable: false,
-        }
-    }
+    fn buffer_description(&self) -> BufferDescription;
 
     fn fill_arrow_array(&self, column_view: AnyColumnView) -> ArrayRef;
 }
 
-struct F64NonNullStrategy;
+struct NonNullDirectStrategy<T> {
+    phantom: PhantomData<T>,
+}
 
-impl ColumnStrategy for F64NonNullStrategy {
+impl<T> NonNullDirectStrategy<T> {
+    fn new() -> Self {
+        Self {
+            phantom: PhantomData,
+        }
+    }
+}
+
+impl<T> ColumnStrategy for NonNullDirectStrategy<T>
+where
+    T: ArrowPrimitiveType,
+    T::Native: Item,
+{
+    fn buffer_description(&self) -> BufferDescription {
+        BufferDescription {
+            kind: T::Native::BUFFER_KIND,
+            nullable: false,
+        }
+    }
+
     fn fill_arrow_array(&self, column_view: AnyColumnView) -> ArrayRef {
-        let slice = f64::as_slice(column_view).unwrap();
-        let mut builder = Float64Builder::new(slice.len());
+        let slice = T::Native::as_slice(column_view).unwrap();
+        let mut builder = PrimitiveBuilder::<T>::new(slice.len());
         builder.append_slice(slice).unwrap();
         Arc::new(builder.finish())
     }
@@ -129,7 +145,7 @@ fn choose_column_strategy(field: &Field) -> Box<dyn ColumnStrategy> {
             if field.is_nullable() {
                 todo!()
             } else {
-                Box::new(F64NonNullStrategy)
+                Box::new(NonNullDirectStrategy::<Float64Type>::new())
             }
         }
         ArrowDataType::Timestamp(_, _) => todo!(),
