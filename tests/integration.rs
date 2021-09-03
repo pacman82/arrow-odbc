@@ -1,4 +1,4 @@
-use arrow::array::{Float32Array, Int64Array};
+use arrow::array::{Float32Array, Int32Array, Int64Array};
 use lazy_static::lazy_static;
 
 use odbc_arrow::{
@@ -28,6 +28,39 @@ lazy_static! {
         env.set_connection_pooling_matching(AttrCpMatch::Strict).unwrap();
         env
     };
+}
+
+#[test]
+fn fetch_32bit_integer() {
+    let table_name = function_name!().rsplit_once(':').unwrap().1;
+
+    // Setup a table on the database with some floats (so we can fetch them)
+    let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
+    setup_empty_table(&conn, table_name, &["INTEGER NOT NULL"]).unwrap();
+    let sql = format!("INSERT INTO {} (a) VALUES (1),(2),(3)", table_name);
+    conn.execute(&sql, ()).unwrap();
+
+    // Query column with values to get a cursor
+    let sql = format!("SELECT a FROM {}", table_name);
+    let cursor = conn.execute(&sql, ()).unwrap().unwrap();
+
+    // Now that we have a cursor, we want to iterate over its rows and fill an arrow batch with it.
+
+    // Batches will contain at most 100 entries.
+    let max_batch_size = 100;
+
+    let mut reader = OdbcReader::new(cursor, max_batch_size).unwrap();
+
+    // Batch for batch copy values from ODBC buffer into arrow batches
+    let arrow_batch = reader.next().unwrap().unwrap();
+
+    // Assert that the correct values are found within the arrow batch
+    let array_vals = arrow_batch
+        .column(0)
+        .as_any()
+        .downcast_ref::<Int32Array>()
+        .unwrap();
+    assert_eq!([1, 2, 3], array_vals.values());
 }
 
 #[test]
