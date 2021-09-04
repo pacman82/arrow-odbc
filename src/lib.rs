@@ -6,6 +6,7 @@ use arrow::{
         ArrowPrimitiveType, DataType as ArrowDataType, Field, Float32Type, Float64Type, Int16Type,
         Int32Type, Int64Type, Int8Type, Schema, SchemaRef,
     },
+    error::ArrowError,
     record_batch::RecordBatch,
 };
 use odbc_api::{
@@ -15,7 +16,7 @@ use odbc_api::{
 
 // Rexport odbc_api and arrow to make it easier for downstream crates to depend to avoid version
 // mismatches
-pub use arrow::{self, error::ArrowError};
+pub use arrow;
 pub use odbc_api;
 
 /// Arrow ODBC reader. Implements the [`arrow::record_batch::RecordBatchReader`] trait so it can be
