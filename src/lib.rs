@@ -32,7 +32,7 @@ pub enum Error {
     )]
     FailedToDescribeColumn(#[source] odbc_api::Error),
     #[error(
-        "Unable to deduce the maximum string length for the sQL Data Type reported by the ODBC \
+        "Unable to deduce the maximum string length for the SQL Data Type reported by the ODBC \
         driver. Reported SQL data type is: {:?}.",
         0
     )]
