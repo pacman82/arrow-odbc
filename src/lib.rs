@@ -1,9 +1,10 @@
 use std::{char::decode_utf16, convert::TryInto, marker::PhantomData, sync::Arc};
 
+use chrono::NaiveDate;
 use thiserror::Error;
 
 use arrow::{
-    array::{ArrayRef, BooleanBuilder, PrimitiveBuilder, StringBuilder},
+    array::{ArrayRef, BooleanBuilder, Date32Builder, PrimitiveBuilder, StringBuilder},
     datatypes::{
         ArrowPrimitiveType, DataType as ArrowDataType, Field, Float32Type, Float64Type, Int16Type,
         Int32Type, Int64Type, Int8Type, Schema, SchemaRef, UInt8Type,
@@ -13,6 +14,7 @@ use arrow::{
 };
 use odbc_api::{
     buffers::{AnyColumnView, BufferDescription, BufferKind, ColumnarRowSet, Item},
+    sys::Date,
     Bit, ColumnDescription, Cursor, DataType as OdbcDataType, RowSetCursor,
 };
 
@@ -110,7 +112,7 @@ impl<C: Cursor> OdbcReader<C> {
                     | OdbcDataType::Varchar { length: _ } => ArrowDataType::Utf8,
                     OdbcDataType::LongVarchar { length: _ } => todo!(),
                     OdbcDataType::LongVarbinary { length: _ } => todo!(),
-                    OdbcDataType::Date => todo!(),
+                    OdbcDataType::Date => ArrowDataType::Date32,
                     OdbcDataType::Time { precision: _ } => todo!(),
                     OdbcDataType::Timestamp { precision: _ } => todo!(),
                     OdbcDataType::BigInt => ArrowDataType::Int64,
@@ -246,7 +248,13 @@ fn choose_column_strategy(
         ArrowDataType::Float32 => primitive_arrow_type_startegy::<Float32Type>(field.is_nullable()),
         ArrowDataType::Float64 => primitive_arrow_type_startegy::<Float64Type>(field.is_nullable()),
         ArrowDataType::Timestamp(_, _) => todo!(),
-        ArrowDataType::Date32 => todo!(),
+        ArrowDataType::Date32 => {
+            if field.is_nullable() {
+                Box::new(NullableDate)
+            } else {
+                Box::new(NonNullableDate)
+            }
+        }
         ArrowDataType::Date64 => todo!(),
         ArrowDataType::Time32(_) => todo!(),
         ArrowDataType::Time64(_) => todo!(),
@@ -446,4 +454,54 @@ impl ColumnStrategy for WideText {
         }
         Arc::new(builder.finish())
     }
+}
+
+struct NonNullableDate;
+
+impl ColumnStrategy for NonNullableDate {
+    fn buffer_description(&self) -> BufferDescription {
+        BufferDescription {
+            nullable: false,
+            kind: BufferKind::Date,
+        }
+    }
+
+    fn fill_arrow_array(&self, column_view: AnyColumnView) -> ArrayRef {
+        let values = Date::as_slice(column_view).unwrap();
+        let mut builder = Date32Builder::new(values.len());
+        for odbc_date in values {
+            builder.append_value(days_since_epoch(&odbc_date)).unwrap();
+        }
+        Arc::new(builder.finish())
+    }
+}
+
+struct NullableDate;
+
+impl ColumnStrategy for NullableDate {
+    fn buffer_description(&self) -> BufferDescription {
+        BufferDescription {
+            nullable: true,
+            kind: BufferKind::Date,
+        }
+    }
+
+    fn fill_arrow_array(&self, column_view: AnyColumnView) -> ArrayRef {
+        let values = Date::as_nullable_slice(column_view).unwrap();
+        let mut builder = Date32Builder::new(values.len());
+        for odbc_date in values {
+            builder
+                .append_option(odbc_date.map(days_since_epoch))
+                .unwrap();
+        }
+        Arc::new(builder.finish())
+    }
+}
+
+/// Transform date to days since unix epoch as i32
+fn days_since_epoch(date: &Date) -> i32 {
+    let unix_epoch = NaiveDate::from_ymd(1970, 1, 1);
+    let date = NaiveDate::from_ymd(date.year as i32, date.month as u32, date.day as u32);
+    let duration = date.signed_duration_since(unix_epoch);
+    duration.num_days().try_into().unwrap()
 }
