@@ -146,7 +146,7 @@ impl<C: Cursor> OdbcReader<C> {
             .fields()
             .iter()
             .map(|field| choose_column_strategy(field))
-            .collect::<Result<_,_>>()?;
+            .collect::<Result<_, _>>()?;
 
         let row_set_buffer = ColumnarRowSet::new(
             max_batch_size,
@@ -221,10 +221,6 @@ fn choose_column_strategy(field: &Field) -> Result<Box<dyn ColumnStrategy>, Erro
         ArrowDataType::Int32 => primitive_arrow_type_startegy::<Int32Type>(field.is_nullable()),
         ArrowDataType::Int64 => primitive_arrow_type_startegy::<Int64Type>(field.is_nullable()),
         ArrowDataType::UInt8 => primitive_arrow_type_startegy::<UInt8Type>(field.is_nullable()),
-        ArrowDataType::UInt16 => return Err(Error::UnsupportedArrowType(ArrowDataType::UInt16)),
-        ArrowDataType::UInt32 => todo!(),
-        ArrowDataType::UInt64 => todo!(),
-        ArrowDataType::Float16 => todo!(),
         ArrowDataType::Float32 => primitive_arrow_type_startegy::<Float32Type>(field.is_nullable()),
         ArrowDataType::Float64 => primitive_arrow_type_startegy::<Float64Type>(field.is_nullable()),
         ArrowDataType::Timestamp(_, _) => todo!(),
@@ -246,6 +242,12 @@ fn choose_column_strategy(field: &Field) -> Result<Box<dyn ColumnStrategy>, Erro
         ArrowDataType::Union(_) => todo!(),
         ArrowDataType::Dictionary(_, _) => todo!(),
         ArrowDataType::Decimal(_, _) => todo!(),
+        arrow_type
+        @
+        (ArrowDataType::UInt16
+        | ArrowDataType::UInt32
+        | ArrowDataType::UInt64
+        | ArrowDataType::Float16) => return Err(Error::UnsupportedArrowType(arrow_type.clone())),
     };
     Ok(strat)
 }
