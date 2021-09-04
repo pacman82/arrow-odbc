@@ -1,12 +1,65 @@
+//! Fill Apache Arrow arrays from ODBC data sources.
+//!
+//! ## Usage
+//!
+//! ```no_run
+//! use odbc_arrow::{odbc_api::Environment, OdbcReader};
+//!
+//! const CONNECTION_STRING: &str = "\
+//!     Driver={ODBC Driver 17 for SQL Server};\
+//!     Server=localhost;\
+//!     UID=SA;\
+//!     PWD=My@Test@Password1;\
+//! ";
+//!
+//! fn main() -> Result<(), anyhow::Error> {
+//!     // Your application is fine if you spin up only one Environment.
+//!     let odbc_environment = unsafe {
+//!         Environment::new().unwrap()
+//!     };
+//!     
+//!     // Connect with database.
+//!     let connection = odbc_environment.connect_with_connection_string(CONNECTION_STRING)?;
+//!
+//!     // This SQL statement does not require any arguments.
+//!     let parameters = ();
+//!
+//!     // Execute query and create result set
+//!     let cursor = connection
+//!         .execute("SELECT * FROM MyTable", parameters)?
+//!         .expect("SELECT statement must produce a cursor");
+//!
+//!     // Each batch shall only consist of maximum 10.000 rows.
+//!     let max_batch_size = 10_000;
+//!
+//!     // Read result set as arrow batches. Infer Arrow types automatically using the meta
+//!     // information of `cursor`.
+//!     let arrow_record_batches = OdbcReader::new(cursor, max_batch_size)?;
+//!
+//!     for batch in arrow_record_batches {
+//!         // ... process batch ...
+//!     }
+//!
+//!     Ok(())
+//! }
+//!
+//!
+//!
+//! ```
 use std::{char::decode_utf16, convert::TryInto, marker::PhantomData, sync::Arc};
 
 use chrono::NaiveDate;
 use thiserror::Error;
 
-use arrow::{array::{ArrayRef, BooleanBuilder, Date32Builder, PrimitiveBuilder, StringBuilder}, datatypes::{
+use arrow::{
+    array::{ArrayRef, BooleanBuilder, Date32Builder, PrimitiveBuilder, StringBuilder},
+    datatypes::{
         ArrowPrimitiveType, DataType as ArrowDataType, Field, Float32Type, Float64Type, Int16Type,
         Int32Type, Int64Type, Int8Type, Schema, SchemaRef, UInt8Type,
-    }, error::ArrowError, record_batch::{RecordBatch, RecordBatchReader}};
+    },
+    error::ArrowError,
+    record_batch::{RecordBatch, RecordBatchReader},
+};
 use odbc_api::{
     buffers::{AnyColumnView, BufferDescription, BufferKind, ColumnarRowSet, Item},
     sys::Date,
@@ -202,7 +255,10 @@ where
     }
 }
 
-impl<C> RecordBatchReader for OdbcReader<C> where C: Cursor {
+impl<C> RecordBatchReader for OdbcReader<C>
+where
+    C: Cursor,
+{
     fn schema(&self) -> SchemaRef {
         self.schema.clone()
     }
