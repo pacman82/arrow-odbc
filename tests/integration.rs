@@ -1,4 +1,4 @@
-use arrow::array::{Float32Array, Int32Array, Int64Array};
+use arrow::array::{Array, Float32Array, Int32Array, Int64Array};
 use lazy_static::lazy_static;
 
 use odbc_arrow::{
@@ -30,6 +30,44 @@ lazy_static! {
     };
 }
 
+/// Fill a record batch with non nullable Integer 32 Bit directly from the datasource
+#[test]
+fn fetch_nullable_32bit_integer() {
+    let table_name = function_name!().rsplit_once(':').unwrap().1;
+
+    // Setup a table on the database with some floats (so we can fetch them)
+    let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
+    setup_empty_table(&conn, table_name, &["INTEGER"]).unwrap();
+    let sql = format!("INSERT INTO {} (a) VALUES (1),(NULL),(3)", table_name);
+    conn.execute(&sql, ()).unwrap();
+
+    // Query column with values to get a cursor
+    let sql = format!("SELECT a FROM {}", table_name);
+    let cursor = conn.execute(&sql, ()).unwrap().unwrap();
+
+    // Now that we have a cursor, we want to iterate over its rows and fill an arrow batch with it.
+
+    // Batches will contain at most 100 entries.
+    let max_batch_size = 100;
+
+    let mut reader = OdbcReader::new(cursor, max_batch_size).unwrap();
+
+    // Batch for batch copy values from ODBC buffer into arrow batches
+    let arrow_batch = reader.next().unwrap().unwrap();
+
+    // Assert that the correct values are found within the arrow batch
+    let array_vals = arrow_batch
+        .column(0)
+        .as_any()
+        .downcast_ref::<Int32Array>()
+        .unwrap();
+    assert!(array_vals.is_valid(0));
+    assert!(array_vals.is_null(1));
+    assert!(array_vals.is_valid(2));
+    assert_eq!([1, 0, 3], array_vals.values());
+}
+
+/// Fill a record batch with non nullable Integer 32 Bit directly from the datasource
 #[test]
 fn fetch_32bit_integer() {
     let table_name = function_name!().rsplit_once(':').unwrap().1;
@@ -63,6 +101,7 @@ fn fetch_32bit_integer() {
     assert_eq!([1, 2, 3], array_vals.values());
 }
 
+/// Fill a record batch with non nullable `f32` directly from the datasource
 #[test]
 fn fetch_32bit_floating_point() {
     let table_name = function_name!().rsplit_once(':').unwrap().1;
