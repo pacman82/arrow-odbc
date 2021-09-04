@@ -1,6 +1,13 @@
 use std::{convert::TryInto, marker::PhantomData, sync::Arc};
 
-use arrow::{array::{ArrayRef, PrimitiveBuilder}, datatypes::{ArrowPrimitiveType, DataType as ArrowDataType, Field, Float32Type, Float64Type, Int32Type, Int64Type, Schema, SchemaRef}, record_batch::RecordBatch};
+use arrow::{
+    array::{ArrayRef, PrimitiveBuilder},
+    datatypes::{
+        ArrowPrimitiveType, DataType as ArrowDataType, Field, Float32Type, Float64Type, Int32Type,
+        Int64Type, Schema, SchemaRef,
+    },
+    record_batch::RecordBatch,
+};
 use odbc_api::{
     buffers::{AnyColumnView, BufferDescription, ColumnarRowSet, Item},
     ColumnDescription, Cursor, DataType as OdbcDataType, RowSetCursor,
@@ -57,10 +64,16 @@ impl<C: Cursor> OdbcReader<C> {
                     .expect("Column name must be representable in utf8"),
                 match column_description.data_type {
                     OdbcDataType::Unknown => todo!(),
-                    OdbcDataType::Char { length } => todo!(),
-                    OdbcDataType::WChar { length } => todo!(),
-                    OdbcDataType::Numeric { precision, scale } => todo!(),
-                    OdbcDataType::Decimal { precision, scale } => todo!(),
+                    OdbcDataType::Char { length: _ } => todo!(),
+                    OdbcDataType::WChar { length: _ } => todo!(),
+                    OdbcDataType::Numeric {
+                        precision: _,
+                        scale: _,
+                    } => todo!(),
+                    OdbcDataType::Decimal {
+                        precision: _,
+                        scale: _,
+                    } => todo!(),
                     OdbcDataType::Integer => ArrowDataType::Int32,
                     OdbcDataType::SmallInt => todo!(),
                     OdbcDataType::Real | OdbcDataType::Float { precision: 0..=24 } => {
@@ -69,22 +82,22 @@ impl<C: Cursor> OdbcReader<C> {
                     OdbcDataType::Float { precision: _ } | OdbcDataType::Double => {
                         ArrowDataType::Float64
                     }
-                    OdbcDataType::Varchar { length } => todo!(),
-                    OdbcDataType::WVarchar { length } => todo!(),
-                    OdbcDataType::LongVarchar { length } => todo!(),
-                    OdbcDataType::LongVarbinary { length } => todo!(),
+                    OdbcDataType::Varchar { length: _ } => todo!(),
+                    OdbcDataType::WVarchar { length: _ } => todo!(),
+                    OdbcDataType::LongVarchar { length: _ } => todo!(),
+                    OdbcDataType::LongVarbinary { length: _ } => todo!(),
                     OdbcDataType::Date => todo!(),
-                    OdbcDataType::Time { precision } => todo!(),
-                    OdbcDataType::Timestamp { precision } => todo!(),
+                    OdbcDataType::Time { precision: _ } => todo!(),
+                    OdbcDataType::Timestamp { precision: _ } => todo!(),
                     OdbcDataType::BigInt => ArrowDataType::Int64,
                     OdbcDataType::TinyInt => todo!(),
                     OdbcDataType::Bit => todo!(),
-                    OdbcDataType::Varbinary { length } => todo!(),
-                    OdbcDataType::Binary { length } => todo!(),
+                    OdbcDataType::Varbinary { length: _ } => todo!(),
+                    OdbcDataType::Binary { length: _ } => todo!(),
                     OdbcDataType::Other {
-                        data_type,
-                        column_size,
-                        decimal_digits,
+                        data_type: _,
+                        column_size: _,
+                        decimal_digits: _,
                     } => todo!(),
                 },
                 column_description.could_be_nullable(),
