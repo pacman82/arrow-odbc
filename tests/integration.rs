@@ -1,4 +1,12 @@
-use arrow::array::{Array, BooleanArray, Float32Array, Int16Array, Int32Array, Int64Array, Int8Array};
+use std::sync::Arc;
+
+use arrow::{
+    array::{
+        Array, BooleanArray, Float32Array, Int16Array, Int32Array, Int64Array, Int8Array,
+        UInt8Array,
+    },
+    datatypes::{DataType, Field, Schema},
+};
 use lazy_static::lazy_static;
 
 use odbc_arrow::{
@@ -165,6 +173,44 @@ fn fetch_8bit_integer() {
         .column(0)
         .as_any()
         .downcast_ref::<Int8Array>()
+        .unwrap();
+    assert_eq!([1, 2, 3], array_vals.values());
+}
+
+/// Fill a record batch with non nullable Integer 8 Bit usigned integer
+#[test]
+fn fetch_8bit_unsigned_integer() {
+    let table_name = function_name!().rsplit_once(':').unwrap().1;
+
+    // Setup a table on the database with some floats (so we can fetch them)
+    let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
+    setup_empty_table(&conn, table_name, &["TINYINT NOT NULL"]).unwrap();
+    let sql = format!("INSERT INTO {} (a) VALUES (1),(2),(3)", table_name);
+    conn.execute(&sql, ()).unwrap();
+
+    // Query column with values to get a cursor
+    let sql = format!("SELECT a FROM {}", table_name);
+    let cursor = conn.execute(&sql, ()).unwrap().unwrap();
+
+    // Now that we have a cursor, we want to iterate over its rows and fill an arrow batch with it.
+
+    // Batches will contain at most 100 entries.
+    let max_batch_size = 100;
+
+    // Specify Uint8 manually, since inference of the arrow type from the sql type would yield a
+    // signed 8 bit integer.
+    let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::UInt8, false)]));
+
+    let mut reader = OdbcReader::with_arrow_schema(cursor, max_batch_size, schema);
+
+    // Batch for batch copy values from ODBC buffer into arrow batches
+    let arrow_batch = reader.next().unwrap().unwrap();
+
+    // Assert that the correct values are found within the arrow batch
+    let array_vals = arrow_batch
+        .column(0)
+        .as_any()
+        .downcast_ref::<UInt8Array>()
         .unwrap();
     assert_eq!([1, 2, 3], array_vals.values());
 }

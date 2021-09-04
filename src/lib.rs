@@ -4,7 +4,7 @@ use arrow::{
     array::{ArrayRef, BooleanBuilder, PrimitiveBuilder},
     datatypes::{
         ArrowPrimitiveType, DataType as ArrowDataType, Field, Float32Type, Float64Type, Int16Type,
-        Int32Type, Int64Type, Int8Type, Schema, SchemaRef,
+        Int32Type, Int64Type, Int8Type, Schema, SchemaRef, UInt8Type,
     },
     error::ArrowError,
     record_batch::RecordBatch,
@@ -203,7 +203,7 @@ fn choose_column_strategy(field: &Field) -> Box<dyn ColumnStrategy> {
         ArrowDataType::Int16 => primitive_arrow_type_startegy::<Int16Type>(field.is_nullable()),
         ArrowDataType::Int32 => primitive_arrow_type_startegy::<Int32Type>(field.is_nullable()),
         ArrowDataType::Int64 => primitive_arrow_type_startegy::<Int64Type>(field.is_nullable()),
-        ArrowDataType::UInt8 => todo!(),
+        ArrowDataType::UInt8 => primitive_arrow_type_startegy::<UInt8Type>(field.is_nullable()),
         ArrowDataType::UInt16 => todo!(),
         ArrowDataType::UInt32 => todo!(),
         ArrowDataType::UInt64 => todo!(),
