@@ -106,8 +106,9 @@ impl<C: Cursor> OdbcReader<C> {
                     OdbcDataType::Float { precision: _ } | OdbcDataType::Double => {
                         ArrowDataType::Float64
                     }
-                    OdbcDataType::Varchar { length: _ } => ArrowDataType::Utf8,
-                    OdbcDataType::WVarchar { length: _ } => todo!(),
+                    OdbcDataType::WVarchar { length: _ } | OdbcDataType::Varchar { length: _ } => {
+                        ArrowDataType::Utf8
+                    }
                     OdbcDataType::LongVarchar { length: _ } => todo!(),
                     OdbcDataType::LongVarbinary { length: _ } => todo!(),
                     OdbcDataType::Date => todo!(),

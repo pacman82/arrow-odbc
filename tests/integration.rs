@@ -417,7 +417,7 @@ fn fetch_64bit_integer() {
     assert_eq!([1, 2, 3], array_vals.values());
 }
 
-/// Fill a record batch with non nullable `i64` directly from the datasource
+/// Fill a record batch of Strings from a varchar source column
 #[test]
 fn fetch_varchar() {
     let table_name = function_name!().rsplit_once(':').unwrap().1;
@@ -425,6 +425,42 @@ fn fetch_varchar() {
     // Setup a table on the database with some floats (so we can fetch them)
     let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
     setup_empty_table(&conn, table_name, &["VARCHAR(50)"]).unwrap();
+    let sql = format!("INSERT INTO {} (a) VALUES ('Hello'),('Bonjour'),(NULL)", table_name);
+    conn.execute(&sql, ()).unwrap();
+
+    // Query column with values to get a cursor
+    let sql = format!("SELECT a FROM {}", table_name);
+    let cursor = conn.execute(&sql, ()).unwrap().unwrap();
+
+    // Now that we have a cursor, we want to iterate over its rows and fill an arrow batch with it.
+
+    // Batches will contain at most 100 entries.
+    let max_batch_size = 100;
+
+    let mut reader = OdbcReader::new(cursor, max_batch_size).unwrap();
+
+    // Batch for batch copy values from ODBC buffer into arrow batches
+    let arrow_batch = reader.next().unwrap().unwrap();
+
+    // Assert that the correct values are found within the arrow batch
+    let array_vals = arrow_batch
+        .column(0)
+        .as_any()
+        .downcast_ref::<StringArray>()
+        .unwrap();
+    assert_eq!("Hello", array_vals.value(0));
+    assert_eq!("Bonjour", array_vals.value(1));
+    assert!(array_vals.is_null(2));
+}
+
+/// Fill a record batch of Strings from a nvarchar source column
+#[test]
+fn fetch_nvarchar() {
+    let table_name = function_name!().rsplit_once(':').unwrap().1;
+
+    // Setup a table on the database with some floats (so we can fetch them)
+    let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
+    setup_empty_table(&conn, table_name, &["NVARCHAR(50)"]).unwrap();
     let sql = format!("INSERT INTO {} (a) VALUES ('Hello'),('Bonjour'),(NULL)", table_name);
     conn.execute(&sql, ()).unwrap();
 
