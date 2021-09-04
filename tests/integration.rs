@@ -15,7 +15,7 @@ use odbc_arrow::{
         sys::{AttrConnectionPooling, AttrCpMatch},
         Connection, Environment,
     },
-    OdbcReader,
+    Error, OdbcReader,
 };
 
 use stdext::function_name;
@@ -201,7 +201,7 @@ fn fetch_8bit_unsigned_integer() {
     // signed 8 bit integer.
     let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::UInt8, false)]));
 
-    let mut reader = OdbcReader::with_arrow_schema(cursor, max_batch_size, schema);
+    let mut reader = OdbcReader::with_arrow_schema(cursor, max_batch_size, schema).unwrap();
 
     // Batch for batch copy values from ODBC buffer into arrow batches
     let arrow_batch = reader.next().unwrap().unwrap();
@@ -213,6 +213,38 @@ fn fetch_8bit_unsigned_integer() {
         .downcast_ref::<UInt8Array>()
         .unwrap();
     assert_eq!([1, 2, 3], array_vals.values());
+}
+
+/// Observe that an explicitly specified Uint16 triggers an unsupported error
+#[test]
+fn unsupported_16bit_unsigned_integer() {
+    let table_name = function_name!().rsplit_once(':').unwrap().1;
+
+    // Setup a table on the database with some floats (so we can fetch them)
+    let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
+    setup_empty_table(&conn, table_name, &["SMALLINT NOT NULL"]).unwrap();
+    let sql = format!("INSERT INTO {} (a) VALUES (1),(2),(3)", table_name);
+    conn.execute(&sql, ()).unwrap();
+
+    // Query column with values to get a cursor
+    let sql = format!("SELECT a FROM {}", table_name);
+    let cursor = conn.execute(&sql, ()).unwrap().unwrap();
+
+    // Now that we have a cursor, we want to iterate over its rows and fill an arrow batch with it.
+
+    // Batches will contain at most 100 entries.
+    let max_batch_size = 100;
+
+    // Specify Uint16 manually, since inference of the arrow type from the sql type would yield a
+    // signed 16 bit integer.
+    let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::UInt16, false)]));
+
+    let result = OdbcReader::with_arrow_schema(cursor, max_batch_size, schema);
+
+    assert!(matches!(
+        result,
+        Err(Error::UnsupportedArrowType(DataType::UInt16))
+    ))
 }
 
 /// Fill a record batch with non nullable Boolean from Bits

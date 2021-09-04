@@ -1,5 +1,7 @@
 use std::{convert::TryInto, marker::PhantomData, sync::Arc};
 
+use thiserror::Error;
+
 use arrow::{
     array::{ArrayRef, BooleanBuilder, PrimitiveBuilder},
     datatypes::{
@@ -18,6 +20,16 @@ use odbc_api::{
 // mismatches
 pub use arrow;
 pub use odbc_api;
+
+#[derive(Error, Debug)]
+pub enum Error {
+    #[error(
+        "Unsupported arrow type: `{0}`. This type can currently not be fetched from an ODBC data \
+        source by an instance of OdbcReader."
+    )]
+    /// The type specified in the arrow schema is not supported to be fetched from the database.
+    UnsupportedArrowType(ArrowDataType),
+}
 
 /// Arrow ODBC reader. Implements the [`arrow::record_batch::RecordBatchReader`] trait so it can be
 /// used to fill Arrow arrays from an ODBC data source.
@@ -108,7 +120,8 @@ impl<C: Cursor> OdbcReader<C> {
         }
 
         let schema = Arc::new(Schema::new(fields));
-        let odbc_reader = Self::with_arrow_schema(cursor, max_batch_size, schema);
+        let odbc_reader = Self::with_arrow_schema(cursor, max_batch_size, schema)
+            .expect("An arrow type inferred by OdbcReader must also be supported by it");
         Ok(odbc_reader)
     }
 
@@ -124,12 +137,16 @@ impl<C: Cursor> OdbcReader<C> {
     /// * `max_batch_size`: Maximum batch size requested from the datasource.
     /// * `schema`: Arrow schema. Describes the type of the Arrow Arrays in the record batches, but
     ///    is also used to determine CData type requested from the data source.
-    pub fn with_arrow_schema(cursor: C, max_batch_size: usize, schema: SchemaRef) -> Self {
+    pub fn with_arrow_schema(
+        cursor: C,
+        max_batch_size: usize,
+        schema: SchemaRef,
+    ) -> Result<Self, Error> {
         let column_strategies: Vec<Box<dyn ColumnStrategy>> = schema
             .fields()
             .iter()
             .map(|field| choose_column_strategy(field))
-            .collect();
+            .collect::<Result<_,_>>()?;
 
         let row_set_buffer = ColumnarRowSet::new(
             max_batch_size,
@@ -137,11 +154,11 @@ impl<C: Cursor> OdbcReader<C> {
         );
         let cursor = cursor.bind_buffer(row_set_buffer).unwrap();
 
-        Self {
+        Ok(Self {
             column_strategies,
             schema,
             cursor,
-        }
+        })
     }
 }
 
@@ -189,8 +206,8 @@ fn odbc_batch_to_arrow_columns(
         .collect()
 }
 
-fn choose_column_strategy(field: &Field) -> Box<dyn ColumnStrategy> {
-    match field.data_type() {
+fn choose_column_strategy(field: &Field) -> Result<Box<dyn ColumnStrategy>, Error> {
+    let strat: Box<dyn ColumnStrategy> = match field.data_type() {
         ArrowDataType::Null => todo!(),
         ArrowDataType::Boolean => {
             if field.is_nullable() {
@@ -204,7 +221,7 @@ fn choose_column_strategy(field: &Field) -> Box<dyn ColumnStrategy> {
         ArrowDataType::Int32 => primitive_arrow_type_startegy::<Int32Type>(field.is_nullable()),
         ArrowDataType::Int64 => primitive_arrow_type_startegy::<Int64Type>(field.is_nullable()),
         ArrowDataType::UInt8 => primitive_arrow_type_startegy::<UInt8Type>(field.is_nullable()),
-        ArrowDataType::UInt16 => todo!(),
+        ArrowDataType::UInt16 => return Err(Error::UnsupportedArrowType(ArrowDataType::UInt16)),
         ArrowDataType::UInt32 => todo!(),
         ArrowDataType::UInt64 => todo!(),
         ArrowDataType::Float16 => todo!(),
@@ -229,7 +246,8 @@ fn choose_column_strategy(field: &Field) -> Box<dyn ColumnStrategy> {
         ArrowDataType::Union(_) => todo!(),
         ArrowDataType::Dictionary(_, _) => todo!(),
         ArrowDataType::Decimal(_, _) => todo!(),
-    }
+    };
+    Ok(strat)
 }
 
 fn primitive_arrow_type_startegy<T>(nullable: bool) -> Box<dyn ColumnStrategy>
