@@ -88,8 +88,6 @@ impl<C: Cursor> OdbcReader<C> {
                     .expect("Column name must be representable in utf8"),
                 match column_description.data_type {
                     OdbcDataType::Unknown => todo!(),
-                    OdbcDataType::Char { length: _ } => todo!(),
-                    OdbcDataType::WChar { length: _ } => todo!(),
                     OdbcDataType::Numeric {
                         precision: _,
                         scale: _,
@@ -106,9 +104,10 @@ impl<C: Cursor> OdbcReader<C> {
                     OdbcDataType::Float { precision: _ } | OdbcDataType::Double => {
                         ArrowDataType::Float64
                     }
-                    OdbcDataType::WVarchar { length: _ } | OdbcDataType::Varchar { length: _ } => {
-                        ArrowDataType::Utf8
-                    }
+                    OdbcDataType::WChar { length: _ }
+                    | OdbcDataType::Char { length: _ }
+                    | OdbcDataType::WVarchar { length: _ }
+                    | OdbcDataType::Varchar { length: _ } => ArrowDataType::Utf8,
                     OdbcDataType::LongVarchar { length: _ } => todo!(),
                     OdbcDataType::LongVarbinary { length: _ } => todo!(),
                     OdbcDataType::Date => todo!(),
