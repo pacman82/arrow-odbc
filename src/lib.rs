@@ -1,9 +1,16 @@
 use std::{convert::TryInto, marker::PhantomData, sync::Arc};
 
-use arrow::{array::{ArrayRef, PrimitiveBuilder}, datatypes::{ArrowPrimitiveType, DataType as ArrowDataType, Field, Float32Type, Float64Type, Int16Type, Int32Type, Int64Type, Int8Type, Schema, SchemaRef}, record_batch::RecordBatch};
+use arrow::{
+    array::{ArrayRef, BooleanBuilder, PrimitiveBuilder},
+    datatypes::{
+        ArrowPrimitiveType, DataType as ArrowDataType, Field, Float32Type, Float64Type, Int16Type,
+        Int32Type, Int64Type, Int8Type, Schema, SchemaRef,
+    },
+    record_batch::RecordBatch,
+};
 use odbc_api::{
-    buffers::{AnyColumnView, BufferDescription, ColumnarRowSet, Item},
-    ColumnDescription, Cursor, DataType as OdbcDataType, RowSetCursor,
+    buffers::{AnyColumnView, BufferDescription, BufferKind, ColumnarRowSet, Item},
+    Bit, ColumnDescription, Cursor, DataType as OdbcDataType, RowSetCursor,
 };
 
 // Rexport odbc_api and arrow to make it easier for downstream crates to depend to avoid version
@@ -84,7 +91,7 @@ impl<C: Cursor> OdbcReader<C> {
                     OdbcDataType::Timestamp { precision: _ } => todo!(),
                     OdbcDataType::BigInt => ArrowDataType::Int64,
                     OdbcDataType::TinyInt => ArrowDataType::Int8,
-                    OdbcDataType::Bit => todo!(),
+                    OdbcDataType::Bit => ArrowDataType::Boolean,
                     OdbcDataType::Varbinary { length: _ } => todo!(),
                     OdbcDataType::Binary { length: _ } => todo!(),
                     OdbcDataType::Other {
@@ -184,7 +191,13 @@ fn odbc_batch_to_arrow_columns(
 fn choose_column_strategy(field: &Field) -> Box<dyn ColumnStrategy> {
     match field.data_type() {
         ArrowDataType::Null => todo!(),
-        ArrowDataType::Boolean => todo!(),
+        ArrowDataType::Boolean => {
+            if field.is_nullable() {
+                Box::new(NullableBoolean)
+            } else {
+                Box::new(NonNullableBoolean)
+            }
+        }
         ArrowDataType::Int8 => primitive_arrow_type_startegy::<Int8Type>(field.is_nullable()),
         ArrowDataType::Int16 => primitive_arrow_type_startegy::<Int16Type>(field.is_nullable()),
         ArrowDataType::Int32 => primitive_arrow_type_startegy::<Int32Type>(field.is_nullable()),
@@ -291,6 +304,48 @@ where
         let mut builder = PrimitiveBuilder::<T>::new(1);
         for value in values {
             builder.append_option(value.copied()).unwrap();
+        }
+        Arc::new(builder.finish())
+    }
+}
+
+struct NonNullableBoolean;
+
+impl ColumnStrategy for NonNullableBoolean {
+    fn buffer_description(&self) -> BufferDescription {
+        BufferDescription {
+            nullable: false,
+            kind: BufferKind::Bit,
+        }
+    }
+
+    fn fill_arrow_array(&self, column_view: AnyColumnView) -> ArrayRef {
+        let values = Bit::as_slice(column_view).unwrap();
+        let mut builder = BooleanBuilder::new(values.len());
+        for bit in values {
+            builder.append_value(bit.as_bool()).unwrap();
+        }
+        Arc::new(builder.finish())
+    }
+}
+
+struct NullableBoolean;
+
+impl ColumnStrategy for NullableBoolean {
+    fn buffer_description(&self) -> BufferDescription {
+        BufferDescription {
+            nullable: true,
+            kind: BufferKind::Bit,
+        }
+    }
+
+    fn fill_arrow_array(&self, column_view: AnyColumnView) -> ArrayRef {
+        let values = Bit::as_nullable_slice(column_view).unwrap();
+        let mut builder = BooleanBuilder::new(1);
+        for bit in values {
+            builder
+                .append_option(bit.copied().map(Bit::as_bool))
+                .unwrap()
         }
         Arc::new(builder.finish())
     }
