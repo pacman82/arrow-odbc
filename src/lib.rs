@@ -1,6 +1,6 @@
 use std::{convert::TryInto, marker::PhantomData, sync::Arc};
 
-use arrow::{array::{ArrayRef, PrimitiveBuilder}, datatypes::{ArrowPrimitiveType, DataType as ArrowDataType, Field, Float32Type, Float64Type, Int16Type, Int32Type, Int64Type, Schema, SchemaRef}, record_batch::RecordBatch};
+use arrow::{array::{ArrayRef, PrimitiveBuilder}, datatypes::{ArrowPrimitiveType, DataType as ArrowDataType, Field, Float32Type, Float64Type, Int16Type, Int32Type, Int64Type, Int8Type, Schema, SchemaRef}, record_batch::RecordBatch};
 use odbc_api::{
     buffers::{AnyColumnView, BufferDescription, ColumnarRowSet, Item},
     ColumnDescription, Cursor, DataType as OdbcDataType, RowSetCursor,
@@ -83,7 +83,7 @@ impl<C: Cursor> OdbcReader<C> {
                     OdbcDataType::Time { precision: _ } => todo!(),
                     OdbcDataType::Timestamp { precision: _ } => todo!(),
                     OdbcDataType::BigInt => ArrowDataType::Int64,
-                    OdbcDataType::TinyInt => todo!(),
+                    OdbcDataType::TinyInt => ArrowDataType::Int8,
                     OdbcDataType::Bit => todo!(),
                     OdbcDataType::Varbinary { length: _ } => todo!(),
                     OdbcDataType::Binary { length: _ } => todo!(),
@@ -185,7 +185,7 @@ fn choose_column_strategy(field: &Field) -> Box<dyn ColumnStrategy> {
     match field.data_type() {
         ArrowDataType::Null => todo!(),
         ArrowDataType::Boolean => todo!(),
-        ArrowDataType::Int8 => todo!(),
+        ArrowDataType::Int8 => primitive_arrow_type_startegy::<Int8Type>(field.is_nullable()),
         ArrowDataType::Int16 => primitive_arrow_type_startegy::<Int16Type>(field.is_nullable()),
         ArrowDataType::Int32 => primitive_arrow_type_startegy::<Int32Type>(field.is_nullable()),
         ArrowDataType::Int64 => primitive_arrow_type_startegy::<Int64Type>(field.is_nullable()),
