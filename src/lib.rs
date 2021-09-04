@@ -3,15 +3,10 @@ use std::{char::decode_utf16, convert::TryInto, marker::PhantomData, sync::Arc};
 use chrono::NaiveDate;
 use thiserror::Error;
 
-use arrow::{
-    array::{ArrayRef, BooleanBuilder, Date32Builder, PrimitiveBuilder, StringBuilder},
-    datatypes::{
+use arrow::{array::{ArrayRef, BooleanBuilder, Date32Builder, PrimitiveBuilder, StringBuilder}, datatypes::{
         ArrowPrimitiveType, DataType as ArrowDataType, Field, Float32Type, Float64Type, Int16Type,
         Int32Type, Int64Type, Int8Type, Schema, SchemaRef, UInt8Type,
-    },
-    error::ArrowError,
-    record_batch::RecordBatch,
-};
+    }, error::ArrowError, record_batch::{RecordBatch, RecordBatchReader}};
 use odbc_api::{
     buffers::{AnyColumnView, BufferDescription, BufferKind, ColumnarRowSet, Item},
     sys::Date,
@@ -204,6 +199,12 @@ where
             // external error.
             Err(odbc_error) => Some(Err(ArrowError::ExternalError(Box::new(odbc_error)))),
         }
+    }
+}
+
+impl<C> RecordBatchReader for OdbcReader<C> where C: Cursor {
+    fn schema(&self) -> SchemaRef {
+        self.schema.clone()
     }
 }
 
