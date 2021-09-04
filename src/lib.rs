@@ -1,9 +1,9 @@
-use std::{convert::TryInto, marker::PhantomData, sync::Arc};
+use std::{char::decode_utf16, convert::TryInto, marker::PhantomData, sync::Arc};
 
 use thiserror::Error;
 
 use arrow::{
-    array::{ArrayRef, BooleanBuilder, PrimitiveBuilder},
+    array::{ArrayRef, BooleanBuilder, PrimitiveBuilder, StringBuilder},
     datatypes::{
         ArrowPrimitiveType, DataType as ArrowDataType, Field, Float32Type, Float64Type, Int16Type,
         Int32Type, Int64Type, Int8Type, Schema, SchemaRef, UInt8Type,
@@ -29,6 +29,17 @@ pub enum Error {
     )]
     /// The type specified in the arrow schema is not supported to be fetched from the database.
     UnsupportedArrowType(ArrowDataType),
+    #[error(
+        "An error occurred fetching the column description or data type from the metainformation \
+        attached to the ODBC result set:\n{0}"
+    )]
+    FailedToDescribeColumn(#[source] odbc_api::Error),
+    #[error(
+        "Unable to deduce the maximum string length for the sQL Data Type reported by the ODBC \
+        driver. Reported SQL data type is: {:?}.",
+        0
+    )]
+    UnknownStringLength(OdbcDataType),
 }
 
 /// Arrow ODBC reader. Implements the [`arrow::record_batch::RecordBatchReader`] trait so it can be
@@ -95,7 +106,7 @@ impl<C: Cursor> OdbcReader<C> {
                     OdbcDataType::Float { precision: _ } | OdbcDataType::Double => {
                         ArrowDataType::Float64
                     }
-                    OdbcDataType::Varchar { length: _ } => todo!(),
+                    OdbcDataType::Varchar { length: _ } => ArrowDataType::Utf8,
                     OdbcDataType::WVarchar { length: _ } => todo!(),
                     OdbcDataType::LongVarchar { length: _ } => todo!(),
                     OdbcDataType::LongVarbinary { length: _ } => todo!(),
@@ -145,7 +156,15 @@ impl<C: Cursor> OdbcReader<C> {
         let column_strategies: Vec<Box<dyn ColumnStrategy>> = schema
             .fields()
             .iter()
-            .map(|field| choose_column_strategy(field))
+            .enumerate()
+            .map(|(index, field)| {
+                choose_column_strategy(
+                    field,
+                    cursor
+                        .col_data_type((index + 1).try_into().unwrap())
+                        .map_err(Error::FailedToDescribeColumn)?,
+                )
+            })
             .collect::<Result<_, _>>()?;
 
         let row_set_buffer = ColumnarRowSet::new(
@@ -206,7 +225,10 @@ fn odbc_batch_to_arrow_columns(
         .collect()
 }
 
-fn choose_column_strategy(field: &Field) -> Result<Box<dyn ColumnStrategy>, Error> {
+fn choose_column_strategy(
+    field: &Field,
+    sql_type: OdbcDataType,
+) -> Result<Box<dyn ColumnStrategy>, Error> {
     let strat: Box<dyn ColumnStrategy> = match field.data_type() {
         ArrowDataType::Null => todo!(),
         ArrowDataType::Boolean => {
@@ -233,7 +255,12 @@ fn choose_column_strategy(field: &Field) -> Result<Box<dyn ColumnStrategy>, Erro
         ArrowDataType::Binary => todo!(),
         ArrowDataType::FixedSizeBinary(_) => todo!(),
         ArrowDataType::LargeBinary => todo!(),
-        ArrowDataType::Utf8 => todo!(),
+        ArrowDataType::Utf8 => Box::new(WideText::new(
+            field.is_nullable(),
+            sql_type
+                .utf16_len()
+                .ok_or(Error::UnknownStringLength(sql_type))?,
+        )),
         ArrowDataType::LargeUtf8 => todo!(),
         ArrowDataType::List(_) => todo!(),
         ArrowDataType::FixedSizeList(_, _) => todo!(),
@@ -367,6 +394,55 @@ impl ColumnStrategy for NullableBoolean {
             builder
                 .append_option(bit.copied().map(Bit::as_bool))
                 .unwrap()
+        }
+        Arc::new(builder.finish())
+    }
+}
+
+struct WideText {
+    /// Maximum string length in u16, excluding terminating zero
+    max_str_len: usize,
+    nullable: bool,
+}
+
+impl WideText {
+    fn new(nullable: bool, max_str_len: usize) -> Self {
+        Self {
+            max_str_len,
+            nullable,
+        }
+    }
+}
+
+impl ColumnStrategy for WideText {
+    fn buffer_description(&self) -> BufferDescription {
+        BufferDescription {
+            nullable: self.nullable,
+            kind: BufferKind::WText {
+                max_str_len: self.max_str_len,
+            },
+        }
+    }
+
+    fn fill_arrow_array(&self, column_view: AnyColumnView) -> ArrayRef {
+        let values = match column_view {
+            AnyColumnView::WText(values) => values,
+            _ => unreachable!(),
+        };
+        let mut builder = StringBuilder::new(1);
+        // Buffer used to convert individual values from utf16 to utf8.
+        let mut buf_utf8 = String::new();
+        for value in values {
+            buf_utf8.clear();
+            let opt = if let Some(utf16) = value {
+                for c in decode_utf16(utf16.as_slice().iter().cloned()) {
+                    buf_utf8.push(c.unwrap());
+                }
+                Some(&buf_utf8)
+            } else {
+                None
+            };
+            builder.append_option(opt).unwrap();
         }
         Arc::new(builder.finish())
     }
