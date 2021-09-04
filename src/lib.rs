@@ -302,7 +302,7 @@ where
 
     fn fill_arrow_array(&self, column_view: AnyColumnView) -> ArrayRef {
         let values = T::Native::as_nullable_slice(column_view).unwrap();
-        let mut builder = PrimitiveBuilder::<T>::new(1);
+        let mut builder = PrimitiveBuilder::<T>::new(values.len());
         for value in values {
             builder.append_option(value.copied()).unwrap();
         }
@@ -342,7 +342,7 @@ impl ColumnStrategy for NullableBoolean {
 
     fn fill_arrow_array(&self, column_view: AnyColumnView) -> ArrayRef {
         let values = Bit::as_nullable_slice(column_view).unwrap();
-        let mut builder = BooleanBuilder::new(1);
+        let mut builder = BooleanBuilder::new(values.len());
         for bit in values {
             builder
                 .append_option(bit.copied().map(Bit::as_bool))
