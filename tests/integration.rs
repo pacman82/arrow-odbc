@@ -1,6 +1,12 @@
 use std::sync::Arc;
 
-use arrow::{array::{Array, BooleanArray, Date32Array, DecimalArray, Float32Array, Int16Array, Int32Array, Int64Array, Int8Array, StringArray, UInt8Array}, datatypes::{DataType, Field, Schema}};
+use arrow::{
+    array::{
+        Array, BooleanArray, Date32Array, DecimalArray, Float32Array, Int16Array, Int32Array,
+        Int64Array, Int8Array, StringArray, UInt8Array,
+    },
+    datatypes::{DataType, Field, Schema},
+};
 use chrono::NaiveDate;
 use lazy_static::lazy_static;
 
@@ -530,9 +536,15 @@ fn fetch_dates() {
         .as_any()
         .downcast_ref::<Date32Array>()
         .unwrap();
-    assert_eq!(Some(NaiveDate::from_ymd(2021, 04, 09)), array_vals.value_as_date(0));
+    assert_eq!(
+        Some(NaiveDate::from_ymd(2021, 04, 09)),
+        array_vals.value_as_date(0)
+    );
     assert!(array_vals.is_null(1));
-    assert_eq!(Some(NaiveDate::from_ymd(2002, 09, 30)), array_vals.value_as_date(2));
+    assert_eq!(
+        Some(NaiveDate::from_ymd(2002, 09, 30)),
+        array_vals.value_as_date(2)
+    );
 }
 
 /// Fill a record batch of Dates
@@ -569,8 +581,14 @@ fn fetch_non_null_dates() {
         .as_any()
         .downcast_ref::<Date32Array>()
         .unwrap();
-    assert_eq!(Some(NaiveDate::from_ymd(2021, 04, 09)), array_vals.value_as_date(0));
-    assert_eq!(Some(NaiveDate::from_ymd(2002, 09, 30)), array_vals.value_as_date(1));
+    assert_eq!(
+        Some(NaiveDate::from_ymd(2021, 04, 09)),
+        array_vals.value_as_date(0)
+    );
+    assert_eq!(
+        Some(NaiveDate::from_ymd(2002, 09, 30)),
+        array_vals.value_as_date(1)
+    );
 }
 
 /// Fill a record batch of Dates
@@ -581,10 +599,7 @@ fn fetch_decimals() {
     // Setup a table on the database with some floats (so we can fetch them)
     let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
     setup_empty_table(&conn, table_name, &["DECIMAL(5,2) NOT NULL"]).unwrap();
-    let sql = format!(
-        "INSERT INTO {} (a) VALUES (123.45),(678.90)",
-        table_name
-    );
+    let sql = format!("INSERT INTO {} (a) VALUES (123.45),(678.90)", table_name);
     conn.execute(&sql, ()).unwrap();
 
     // Query column with values to get a cursor

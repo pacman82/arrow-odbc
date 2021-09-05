@@ -311,7 +311,6 @@ fn choose_column_strategy(
     lazy_display_size: impl Fn() -> Result<isize, odbc_api::Error>,
 ) -> Result<Box<dyn ColumnStrategy>, Error> {
     let strat: Box<dyn ColumnStrategy> = match field.data_type() {
-        ArrowDataType::Null => todo!(),
         ArrowDataType::Boolean => {
             if field.is_nullable() {
                 Box::new(NullableBoolean)
@@ -326,7 +325,6 @@ fn choose_column_strategy(
         ArrowDataType::UInt8 => primitive_arrow_type_startegy::<UInt8Type>(field.is_nullable()),
         ArrowDataType::Float32 => primitive_arrow_type_startegy::<Float32Type>(field.is_nullable()),
         ArrowDataType::Float64 => primitive_arrow_type_startegy::<Float64Type>(field.is_nullable()),
-        ArrowDataType::Timestamp(_, _) => todo!(),
         ArrowDataType::Date32 => {
             if field.is_nullable() {
                 Box::new(NullableDate)
@@ -334,14 +332,7 @@ fn choose_column_strategy(
                 Box::new(NonNullableDate)
             }
         }
-        ArrowDataType::Date64 => todo!(),
-        ArrowDataType::Time32(_) => todo!(),
-        ArrowDataType::Time64(_) => todo!(),
-        ArrowDataType::Duration(_) => todo!(),
-        ArrowDataType::Interval(_) => todo!(),
-        ArrowDataType::Binary => todo!(),
-        ArrowDataType::FixedSizeBinary(_) => todo!(),
-        ArrowDataType::LargeBinary => todo!(),
+
         ArrowDataType::Utf8 => {
             // Currently we request text data as utf16 as this works well with both Posix and
             // Windows environments.
@@ -364,19 +355,29 @@ fn choose_column_strategy(
             };
             Box::new(WideText::new(field.is_nullable(), utf16_len))
         }
-        ArrowDataType::LargeUtf8 => todo!(),
-        ArrowDataType::List(_) => todo!(),
-        ArrowDataType::FixedSizeList(_, _) => todo!(),
-        ArrowDataType::LargeList(_) => todo!(),
-        ArrowDataType::Struct(_) => todo!(),
-        ArrowDataType::Union(_) => todo!(),
-        ArrowDataType::Dictionary(_, _) => todo!(),
         ArrowDataType::Decimal(precision, scale) => {
             Box::new(Decimal::new(field.is_nullable(), *precision, *scale))
         }
         arrow_type
         @
-        (ArrowDataType::UInt16
+        (ArrowDataType::Null
+        | ArrowDataType::Timestamp(_, _)
+        | ArrowDataType::Date64
+        | ArrowDataType::Time32(_)
+        | ArrowDataType::Time64(_)
+        | ArrowDataType::Duration(_)
+        | ArrowDataType::Interval(_)
+        | ArrowDataType::Binary
+        | ArrowDataType::FixedSizeBinary(_)
+        | ArrowDataType::LargeBinary
+        | ArrowDataType::LargeUtf8
+        | ArrowDataType::List(_)
+        | ArrowDataType::FixedSizeList(_, _)
+        | ArrowDataType::LargeList(_)
+        | ArrowDataType::Struct(_)
+        | ArrowDataType::Union(_)
+        | ArrowDataType::Dictionary(_, _)
+        | ArrowDataType::UInt16
         | ArrowDataType::UInt32
         | ArrowDataType::UInt64
         | ArrowDataType::Float16) => return Err(Error::UnsupportedArrowType(arrow_type.clone())),
@@ -567,7 +568,7 @@ impl ColumnStrategy for NonNullableDate {
         let values = Date::as_slice(column_view).unwrap();
         let mut builder = Date32Builder::new(values.len());
         for odbc_date in values {
-            builder.append_value(days_since_epoch(&odbc_date)).unwrap();
+            builder.append_value(days_since_epoch(odbc_date)).unwrap();
         }
         Arc::new(builder.finish())
     }
