@@ -54,3 +54,29 @@ fn main() -> Result<(), anyhow::Error> {
     Ok(())
 }
 ```
+
+## Matching of ODBC to Arrow types
+
+| ODBC             | Arrow   |
+| ---------------- | ------- |
+| Numeric(p <= 38) | Decimal |
+| Decimal(p <= 38) | Decimal |
+| Integer          | Int32   |
+| SmallInt         | Int16   |
+| Real             | Float32 |
+| Float(p<=24)     | Float32 |
+| Double           | Float64 |
+| Float(p > 24)    | Float64 |
+| Date             | Date32  |
+| LongVarbinary    | todo!   |
+| Timestamp        | todo!   |
+| BigInt           | Int64   |
+| TinyInt          | Int8    |
+| Bit              | Boolean |
+| Varbinary        | todo!   |
+| Binary           | todo!   |
+| All others       | Utf8    |
+
+## Supported Arrow types
+
+WIP
