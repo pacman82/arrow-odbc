@@ -86,10 +86,17 @@ pub enum Error {
     FailedToDescribeColumn(#[source] odbc_api::Error),
     #[error(
         "Unable to deduce the maximum string length for the SQL Data Type reported by the ODBC \
-        driver. Reported SQL data type is: {:?}.",
-        0
+        driver. Reported SQL data type is: {:?}.\n Error fetching column display size: {source}",
+        sql_type
     )]
-    UnknownStringLength(OdbcDataType),
+    UnknownStringLength {
+        sql_type: OdbcDataType,
+        source: odbc_api::Error,
+    },
+    #[error("ODBC reported a display size of {0}.")]
+    InvalidDisplaySize(isize),
+    #[error("Unable to retrieve number of columns in result set.\n{0}")]
+    UnableToRetrieveNumCols(odbc_api::Error),
 }
 
 /// Arrow ODBC reader. Implements the [`arrow::record_batch::RecordBatchReader`] trait so it can be
@@ -122,22 +129,37 @@ impl<C: Cursor> OdbcReader<C> {
     ///   The type of these buffers will be inferred from the arrow schema. Not every arrow type is
     ///   supported though.
     /// * `max_batch_size`: Maximum batch size requested from the datasource.
-    pub fn new(cursor: C, max_batch_size: usize) -> Result<Self, odbc_api::Error> {
+    pub fn new(cursor: C, max_batch_size: usize) -> Result<Self, Error> {
         // Get number of columns from result set. We know it to contain at least one column,
         // otherwise it would not have been created.
-        let num_cols: u16 = cursor.num_result_cols()?.try_into().unwrap();
+        let num_cols: u16 = cursor
+            .num_result_cols()
+            .map_err(Error::UnableToRetrieveNumCols)?
+            .try_into()
+            .unwrap();
         let mut fields = Vec::new();
 
         for index in 0..num_cols {
             let mut column_description = ColumnDescription::default();
-            cursor.describe_col(index + 1, &mut column_description)?;
+            cursor
+                .describe_col(index + 1, &mut column_description)
+                .map_err(Error::FailedToDescribeColumn)?;
 
             let field = Field::new(
                 &column_description
                     .name_to_string()
                     .expect("Column name must be representable in utf8"),
                 match column_description.data_type {
-                    OdbcDataType::Unknown => todo!(),
+                    OdbcDataType::Unknown
+                    | OdbcDataType::Other {
+                        data_type: _,
+                        column_size: _,
+                        decimal_digits: _,
+                    }
+                    | OdbcDataType::WChar { length: _ }
+                    | OdbcDataType::Char { length: _ }
+                    | OdbcDataType::WVarchar { length: _ }
+                    | OdbcDataType::Varchar { length: _ } => ArrowDataType::Utf8,
                     OdbcDataType::Numeric {
                         precision: _,
                         scale: _,
@@ -154,10 +176,6 @@ impl<C: Cursor> OdbcReader<C> {
                     OdbcDataType::Float { precision: _ } | OdbcDataType::Double => {
                         ArrowDataType::Float64
                     }
-                    OdbcDataType::WChar { length: _ }
-                    | OdbcDataType::Char { length: _ }
-                    | OdbcDataType::WVarchar { length: _ }
-                    | OdbcDataType::Varchar { length: _ } => ArrowDataType::Utf8,
                     OdbcDataType::LongVarchar { length: _ } => todo!(),
                     OdbcDataType::LongVarbinary { length: _ } => todo!(),
                     OdbcDataType::Date => ArrowDataType::Date32,
@@ -168,11 +186,6 @@ impl<C: Cursor> OdbcReader<C> {
                     OdbcDataType::Bit => ArrowDataType::Boolean,
                     OdbcDataType::Varbinary { length: _ } => todo!(),
                     OdbcDataType::Binary { length: _ } => todo!(),
-                    OdbcDataType::Other {
-                        data_type: _,
-                        column_size: _,
-                        decimal_digits: _,
-                    } => todo!(),
                 },
                 column_description.could_be_nullable(),
             );
@@ -208,12 +221,14 @@ impl<C: Cursor> OdbcReader<C> {
             .iter()
             .enumerate()
             .map(|(index, field)| {
-                choose_column_strategy(
-                    field,
+                let col_index = (index + 1).try_into().unwrap();
+                let lazy_sql_data_type = || {
                     cursor
-                        .col_data_type((index + 1).try_into().unwrap())
-                        .map_err(Error::FailedToDescribeColumn)?,
-                )
+                        .col_data_type(col_index)
+                        .map_err(Error::FailedToDescribeColumn)
+                };
+                let lazy_display_size = || cursor.col_display_size(col_index);
+                choose_column_strategy(field, lazy_sql_data_type, lazy_display_size)
             })
             .collect::<Result<_, _>>()?;
 
@@ -264,9 +279,12 @@ where
     }
 }
 
+/// All decisions needed to copy data from an ODBC buffer to an Arrow Array
 trait ColumnStrategy {
+    /// Describes the buffer which is bound to the ODBC cursor.
     fn buffer_description(&self) -> BufferDescription;
 
+    /// Create an arrow array from an ODBC buffer described in [`Self::buffer_description`].
     fn fill_arrow_array(&self, column_view: AnyColumnView) -> ArrayRef;
 }
 
@@ -286,7 +304,8 @@ fn odbc_batch_to_arrow_columns(
 
 fn choose_column_strategy(
     field: &Field,
-    sql_type: OdbcDataType,
+    lazy_sql_type: impl Fn() -> Result<OdbcDataType, Error>,
+    lazy_display_size: impl Fn() -> Result<isize, odbc_api::Error>,
 ) -> Result<Box<dyn ColumnStrategy>, Error> {
     let strat: Box<dyn ColumnStrategy> = match field.data_type() {
         ArrowDataType::Null => todo!(),
@@ -320,12 +339,28 @@ fn choose_column_strategy(
         ArrowDataType::Binary => todo!(),
         ArrowDataType::FixedSizeBinary(_) => todo!(),
         ArrowDataType::LargeBinary => todo!(),
-        ArrowDataType::Utf8 => Box::new(WideText::new(
-            field.is_nullable(),
-            sql_type
-                .utf16_len()
-                .ok_or(Error::UnknownStringLength(sql_type))?,
-        )),
+        ArrowDataType::Utf8 => {
+            // Currently we request text data as utf16 as this works well with both Posix and
+            // Windows environments.
+
+            // Use the SQL type first to determine buffer length. For character data the display
+            // length is automatically multiplied by two, to make room for characters consisting of
+            // more than one `u16`.
+            let sql_type = lazy_sql_type()?;
+            let utf16_len = if let Some(len) = sql_type.utf16_len() {
+                len
+            } else {
+                // The data type does not seem to have a display size associated with it. As a final
+                // ditch effort request display size directly from the metadata.
+                let signed = lazy_display_size()
+                    .map_err(|source| Error::UnknownStringLength { sql_type, source })?;
+                if signed < 1 {
+                    return Err(Error::InvalidDisplaySize(signed));
+                }
+                signed as usize
+            };
+            Box::new(WideText::new(field.is_nullable(), utf16_len))
+        }
         ArrowDataType::LargeUtf8 => todo!(),
         ArrowDataType::List(_) => todo!(),
         ArrowDataType::FixedSizeList(_, _) => todo!(),
