@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use arrow::{array::{Array, BooleanArray, Date32Array, Float32Array, Int16Array, Int32Array, Int64Array, Int8Array, StringArray, UInt8Array}, datatypes::{DataType, Field, Schema}};
+use arrow::{array::{Array, BooleanArray, Date32Array, DecimalArray, Float32Array, Int16Array, Int32Array, Int64Array, Int8Array, StringArray, UInt8Array}, datatypes::{DataType, Field, Schema}};
 use chrono::NaiveDate;
 use lazy_static::lazy_static;
 
@@ -571,6 +571,44 @@ fn fetch_non_null_dates() {
         .unwrap();
     assert_eq!(Some(NaiveDate::from_ymd(2021, 04, 09)), array_vals.value_as_date(0));
     assert_eq!(Some(NaiveDate::from_ymd(2002, 09, 30)), array_vals.value_as_date(1));
+}
+
+/// Fill a record batch of Dates
+#[test]
+fn fetch_decimals() {
+    let table_name = function_name!().rsplit_once(':').unwrap().1;
+
+    // Setup a table on the database with some floats (so we can fetch them)
+    let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
+    setup_empty_table(&conn, table_name, &["DECIMAL(5,2) NOT NULL"]).unwrap();
+    let sql = format!(
+        "INSERT INTO {} (a) VALUES (123.45),(678.90)",
+        table_name
+    );
+    conn.execute(&sql, ()).unwrap();
+
+    // Query column with values to get a cursor
+    let sql = format!("SELECT a FROM {}", table_name);
+    let cursor = conn.execute(&sql, ()).unwrap().unwrap();
+
+    // Now that we have a cursor, we want to iterate over its rows and fill an arrow batch with it.
+
+    // Batches will contain at most 100 entries.
+    let max_batch_size = 100;
+
+    let mut reader = OdbcReader::new(cursor, max_batch_size).unwrap();
+
+    // Batch for batch copy values from ODBC buffer into arrow batches
+    let arrow_batch = reader.next().unwrap().unwrap();
+
+    // Assert that the correct values are found within the arrow batch
+    let array_vals = arrow_batch
+        .column(0)
+        .as_any()
+        .downcast_ref::<DecimalArray>()
+        .unwrap();
+    assert_eq!("123.45", array_vals.value_as_string(0));
+    assert_eq!("678.90", array_vals.value_as_string(1));
 }
 
 /// Like [`fetch_32bit_floating_point`], but utilizing a prepared query instead of a one shot.

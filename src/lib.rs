@@ -50,16 +50,12 @@ use std::{char::decode_utf16, convert::TryInto, marker::PhantomData, sync::Arc};
 
 use chrono::NaiveDate;
 use thiserror::Error;
+use atoi::FromRadix10Signed;
 
-use arrow::{
-    array::{ArrayRef, BooleanBuilder, Date32Builder, PrimitiveBuilder, StringBuilder},
-    datatypes::{
+use arrow::{array::{ArrayRef, BooleanBuilder, Date32Builder, DecimalBuilder, PrimitiveBuilder, StringBuilder}, datatypes::{
         ArrowPrimitiveType, DataType as ArrowDataType, Field, Float32Type, Float64Type, Int16Type,
         Int32Type, Int64Type, Int8Type, Schema, SchemaRef, UInt8Type,
-    },
-    error::ArrowError,
-    record_batch::{RecordBatch, RecordBatchReader},
-};
+    }, error::ArrowError, record_batch::{RecordBatch, RecordBatchReader}};
 use odbc_api::{
     buffers::{AnyColumnView, BufferDescription, BufferKind, ColumnarRowSet, Item},
     sys::Date,
@@ -150,24 +146,10 @@ impl<C: Cursor> OdbcReader<C> {
                     .name_to_string()
                     .expect("Column name must be representable in utf8"),
                 match column_description.data_type {
-                    OdbcDataType::Unknown
-                    | OdbcDataType::Other {
-                        data_type: _,
-                        column_size: _,
-                        decimal_digits: _,
+                    OdbcDataType::Numeric { precision: p @ 0..=38, scale }
+                    | OdbcDataType::Decimal { precision: p@  0..=38, scale } => {
+                        ArrowDataType::Decimal(p, scale.try_into().unwrap())
                     }
-                    | OdbcDataType::WChar { length: _ }
-                    | OdbcDataType::Char { length: _ }
-                    | OdbcDataType::WVarchar { length: _ }
-                    | OdbcDataType::Varchar { length: _ } => ArrowDataType::Utf8,
-                    OdbcDataType::Numeric {
-                        precision: _,
-                        scale: _,
-                    } => todo!(),
-                    OdbcDataType::Decimal {
-                        precision: _,
-                        scale: _,
-                    } => todo!(),
                     OdbcDataType::Integer => ArrowDataType::Int32,
                     OdbcDataType::SmallInt => ArrowDataType::Int16,
                     OdbcDataType::Real | OdbcDataType::Float { precision: 0..=24 } => {
@@ -186,6 +168,18 @@ impl<C: Cursor> OdbcReader<C> {
                     OdbcDataType::Bit => ArrowDataType::Boolean,
                     OdbcDataType::Varbinary { length: _ } => todo!(),
                     OdbcDataType::Binary { length: _ } => todo!(),
+                    OdbcDataType::Unknown
+                    | OdbcDataType::Numeric { .. }
+                    | OdbcDataType::Decimal { .. }
+                    | OdbcDataType::Other {
+                        data_type: _,
+                        column_size: _,
+                        decimal_digits: _,
+                    }
+                    | OdbcDataType::WChar { length: _ }
+                    | OdbcDataType::Char { length: _ }
+                    | OdbcDataType::WVarchar { length: _ }
+                    | OdbcDataType::Varchar { length: _ } => ArrowDataType::Utf8,
                 },
                 column_description.could_be_nullable(),
             );
@@ -194,9 +188,7 @@ impl<C: Cursor> OdbcReader<C> {
         }
 
         let schema = Arc::new(Schema::new(fields));
-        let odbc_reader = Self::with_arrow_schema(cursor, max_batch_size, schema)
-            .expect("An arrow type inferred by OdbcReader must also be supported by it");
-        Ok(odbc_reader)
+        Self::with_arrow_schema(cursor, max_batch_size, schema)
     }
 
     /// Construct a new `OdbcReader instance.
@@ -368,7 +360,9 @@ fn choose_column_strategy(
         ArrowDataType::Struct(_) => todo!(),
         ArrowDataType::Union(_) => todo!(),
         ArrowDataType::Dictionary(_, _) => todo!(),
-        ArrowDataType::Decimal(_, _) => todo!(),
+        ArrowDataType::Decimal(precision, scale) => {
+            Box::new(Decimal::new(field.is_nullable(), *precision, *scale))
+        }
         arrow_type
         @
         (ArrowDataType::UInt16
@@ -596,4 +590,57 @@ fn days_since_epoch(date: &Date) -> i32 {
     let date = NaiveDate::from_ymd(date.year as i32, date.month as u32, date.day as u32);
     let duration = date.signed_duration_since(unix_epoch);
     duration.num_days().try_into().unwrap()
+}
+
+struct Decimal {
+    nullable: bool,
+    precision: usize,
+    scale: usize,
+}
+
+impl Decimal {
+    fn new(nullable: bool, precision: usize, scale: usize) -> Self {
+        Self {
+            nullable,
+            precision,
+            scale,
+        }
+    }
+}
+
+impl ColumnStrategy for Decimal {
+    fn buffer_description(&self) -> BufferDescription {
+        BufferDescription{
+            nullable: self.nullable,
+            // Must be able to hold num precision digits a sign and a decimal point 
+            kind: BufferKind::Text { max_str_len: self.precision + 2 }
+        }
+    }
+
+    fn fill_arrow_array(&self, column_view: AnyColumnView) -> ArrayRef {
+        match column_view {
+            AnyColumnView::Text(values) => {
+                let capacity = values.len();
+                let mut builder = DecimalBuilder::new(capacity, self.precision, self.scale);
+
+                let mut buf_digits = Vec::new();
+
+                for opt in values {
+                    if let Some(text) = opt {
+                        buf_digits.clear();
+                        buf_digits.extend(text.iter().filter(|&&c| c != b'.'));
+
+                        let (num, _consumed) = i128::from_radix_10_signed(&buf_digits);
+
+                        builder.append_value(num).unwrap();
+                    } else {
+                        builder.append_null().unwrap();
+                    }
+                }
+
+                Arc::new(builder.finish())
+            }
+            _ => unreachable!()
+        }
+    }
 }
