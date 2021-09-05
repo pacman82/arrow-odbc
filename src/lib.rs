@@ -161,7 +161,6 @@ impl<C: Cursor> OdbcReader<C> {
                     OdbcDataType::LongVarchar { length: _ } => todo!(),
                     OdbcDataType::LongVarbinary { length: _ } => todo!(),
                     OdbcDataType::Date => ArrowDataType::Date32,
-                    OdbcDataType::Time { precision: _ } => todo!(),
                     OdbcDataType::Timestamp { precision: _ } => todo!(),
                     OdbcDataType::BigInt => ArrowDataType::Int64,
                     OdbcDataType::TinyInt => ArrowDataType::Int8,
@@ -169,6 +168,7 @@ impl<C: Cursor> OdbcReader<C> {
                     OdbcDataType::Varbinary { length: _ } => todo!(),
                     OdbcDataType::Binary { length: _ } => todo!(),
                     OdbcDataType::Unknown
+                    | OdbcDataType::Time { precision: _ }
                     | OdbcDataType::Numeric { .. }
                     | OdbcDataType::Decimal { .. }
                     | OdbcDataType::Other {
