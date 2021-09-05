@@ -48,14 +48,21 @@
 //! ```
 use std::{char::decode_utf16, convert::TryInto, marker::PhantomData, sync::Arc};
 
+use atoi::FromRadix10Signed;
 use chrono::NaiveDate;
 use thiserror::Error;
-use atoi::FromRadix10Signed;
 
-use arrow::{array::{ArrayRef, BooleanBuilder, Date32Builder, DecimalBuilder, PrimitiveBuilder, StringBuilder}, datatypes::{
+use arrow::{
+    array::{
+        ArrayRef, BooleanBuilder, Date32Builder, DecimalBuilder, PrimitiveBuilder, StringBuilder,
+    },
+    datatypes::{
         ArrowPrimitiveType, DataType as ArrowDataType, Field, Float32Type, Float64Type, Int16Type,
         Int32Type, Int64Type, Int8Type, Schema, SchemaRef, UInt8Type,
-    }, error::ArrowError, record_batch::{RecordBatch, RecordBatchReader}};
+    },
+    error::ArrowError,
+    record_batch::{RecordBatch, RecordBatchReader},
+};
 use odbc_api::{
     buffers::{AnyColumnView, BufferDescription, BufferKind, ColumnarRowSet, Item},
     sys::Date,
@@ -146,10 +153,14 @@ impl<C: Cursor> OdbcReader<C> {
                     .name_to_string()
                     .expect("Column name must be representable in utf8"),
                 match column_description.data_type {
-                    OdbcDataType::Numeric { precision: p @ 0..=38, scale }
-                    | OdbcDataType::Decimal { precision: p@  0..=38, scale } => {
-                        ArrowDataType::Decimal(p, scale.try_into().unwrap())
+                    OdbcDataType::Numeric {
+                        precision: p @ 0..=38,
+                        scale,
                     }
+                    | OdbcDataType::Decimal {
+                        precision: p @ 0..=38,
+                        scale,
+                    } => ArrowDataType::Decimal(p, scale.try_into().unwrap()),
                     OdbcDataType::Integer => ArrowDataType::Int32,
                     OdbcDataType::SmallInt => ArrowDataType::Int16,
                     OdbcDataType::Real | OdbcDataType::Float { precision: 0..=24 } => {
@@ -610,10 +621,12 @@ impl Decimal {
 
 impl ColumnStrategy for Decimal {
     fn buffer_description(&self) -> BufferDescription {
-        BufferDescription{
+        BufferDescription {
             nullable: self.nullable,
-            // Must be able to hold num precision digits a sign and a decimal point 
-            kind: BufferKind::Text { max_str_len: self.precision + 2 }
+            // Must be able to hold num precision digits a sign and a decimal point
+            kind: BufferKind::Text {
+                max_str_len: self.precision + 2,
+            },
         }
     }
 
@@ -640,7 +653,7 @@ impl ColumnStrategy for Decimal {
 
                 Arc::new(builder.finish())
             }
-            _ => unreachable!()
+            _ => unreachable!(),
         }
     }
 }
