@@ -54,7 +54,8 @@ use thiserror::Error;
 
 use arrow::{
     array::{
-        ArrayRef, BooleanBuilder, Date32Builder, DecimalBuilder, PrimitiveBuilder, StringBuilder,
+        ArrayRef, BinaryBuilder, BooleanBuilder, Date32Builder, DecimalBuilder, PrimitiveBuilder,
+        StringBuilder,
     },
     datatypes::{
         ArrowPrimitiveType, DataType as ArrowDataType, Field, Float32Type, Float64Type, Int16Type,
@@ -169,14 +170,14 @@ impl<C: Cursor> OdbcReader<C> {
                     OdbcDataType::Float { precision: _ } | OdbcDataType::Double => {
                         ArrowDataType::Float64
                     }
-                    OdbcDataType::LongVarbinary { length: _ } => todo!(),
                     OdbcDataType::Date => ArrowDataType::Date32,
                     OdbcDataType::Timestamp { precision: _ } => todo!(),
                     OdbcDataType::BigInt => ArrowDataType::Int64,
                     OdbcDataType::TinyInt => ArrowDataType::Int8,
                     OdbcDataType::Bit => ArrowDataType::Boolean,
-                    OdbcDataType::Varbinary { length: _ } => todo!(),
-                    OdbcDataType::Binary { length: _ } => todo!(),
+                    OdbcDataType::LongVarbinary { length: _ }
+                    | OdbcDataType::Binary { length: _ }
+                    | OdbcDataType::Varbinary { length: _ } => ArrowDataType::Binary,
                     OdbcDataType::Unknown
                     | OdbcDataType::Time { precision: _ }
                     | OdbcDataType::Numeric { .. }
@@ -358,6 +359,11 @@ fn choose_column_strategy(
         ArrowDataType::Decimal(precision, scale) => {
             Box::new(Decimal::new(field.is_nullable(), *precision, *scale))
         }
+        ArrowDataType::Binary => {
+            let sql_type = lazy_sql_type()?;
+            let length = sql_type.column_size();
+            Box::new(Binary::new(field.is_nullable(), length))
+        }
         arrow_type
         @
         (ArrowDataType::Null
@@ -367,7 +373,6 @@ fn choose_column_strategy(
         | ArrowDataType::Time64(_)
         | ArrowDataType::Duration(_)
         | ArrowDataType::Interval(_)
-        | ArrowDataType::Binary
         | ArrowDataType::FixedSizeBinary(_)
         | ArrowDataType::LargeBinary
         | ArrowDataType::LargeUtf8
@@ -535,7 +540,7 @@ impl ColumnStrategy for WideText {
             AnyColumnView::WText(values) => values,
             _ => unreachable!(),
         };
-        let mut builder = StringBuilder::new(1);
+        let mut builder = StringBuilder::new(values.len());
         // Buffer used to convert individual values from utf16 to utf8.
         let mut buf_utf8 = String::new();
         for value in values {
@@ -656,5 +661,44 @@ impl ColumnStrategy for Decimal {
             }
             _ => unreachable!(),
         }
+    }
+}
+
+struct Binary {
+    /// Maximum length in bytes of elements
+    max_len: usize,
+    nullable: bool,
+}
+
+impl Binary {
+    fn new(nullable: bool, max_len: usize) -> Self {
+        Self { max_len, nullable }
+    }
+}
+
+impl ColumnStrategy for Binary {
+    fn buffer_description(&self) -> BufferDescription {
+        BufferDescription {
+            nullable: self.nullable,
+            kind: BufferKind::Binary {
+                length: self.max_len,
+            },
+        }
+    }
+
+    fn fill_arrow_array(&self, column_view: AnyColumnView) -> ArrayRef {
+        let values = match column_view {
+            AnyColumnView::Binary(values) => values,
+            _ => unreachable!(),
+        };
+        let mut builder = BinaryBuilder::new(values.len());
+        for value in values {
+            if let Some(bytes) = value {
+                builder.append_value(bytes).unwrap();
+            } else {
+                builder.append_null().unwrap();
+            }
+        }
+        Arc::new(builder.finish())
     }
 }

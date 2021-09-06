@@ -68,13 +68,13 @@ fn main() -> Result<(), anyhow::Error> {
 | Double           | Float64 |
 | Float(p > 24)    | Float64 |
 | Date             | Date32  |
-| LongVarbinary    | todo!   |
+| LongVarbinary    | Binary  |
 | Timestamp        | todo!   |
 | BigInt           | Int64   |
 | TinyInt          | Int8    |
 | Bit              | Boolean |
-| Varbinary        | todo!   |
-| Binary           | todo!   |
+| Varbinary        | Binary  |
+| Binary           | Binary  |
 | All others       | Utf8    |
 
 ## Supported Arrow types

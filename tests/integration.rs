@@ -1,15 +1,10 @@
 use std::sync::Arc;
 
-use arrow::{
-    array::{
-        Array, ArrayRef, BooleanArray, Date32Array, DecimalArray, Float32Array, Int16Array,
-        Int32Array, Int64Array, Int8Array, StringArray, UInt8Array,
-    },
-    datatypes::{DataType, Field, Schema},
-};
+use arrow::{array::{Array, ArrayRef, BinaryArray, BooleanArray, Date32Array, DecimalArray, Float32Array, Int16Array, Int32Array, Int64Array, Int8Array, StringArray, UInt8Array}, datatypes::{DataType, Field, Schema}};
 use chrono::NaiveDate;
 use lazy_static::lazy_static;
 
+use odbc_api::IntoParameter;
 use odbc_arrow::{
     arrow::array::Float64Array,
     odbc_api::{
@@ -315,6 +310,47 @@ fn fetch_decimals() {
     // Assert that the correct values are found within the arrow batch
     assert_eq!("123.45", array_vals.value_as_string(0));
     assert_eq!("678.90", array_vals.value_as_string(1));
+}
+
+/// Fetch binary data
+/// Like [`fetch_32bit_floating_point`], but utilizing a prepared query instead of a one shot.
+#[test]
+fn fetch_varbinary_data() {
+    let table_name = function_name!().rsplit_once(':').unwrap().1;
+
+    // Setup a table on the database with some floats (so we can fetch them)
+    let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
+    setup_empty_table(&conn, table_name, &["VARBINARY(30) NOT NULL"]).unwrap();
+    let sql = format!("INSERT INTO {} (a) VALUES (?)", table_name);
+    // Use prepared query and arguments for insertion, since literal representation depends a lot
+    // on the DB under test.
+    let mut insert = conn.prepare(&sql).unwrap();
+    insert.execute(&b"Hello".into_parameter()).unwrap();
+    insert.execute(&b"World".into_parameter()).unwrap();
+
+    // Query column with values to get a cursor
+    let sql = format!("SELECT a FROM {} ORDER BY id", table_name);
+    let cursor = conn.execute(&sql, ()).unwrap().unwrap();
+
+    // Now that we have a cursor, we want to iterate over its rows and fill an arrow batch with it.
+
+    // Batches will contain at most 100 entries.
+    let max_batch_size = 100;
+
+    // Instantiate reader with Arrow schema and ODBC cursor
+    let mut reader = OdbcReader::new(cursor, max_batch_size).unwrap();
+
+    // Batch for batch copy values from ODBC buffer into arrow batches
+    let arrow_batch = reader.next().unwrap().unwrap();
+
+    // Assert that the correct values are found within the arrow batch
+    let array_vals = arrow_batch
+        .column(0)
+        .as_any()
+        .downcast_ref::<BinaryArray>()
+        .unwrap();
+    assert_eq!(b"Hello", array_vals.value(0));
+    assert_eq!(b"World", array_vals.value(1));
 }
 
 /// Like [`fetch_32bit_floating_point`], but utilizing a prepared query instead of a one shot.
