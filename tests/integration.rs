@@ -2,8 +2,8 @@ use std::sync::Arc;
 
 use arrow::{
     array::{
-        Array, BooleanArray, Date32Array, DecimalArray, Float32Array, Int16Array, Int32Array,
-        Int64Array, Int8Array, StringArray, UInt8Array,
+        Array, ArrayRef, BooleanArray, Date32Array, DecimalArray, Float32Array, Int16Array,
+        Int32Array, Int64Array, Int8Array, StringArray, UInt8Array,
     },
     datatypes::{DataType, Field, Schema},
 };
@@ -44,32 +44,9 @@ lazy_static! {
 fn fetch_nullable_32bit_integer() {
     let table_name = function_name!().rsplit_once(':').unwrap().1;
 
-    // Setup a table on the database with some floats (so we can fetch them)
-    let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
-    setup_empty_table(&conn, table_name, &["INTEGER"]).unwrap();
-    let sql = format!("INSERT INTO {} (a) VALUES (1),(NULL),(3)", table_name);
-    conn.execute(&sql, ()).unwrap();
+    let array_any = fetch_arrow_data(table_name, "INTEGER", "(1),(NULL),(3)").unwrap();
 
-    // Query column with values to get a cursor
-    let sql = format!("SELECT a FROM {}", table_name);
-    let cursor = conn.execute(&sql, ()).unwrap().unwrap();
-
-    // Now that we have a cursor, we want to iterate over its rows and fill an arrow batch with it.
-
-    // Batches will contain at most 100 entries.
-    let max_batch_size = 100;
-
-    let mut reader = OdbcReader::new(cursor, max_batch_size).unwrap();
-
-    // Batch for batch copy values from ODBC buffer into arrow batches
-    let arrow_batch = reader.next().unwrap().unwrap();
-
-    // Assert that the correct values are found within the arrow batch
-    let array_vals = arrow_batch
-        .column(0)
-        .as_any()
-        .downcast_ref::<Int32Array>()
-        .unwrap();
+    let array_vals = array_any.as_any().downcast_ref::<Int32Array>().unwrap();
     assert!(array_vals.is_valid(0));
     assert!(array_vals.is_null(1));
     assert!(array_vals.is_valid(2));
@@ -81,32 +58,9 @@ fn fetch_nullable_32bit_integer() {
 fn fetch_32bit_integer() {
     let table_name = function_name!().rsplit_once(':').unwrap().1;
 
-    // Setup a table on the database with some floats (so we can fetch them)
-    let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
-    setup_empty_table(&conn, table_name, &["INTEGER NOT NULL"]).unwrap();
-    let sql = format!("INSERT INTO {} (a) VALUES (1),(2),(3)", table_name);
-    conn.execute(&sql, ()).unwrap();
+    let array_any = fetch_arrow_data(table_name, "INTEGER NOT NULL", "(1),(2),(3)").unwrap();
 
-    // Query column with values to get a cursor
-    let sql = format!("SELECT a FROM {}", table_name);
-    let cursor = conn.execute(&sql, ()).unwrap().unwrap();
-
-    // Now that we have a cursor, we want to iterate over its rows and fill an arrow batch with it.
-
-    // Batches will contain at most 100 entries.
-    let max_batch_size = 100;
-
-    let mut reader = OdbcReader::new(cursor, max_batch_size).unwrap();
-
-    // Batch for batch copy values from ODBC buffer into arrow batches
-    let arrow_batch = reader.next().unwrap().unwrap();
-
-    // Assert that the correct values are found within the arrow batch
-    let array_vals = arrow_batch
-        .column(0)
-        .as_any()
-        .downcast_ref::<Int32Array>()
-        .unwrap();
+    let array_vals = array_any.as_any().downcast_ref::<Int32Array>().unwrap();
     assert_eq!([1, 2, 3], array_vals.values());
 }
 
@@ -115,32 +69,9 @@ fn fetch_32bit_integer() {
 fn fetch_16bit_integer() {
     let table_name = function_name!().rsplit_once(':').unwrap().1;
 
-    // Setup a table on the database with some floats (so we can fetch them)
-    let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
-    setup_empty_table(&conn, table_name, &["SMALLINT NOT NULL"]).unwrap();
-    let sql = format!("INSERT INTO {} (a) VALUES (1),(2),(3)", table_name);
-    conn.execute(&sql, ()).unwrap();
+    let array_any = fetch_arrow_data(table_name, "SMALLINT NOT NULL", "(1),(2),(3)").unwrap();
 
-    // Query column with values to get a cursor
-    let sql = format!("SELECT a FROM {}", table_name);
-    let cursor = conn.execute(&sql, ()).unwrap().unwrap();
-
-    // Now that we have a cursor, we want to iterate over its rows and fill an arrow batch with it.
-
-    // Batches will contain at most 100 entries.
-    let max_batch_size = 100;
-
-    let mut reader = OdbcReader::new(cursor, max_batch_size).unwrap();
-
-    // Batch for batch copy values from ODBC buffer into arrow batches
-    let arrow_batch = reader.next().unwrap().unwrap();
-
-    // Assert that the correct values are found within the arrow batch
-    let array_vals = arrow_batch
-        .column(0)
-        .as_any()
-        .downcast_ref::<Int16Array>()
-        .unwrap();
+    let array_vals = array_any.as_any().downcast_ref::<Int16Array>().unwrap();
     assert_eq!([1, 2, 3], array_vals.values());
 }
 
@@ -149,38 +80,16 @@ fn fetch_16bit_integer() {
 fn fetch_8bit_integer() {
     let table_name = function_name!().rsplit_once(':').unwrap().1;
 
-    // Setup a table on the database with some floats (so we can fetch them)
-    let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
-    setup_empty_table(&conn, table_name, &["TINYINT NOT NULL"]).unwrap();
-    let sql = format!("INSERT INTO {} (a) VALUES (1),(2),(3)", table_name);
-    conn.execute(&sql, ()).unwrap();
+    let array_any = fetch_arrow_data(table_name, "TINYINT NOT NULL", "(1),(2),(3)").unwrap();
 
-    // Query column with values to get a cursor
-    let sql = format!("SELECT a FROM {}", table_name);
-    let cursor = conn.execute(&sql, ()).unwrap().unwrap();
-
-    // Now that we have a cursor, we want to iterate over its rows and fill an arrow batch with it.
-
-    // Batches will contain at most 100 entries.
-    let max_batch_size = 100;
-
-    let mut reader = OdbcReader::new(cursor, max_batch_size).unwrap();
-
-    // Batch for batch copy values from ODBC buffer into arrow batches
-    let arrow_batch = reader.next().unwrap().unwrap();
-
-    // Assert that the correct values are found within the arrow batch
-    let array_vals = arrow_batch
-        .column(0)
-        .as_any()
-        .downcast_ref::<Int8Array>()
-        .unwrap();
+    let array_vals = array_any.as_any().downcast_ref::<Int8Array>().unwrap();
     assert_eq!([1, 2, 3], array_vals.values());
 }
 
-/// Fill a record batch with non nullable Integer 8 Bit usigned integer
+/// Fill a record batch with non nullable Integer 8 Bit usigned integer. Since that type would never
+/// interferred from the Database automatically it must be specified explicitly in a schema
 #[test]
-fn fetch_8bit_unsigned_integer() {
+fn fetch_8bit_unsigned_integer_explicit_schema() {
     let table_name = function_name!().rsplit_once(':').unwrap().1;
 
     // Setup a table on the database with some floats (so we can fetch them)
@@ -253,32 +162,11 @@ fn unsupported_16bit_unsigned_integer() {
 fn fetch_boolean() {
     let table_name = function_name!().rsplit_once(':').unwrap().1;
 
-    // Setup a table on the database with some floats (so we can fetch them)
-    let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
-    setup_empty_table(&conn, table_name, &["BIT NOT NULL"]).unwrap();
-    let sql = format!("INSERT INTO {} (a) VALUES (1),(0),(1)", table_name);
-    conn.execute(&sql, ()).unwrap();
+    let array_any = fetch_arrow_data(table_name, "BIT NOT NULL", "(1),(0),(1)").unwrap();
 
-    // Query column with values to get a cursor
-    let sql = format!("SELECT a FROM {}", table_name);
-    let cursor = conn.execute(&sql, ()).unwrap().unwrap();
-
-    // Now that we have a cursor, we want to iterate over its rows and fill an arrow batch with it.
-
-    // Batches will contain at most 100 entries.
-    let max_batch_size = 100;
-
-    let mut reader = OdbcReader::new(cursor, max_batch_size).unwrap();
-
-    // Batch for batch copy values from ODBC buffer into arrow batches
-    let arrow_batch = reader.next().unwrap().unwrap();
+    let array_vals = array_any.as_any().downcast_ref::<BooleanArray>().unwrap();
 
     // Assert that the correct values are found within the arrow batch
-    let array_vals = arrow_batch
-        .column(0)
-        .as_any()
-        .downcast_ref::<BooleanArray>()
-        .unwrap();
     assert_eq!(true, array_vals.value(0));
     assert_eq!(false, array_vals.value(1));
     assert_eq!(true, array_vals.value(2));
@@ -289,32 +177,11 @@ fn fetch_boolean() {
 fn fetch_nullable_boolean() {
     let table_name = function_name!().rsplit_once(':').unwrap().1;
 
-    // Setup a table on the database with some floats (so we can fetch them)
-    let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
-    setup_empty_table(&conn, table_name, &["BIT"]).unwrap();
-    let sql = format!("INSERT INTO {} (a) VALUES (1),(NULL),(0)", table_name);
-    conn.execute(&sql, ()).unwrap();
+    let array_any = fetch_arrow_data(table_name, "BIT", "(1),(NULL),(0)").unwrap();
 
-    // Query column with values to get a cursor
-    let sql = format!("SELECT a FROM {}", table_name);
-    let cursor = conn.execute(&sql, ()).unwrap().unwrap();
-
-    // Now that we have a cursor, we want to iterate over its rows and fill an arrow batch with it.
-
-    // Batches will contain at most 100 entries.
-    let max_batch_size = 100;
-
-    let mut reader = OdbcReader::new(cursor, max_batch_size).unwrap();
-
-    // Batch for batch copy values from ODBC buffer into arrow batches
-    let arrow_batch = reader.next().unwrap().unwrap();
+    let array_vals = array_any.as_any().downcast_ref::<BooleanArray>().unwrap();
 
     // Assert that the correct values are found within the arrow batch
-    let array_vals = arrow_batch
-        .column(0)
-        .as_any()
-        .downcast_ref::<BooleanArray>()
-        .unwrap();
     assert!(array_vals.is_valid(0));
     assert_eq!(true, array_vals.value(0));
     assert!(array_vals.is_null(1));
@@ -327,32 +194,9 @@ fn fetch_nullable_boolean() {
 fn fetch_32bit_floating_point() {
     let table_name = function_name!().rsplit_once(':').unwrap().1;
 
-    // Setup a table on the database with some floats (so we can fetch them)
-    let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
-    setup_empty_table(&conn, table_name, &["REAL NOT NULL"]).unwrap();
-    let sql = format!("INSERT INTO {} (a) VALUES (1),(2),(3)", table_name);
-    conn.execute(&sql, ()).unwrap();
+    let array_any = fetch_arrow_data(table_name, "REAL NOT NULL", "(1),(2),(3)").unwrap();
 
-    // Query column with values to get a cursor
-    let sql = format!("SELECT a FROM {}", table_name);
-    let cursor = conn.execute(&sql, ()).unwrap().unwrap();
-
-    // Now that we have a cursor, we want to iterate over its rows and fill an arrow batch with it.
-
-    // Batches will contain at most 100 entries.
-    let max_batch_size = 100;
-
-    let mut reader = OdbcReader::new(cursor, max_batch_size).unwrap();
-
-    // Batch for batch copy values from ODBC buffer into arrow batches
-    let arrow_batch = reader.next().unwrap().unwrap();
-
-    // Assert that the correct values are found within the arrow batch
-    let array_vals = arrow_batch
-        .column(0)
-        .as_any()
-        .downcast_ref::<Float32Array>()
-        .unwrap();
+    let array_vals = array_any.as_any().downcast_ref::<Float32Array>().unwrap();
     assert_eq!([1., 2., 3.], array_vals.values());
 }
 
@@ -361,32 +205,12 @@ fn fetch_32bit_floating_point() {
 fn fetch_64bit_floating_point() {
     let table_name = function_name!().rsplit_once(':').unwrap().1;
 
-    // Setup a table on the database with some floats (so we can fetch them)
-    let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
-    setup_empty_table(&conn, table_name, &["DOUBLE PRECISION NOT NULL"]).unwrap();
-    let sql = format!("INSERT INTO {} (a) VALUES (1),(2),(3)", table_name);
-    conn.execute(&sql, ()).unwrap();
+    let array_any =
+        fetch_arrow_data(table_name, "DOUBLE PRECISION NOT NULL", "(1),(2),(3)").unwrap();
 
-    // Query column with values to get a cursor
-    let sql = format!("SELECT a FROM {}", table_name);
-    let cursor = conn.execute(&sql, ()).unwrap().unwrap();
-
-    // Now that we have a cursor, we want to iterate over its rows and fill an arrow batch with it.
-
-    // Batches will contain at most 100 entries.
-    let max_batch_size = 100;
-
-    let mut reader = OdbcReader::new(cursor, max_batch_size).unwrap();
-
-    // Batch for batch copy values from ODBC buffer into arrow batches
-    let arrow_batch = reader.next().unwrap().unwrap();
+    let array_vals = array_any.as_any().downcast_ref::<Float64Array>().unwrap();
 
     // Assert that the correct values are found within the arrow batch
-    let array_vals = arrow_batch
-        .column(0)
-        .as_any()
-        .downcast_ref::<Float64Array>()
-        .unwrap();
     assert_eq!([1., 2., 3.], array_vals.values());
 }
 
@@ -395,32 +219,11 @@ fn fetch_64bit_floating_point() {
 fn fetch_64bit_integer() {
     let table_name = function_name!().rsplit_once(':').unwrap().1;
 
-    // Setup a table on the database with some floats (so we can fetch them)
-    let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
-    setup_empty_table(&conn, table_name, &["BIGINT NOT NULL"]).unwrap();
-    let sql = format!("INSERT INTO {} (a) VALUES (1),(2),(3)", table_name);
-    conn.execute(&sql, ()).unwrap();
+    let array_any = fetch_arrow_data(table_name, "BIGINT NOT NULL", "(1),(2),(3)").unwrap();
 
-    // Query column with values to get a cursor
-    let sql = format!("SELECT a FROM {}", table_name);
-    let cursor = conn.execute(&sql, ()).unwrap().unwrap();
-
-    // Now that we have a cursor, we want to iterate over its rows and fill an arrow batch with it.
-
-    // Batches will contain at most 100 entries.
-    let max_batch_size = 100;
-
-    let mut reader = OdbcReader::new(cursor, max_batch_size).unwrap();
-
-    // Batch for batch copy values from ODBC buffer into arrow batches
-    let arrow_batch = reader.next().unwrap().unwrap();
+    let array_vals = array_any.as_any().downcast_ref::<Int64Array>().unwrap();
 
     // Assert that the correct values are found within the arrow batch
-    let array_vals = arrow_batch
-        .column(0)
-        .as_any()
-        .downcast_ref::<Int64Array>()
-        .unwrap();
     assert_eq!([1, 2, 3], array_vals.values());
 }
 
@@ -429,35 +232,12 @@ fn fetch_64bit_integer() {
 fn fetch_varchar() {
     let table_name = function_name!().rsplit_once(':').unwrap().1;
 
-    // Setup a table on the database with some floats (so we can fetch them)
-    let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
-    setup_empty_table(&conn, table_name, &["VARCHAR(50)"]).unwrap();
-    let sql = format!(
-        "INSERT INTO {} (a) VALUES ('Hello'),('Bonjour'),(NULL)",
-        table_name
-    );
-    conn.execute(&sql, ()).unwrap();
+    let array_any =
+        fetch_arrow_data(table_name, "VARCHAR(50)", "('Hello'),('Bonjour'),(NULL)").unwrap();
 
-    // Query column with values to get a cursor
-    let sql = format!("SELECT a FROM {}", table_name);
-    let cursor = conn.execute(&sql, ()).unwrap().unwrap();
-
-    // Now that we have a cursor, we want to iterate over its rows and fill an arrow batch with it.
-
-    // Batches will contain at most 100 entries.
-    let max_batch_size = 100;
-
-    let mut reader = OdbcReader::new(cursor, max_batch_size).unwrap();
-
-    // Batch for batch copy values from ODBC buffer into arrow batches
-    let arrow_batch = reader.next().unwrap().unwrap();
+    let array_vals = array_any.as_any().downcast_ref::<StringArray>().unwrap();
 
     // Assert that the correct values are found within the arrow batch
-    let array_vals = arrow_batch
-        .column(0)
-        .as_any()
-        .downcast_ref::<StringArray>()
-        .unwrap();
     assert_eq!("Hello", array_vals.value(0));
     assert_eq!("Bonjour", array_vals.value(1));
     assert!(array_vals.is_null(2));
@@ -468,35 +248,12 @@ fn fetch_varchar() {
 fn fetch_nvarchar() {
     let table_name = function_name!().rsplit_once(':').unwrap().1;
 
-    // Setup a table on the database with some floats (so we can fetch them)
-    let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
-    setup_empty_table(&conn, table_name, &["NVARCHAR(50)"]).unwrap();
-    let sql = format!(
-        "INSERT INTO {} (a) VALUES ('Hello'),('Bonjour'),(NULL)",
-        table_name
-    );
-    conn.execute(&sql, ()).unwrap();
+    let array_any =
+        fetch_arrow_data(table_name, "NVARCHAR(50)", "('Hello'),('Bonjour'),(NULL)").unwrap();
 
-    // Query column with values to get a cursor
-    let sql = format!("SELECT a FROM {}", table_name);
-    let cursor = conn.execute(&sql, ()).unwrap().unwrap();
-
-    // Now that we have a cursor, we want to iterate over its rows and fill an arrow batch with it.
-
-    // Batches will contain at most 100 entries.
-    let max_batch_size = 100;
-
-    let mut reader = OdbcReader::new(cursor, max_batch_size).unwrap();
-
-    // Batch for batch copy values from ODBC buffer into arrow batches
-    let arrow_batch = reader.next().unwrap().unwrap();
+    let array_vals = array_any.as_any().downcast_ref::<StringArray>().unwrap();
 
     // Assert that the correct values are found within the arrow batch
-    let array_vals = arrow_batch
-        .column(0)
-        .as_any()
-        .downcast_ref::<StringArray>()
-        .unwrap();
     assert_eq!("Hello", array_vals.value(0));
     assert_eq!("Bonjour", array_vals.value(1));
     assert!(array_vals.is_null(2));
@@ -507,35 +264,12 @@ fn fetch_nvarchar() {
 fn fetch_dates() {
     let table_name = function_name!().rsplit_once(':').unwrap().1;
 
-    // Setup a table on the database with some floats (so we can fetch them)
-    let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
-    setup_empty_table(&conn, table_name, &["DATE"]).unwrap();
-    let sql = format!(
-        "INSERT INTO {} (a) VALUES ('2021-04-09'),(NULL),('2002-09-30')",
-        table_name
-    );
-    conn.execute(&sql, ()).unwrap();
+    let array_any =
+        fetch_arrow_data(table_name, "DATE", "('2021-04-09'),(NULL),('2002-09-30')").unwrap();
 
-    // Query column with values to get a cursor
-    let sql = format!("SELECT a FROM {}", table_name);
-    let cursor = conn.execute(&sql, ()).unwrap().unwrap();
-
-    // Now that we have a cursor, we want to iterate over its rows and fill an arrow batch with it.
-
-    // Batches will contain at most 100 entries.
-    let max_batch_size = 100;
-
-    let mut reader = OdbcReader::new(cursor, max_batch_size).unwrap();
-
-    // Batch for batch copy values from ODBC buffer into arrow batches
-    let arrow_batch = reader.next().unwrap().unwrap();
+    let array_vals = array_any.as_any().downcast_ref::<Date32Array>().unwrap();
 
     // Assert that the correct values are found within the arrow batch
-    let array_vals = arrow_batch
-        .column(0)
-        .as_any()
-        .downcast_ref::<Date32Array>()
-        .unwrap();
     assert_eq!(
         Some(NaiveDate::from_ymd(2021, 04, 09)),
         array_vals.value_as_date(0)
@@ -547,40 +281,17 @@ fn fetch_dates() {
     );
 }
 
-/// Fill a record batch of Dates
+/// Fill a record batch of non nullable Dates
 #[test]
 fn fetch_non_null_dates() {
     let table_name = function_name!().rsplit_once(':').unwrap().1;
 
-    // Setup a table on the database with some floats (so we can fetch them)
-    let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
-    setup_empty_table(&conn, table_name, &["DATE NOT NULL"]).unwrap();
-    let sql = format!(
-        "INSERT INTO {} (a) VALUES ('2021-04-09'),('2002-09-30')",
-        table_name
-    );
-    conn.execute(&sql, ()).unwrap();
+    let array_any =
+        fetch_arrow_data(table_name, "DATE NOT NULL", "('2021-04-09'),('2002-09-30')").unwrap();
 
-    // Query column with values to get a cursor
-    let sql = format!("SELECT a FROM {}", table_name);
-    let cursor = conn.execute(&sql, ()).unwrap().unwrap();
-
-    // Now that we have a cursor, we want to iterate over its rows and fill an arrow batch with it.
-
-    // Batches will contain at most 100 entries.
-    let max_batch_size = 100;
-
-    let mut reader = OdbcReader::new(cursor, max_batch_size).unwrap();
-
-    // Batch for batch copy values from ODBC buffer into arrow batches
-    let arrow_batch = reader.next().unwrap().unwrap();
+    let array_vals = array_any.as_any().downcast_ref::<Date32Array>().unwrap();
 
     // Assert that the correct values are found within the arrow batch
-    let array_vals = arrow_batch
-        .column(0)
-        .as_any()
-        .downcast_ref::<Date32Array>()
-        .unwrap();
     assert_eq!(
         Some(NaiveDate::from_ymd(2021, 04, 09)),
         array_vals.value_as_date(0)
@@ -596,32 +307,12 @@ fn fetch_non_null_dates() {
 fn fetch_decimals() {
     let table_name = function_name!().rsplit_once(':').unwrap().1;
 
-    // Setup a table on the database with some floats (so we can fetch them)
-    let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
-    setup_empty_table(&conn, table_name, &["DECIMAL(5,2) NOT NULL"]).unwrap();
-    let sql = format!("INSERT INTO {} (a) VALUES (123.45),(678.90)", table_name);
-    conn.execute(&sql, ()).unwrap();
+    let array_any =
+        fetch_arrow_data(table_name, "DECIMAL(5,2) NOT NULL", "(123.45),(678.90)").unwrap();
 
-    // Query column with values to get a cursor
-    let sql = format!("SELECT a FROM {}", table_name);
-    let cursor = conn.execute(&sql, ()).unwrap().unwrap();
-
-    // Now that we have a cursor, we want to iterate over its rows and fill an arrow batch with it.
-
-    // Batches will contain at most 100 entries.
-    let max_batch_size = 100;
-
-    let mut reader = OdbcReader::new(cursor, max_batch_size).unwrap();
-
-    // Batch for batch copy values from ODBC buffer into arrow batches
-    let arrow_batch = reader.next().unwrap().unwrap();
+    let array_vals = array_any.as_any().downcast_ref::<DecimalArray>().unwrap();
 
     // Assert that the correct values are found within the arrow batch
-    let array_vals = arrow_batch
-        .column(0)
-        .as_any()
-        .downcast_ref::<DecimalArray>()
-        .unwrap();
     assert_eq!("123.45", array_vals.value_as_string(0));
     assert_eq!("678.90", array_vals.value_as_string(1));
 }
@@ -662,8 +353,38 @@ fn prepared_query() {
     assert_eq!([1., 2., 3.], array_vals.values());
 }
 
+/// Inserts the values in the literal into the database and returns them as an Arrow array.
+fn fetch_arrow_data(
+    table_name: &str,
+    column_type: &str,
+    literal: &str,
+) -> Result<ArrayRef, anyhow::Error> {
+    // Setup a table on the database
+    let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
+    setup_empty_table(&conn, table_name, &[column_type]).unwrap();
+    // Insert values using literals
+    let sql = format!("INSERT INTO {} (a) VALUES {}", table_name, literal);
+    conn.execute(&sql, ()).unwrap();
+
+    // Query column with values to get a cursor
+    let sql = format!("SELECT a FROM {}", table_name);
+    let cursor = conn.execute(&sql, ()).unwrap().unwrap();
+
+    // Now that we have a cursor, we want to iterate over its rows and fill an arrow batch with it.
+
+    // Batches will contain at most 100 entries.
+    let max_batch_size = 100;
+
+    let mut reader = OdbcReader::new(cursor, max_batch_size)?;
+
+    // Batch for batch copy values from ODBC buffer into arrow batches
+    let record_batch = reader.next().unwrap()?;
+
+    Ok(record_batch.column(0).clone())
+}
+
 /// Creates the table and assures it is empty. Columns are named a,b,c, etc.
-pub fn setup_empty_table(
+fn setup_empty_table(
     conn: &Connection,
     table_name: &str,
     column_types: &[&str],
