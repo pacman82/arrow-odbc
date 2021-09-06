@@ -1,10 +1,10 @@
 [package]
-name = "odbc-arrow"
+name = "arrow-odbc"
 version = "0.1.0"
 authors = ["Markus Klein"]
 edition = "2018"
 license = "MIT"
-repository = "https://github.com/pacman82/odbc-arrow"
+repository = "https://github.com/pacman82/arrow-odbc"
 
 # A short blurb about the package. This is not rendered in any format when
 # uploaded to crates.io (aka this is not markdown).

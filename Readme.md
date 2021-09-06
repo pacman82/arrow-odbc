@@ -1,6 +1,6 @@
-# odbc-arrow
+# arrow-odbc
 
-[![Licence](https://img.shields.io/crates/l/odbc-api)](https://github.com/pacman82/odbc-arrow/blob/master/License)
+[![Licence](https://img.shields.io/crates/l/arrow-odbc)](https://github.com/pacman82/arrow-odbc/blob/master/License)
 
 Fill Apache Arrow arrays from ODBC data sources. This crate is build on top of the [`arrow`](https://crates.io/crates/arrow) and [`odbc-api`](https://crates.io/crates/odbc-api) crate and enables you to read the data of an ODBC data source as sequence of Apache Arrow record batches.
 
@@ -15,7 +15,7 @@ Fill Apache Arrow arrays from ODBC data sources. This crate is build on top of t
 ## Usage
 
 ```rust
-use odbc_arrow::{odbc_api::Environment, OdbcReader};
+use arrow_odbc::{odbc_api::Environment, OdbcReader};
 
 const CONNECTION_STRING: &str = "\
     Driver={ODBC Driver 17 for SQL Server};\

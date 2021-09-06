@@ -5,7 +5,7 @@ use chrono::NaiveDate;
 use lazy_static::lazy_static;
 
 use odbc_api::IntoParameter;
-use odbc_arrow::{
+use arrow_odbc::{
     arrow::array::Float64Array,
     odbc_api::{
         sys::{AttrConnectionPooling, AttrCpMatch},
