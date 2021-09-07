@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.1
+
+* Add Readme path to manifest
+
 ## 0.1.0
 
 Initial release
