@@ -55,18 +55,18 @@ use thiserror::Error;
 use arrow::{
     array::{
         ArrayRef, BinaryBuilder, BooleanBuilder, Date32Builder, DecimalBuilder, PrimitiveBuilder,
-        StringBuilder,
+        StringBuilder, TimestampMillisecondBuilder,
     },
     datatypes::{
         ArrowPrimitiveType, DataType as ArrowDataType, Field, Float32Type, Float64Type, Int16Type,
-        Int32Type, Int64Type, Int8Type, Schema, SchemaRef, UInt8Type,
+        Int32Type, Int64Type, Int8Type, Schema, SchemaRef, TimeUnit, UInt8Type,
     },
     error::ArrowError,
     record_batch::{RecordBatch, RecordBatchReader},
 };
 use odbc_api::{
     buffers::{AnyColumnView, BufferDescription, BufferKind, ColumnarRowSet, Item},
-    sys::Date,
+    sys::{Date, Timestamp},
     Bit, ColumnDescription, Cursor, DataType as OdbcDataType, RowSetCursor,
 };
 
@@ -171,6 +171,10 @@ impl<C: Cursor> OdbcReader<C> {
                         ArrowDataType::Float64
                     }
                     OdbcDataType::Date => ArrowDataType::Date32,
+                    // OdbcDataType::Timestamp { precision: 0 } => ArrowDataType::Timestamp(TimeUnit::Second ,None),
+                    OdbcDataType::Timestamp { precision: 0..=3 } => {
+                        ArrowDataType::Timestamp(TimeUnit::Millisecond, None)
+                    }
                     OdbcDataType::Timestamp { precision: _ } => todo!(),
                     OdbcDataType::BigInt => ArrowDataType::Int64,
                     OdbcDataType::TinyInt => ArrowDataType::Int8,
@@ -364,6 +368,9 @@ fn choose_column_strategy(
             let length = sql_type.column_size();
             Box::new(Binary::new(field.is_nullable(), length))
         }
+        ArrowDataType::Timestamp(TimeUnit::Millisecond, _) => {
+            Box::new(NonNullableTimestampMilliseconds)
+        }
         arrow_type
         @
         (ArrowDataType::Null
@@ -463,6 +470,38 @@ where
         let mut builder = PrimitiveBuilder::<T>::new(values.len());
         for value in values {
             builder.append_option(value.copied()).unwrap();
+        }
+        Arc::new(builder.finish())
+    }
+}
+
+struct NonNullableTimestampMilliseconds;
+
+impl ColumnStrategy for NonNullableTimestampMilliseconds {
+    fn buffer_description(&self) -> BufferDescription {
+        BufferDescription {
+            nullable: false,
+            kind: BufferKind::Timestamp,
+        }
+    }
+
+    fn fill_arrow_array(&self, column_view: AnyColumnView) -> ArrayRef {
+        let values = Timestamp::as_slice(column_view).unwrap();
+        let mut builder = TimestampMillisecondBuilder::new(values.len());
+        for odbc_value in values {
+            let ndt = NaiveDate::from_ymd(
+                odbc_value.year as i32,
+                odbc_value.month as u32,
+                odbc_value.day as u32,
+            )
+            .and_hms_milli(
+                odbc_value.hour as u32,
+                odbc_value.minute as u32,
+                odbc_value.second as u32,
+                odbc_value.fraction * 1_000_000,
+            );
+            let arrow_value = ndt.timestamp_millis();
+            builder.append_value(arrow_value).unwrap();
         }
         Arc::new(builder.finish())
     }

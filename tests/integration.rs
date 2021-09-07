@@ -1,10 +1,16 @@
 use std::sync::Arc;
 
-use arrow::{array::{Array, ArrayRef, BinaryArray, BooleanArray, Date32Array, DecimalArray, Float32Array, Int16Array, Int32Array, Int64Array, Int8Array, StringArray, UInt8Array}, datatypes::{DataType, Field, Schema}};
+use arrow::{
+    array::{
+        Array, ArrayRef, BinaryArray, BooleanArray, Date32Array, DecimalArray, Float32Array,
+        Int16Array, Int32Array, Int64Array, Int8Array, StringArray, TimestampMillisecondArray,
+        UInt8Array,
+    },
+    datatypes::{DataType, Field, Schema},
+};
 use chrono::NaiveDate;
 use lazy_static::lazy_static;
 
-use odbc_api::IntoParameter;
 use arrow_odbc::{
     arrow::array::Float64Array,
     odbc_api::{
@@ -13,6 +19,7 @@ use arrow_odbc::{
     },
     Error, OdbcReader,
 };
+use odbc_api::IntoParameter;
 
 use stdext::function_name;
 
@@ -294,6 +301,34 @@ fn fetch_non_null_dates() {
     assert_eq!(
         Some(NaiveDate::from_ymd(2002, 09, 30)),
         array_vals.value_as_date(1)
+    );
+}
+
+/// Fill a record batch of non nullable Dates
+#[test]
+fn fetch_non_null_date_time() {
+    let table_name = function_name!().rsplit_once(':').unwrap().1;
+
+    let array_any = fetch_arrow_data(
+        table_name,
+        "DATETIME",
+        "('2021-04-09 18:57:50'),('2002-09-30 12:43:17')",
+    )
+    .unwrap();
+
+    let array_vals = array_any
+        .as_any()
+        .downcast_ref::<TimestampMillisecondArray>()
+        .unwrap();
+
+    // Assert that the correct values are found within the arrow batch
+    assert_eq!(
+        Some(NaiveDate::from_ymd(2021, 04, 09).and_hms_milli(18,57,50,0)),
+        array_vals.value_as_datetime(0)
+    );
+    assert_eq!(
+        Some(NaiveDate::from_ymd(2002, 09, 30).and_hms_milli(12,43,17,00)),
+        array_vals.value_as_datetime(1)
     );
 }
 
