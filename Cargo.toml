@@ -1,6 +1,6 @@
 [package]
 name = "arrow-odbc"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["Markus Klein"]
 edition = "2018"
 license = "MIT"
@@ -18,7 +18,12 @@ keywords = ["odbc", "database", "sql", "arrow"]
 # This is a list of up to five categories where this crate would fit.
 # Categories are a fixed list available at crates.io/category_slugs, and
 # they must match exactly.
-categories = ["api-bindings", "database"]
+categories = ["database"]
+
+# This points to a file under the package root (relative to this `Cargo.toml`).
+# The contents of this file are stored and indexed in the registry.
+# crates.io will render this file and place the result on the crate's page.
+readme = "Readme.md"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -27,7 +32,7 @@ arrow = "5.3.0"
 atoi = "0.4.0"
 chrono = "0.4.19"
 odbc-api = "0.27.3"
-thiserror = "1.0.28"
+thiserror = "1.0.29"
 
 [dev-dependencies]
 anyhow = "1.0.43"
