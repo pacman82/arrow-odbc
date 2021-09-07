@@ -304,15 +304,43 @@ fn fetch_non_null_dates() {
     );
 }
 
-/// Fill a record batch of non nullable Dates
+/// Fill a record batch of non nullable timestamps with milliseconds precision
 #[test]
 fn fetch_non_null_date_time() {
     let table_name = function_name!().rsplit_once(':').unwrap().1;
 
     let array_any = fetch_arrow_data(
         table_name,
+        "DATETIME NOT NULL",
+        "('2021-04-09 18:57:50.12'),('2002-09-30 12:43:17.45')",
+    )
+    .unwrap();
+
+    let array_vals = array_any
+        .as_any()
+        .downcast_ref::<TimestampMillisecondArray>()
+        .unwrap();
+
+    // Assert that the correct values are found within the arrow batch
+    assert_eq!(
+        Some(NaiveDate::from_ymd(2021, 04, 09).and_hms_milli(18, 57, 50, 120)),
+        array_vals.value_as_datetime(0)
+    );
+    assert_eq!(
+        Some(NaiveDate::from_ymd(2002, 09, 30).and_hms_milli(12, 43, 17, 450)),
+        array_vals.value_as_datetime(1)
+    );
+}
+
+/// Fill a record batch of nullable timestamps with milliseconds precision
+#[test]
+fn fetch_date_time() {
+    let table_name = function_name!().rsplit_once(':').unwrap().1;
+
+    let array_any = fetch_arrow_data(
+        table_name,
         "DATETIME",
-        "('2021-04-09 18:57:50'),('2002-09-30 12:43:17')",
+        "('2021-04-09 18:57:50'),(NULL),('2002-09-30 12:43:17')",
     )
     .unwrap();
 
@@ -326,9 +354,10 @@ fn fetch_non_null_date_time() {
         Some(NaiveDate::from_ymd(2021, 04, 09).and_hms_milli(18, 57, 50, 0)),
         array_vals.value_as_datetime(0)
     );
+    assert!(array_vals.is_null(1));
     assert_eq!(
         Some(NaiveDate::from_ymd(2002, 09, 30).and_hms_milli(12, 43, 17, 00)),
-        array_vals.value_as_datetime(1)
+        array_vals.value_as_datetime(2)
     );
 }
 

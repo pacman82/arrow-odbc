@@ -1,19 +1,22 @@
-use std::{char::decode_utf16, convert::TryInto, marker::PhantomData, sync::Arc};
+use std::{char::decode_utf16, marker::PhantomData, sync::Arc};
 
 use arrow::{
     array::{
-        ArrayRef, BinaryBuilder, BooleanBuilder, Date32Builder, DecimalBuilder, PrimitiveBuilder,
-        StringBuilder, TimestampMillisecondBuilder,
+        ArrayRef, BinaryBuilder, BooleanBuilder, DecimalBuilder, PrimitiveBuilder,
+        StringBuilder,
     },
     datatypes::ArrowPrimitiveType,
 };
 use atoi::FromRadix10Signed;
-use chrono::NaiveDate;
 use odbc_api::{
     buffers::{AnyColumnView, BufferDescription, BufferKind, Item},
-    sys::{Date, Timestamp},
     Bit,
 };
+
+mod with_conversion;
+mod date_time;
+
+pub use self::{with_conversion::{Conversion, with_conversion}, date_time::{DateConversion, TimestampMsConversion}};
 
 /// All decisions needed to copy data from an ODBC buffer to an Arrow Array
 pub trait ColumnStrategy {
@@ -24,7 +27,9 @@ pub trait ColumnStrategy {
     fn fill_arrow_array(&self, column_view: AnyColumnView) -> ArrayRef;
 }
 
-pub fn primitive_arrow_type_startegy<T>(nullable: bool) -> Box<dyn ColumnStrategy>
+/// This is applicable thenever there is a Primitive Arrow array whose native type is identical with
+/// the ODBC buffer type.
+pub fn no_conversion<T>(nullable: bool) -> Box<dyn ColumnStrategy>
 where
     T: ArrowPrimitiveType,
     T::Native: Item,
@@ -97,38 +102,6 @@ where
         let mut builder = PrimitiveBuilder::<T>::new(values.len());
         for value in values {
             builder.append_option(value.copied()).unwrap();
-        }
-        Arc::new(builder.finish())
-    }
-}
-
-pub struct NonNullableTimestampMilliseconds;
-
-impl ColumnStrategy for NonNullableTimestampMilliseconds {
-    fn buffer_description(&self) -> BufferDescription {
-        BufferDescription {
-            nullable: false,
-            kind: BufferKind::Timestamp,
-        }
-    }
-
-    fn fill_arrow_array(&self, column_view: AnyColumnView) -> ArrayRef {
-        let values = Timestamp::as_slice(column_view).unwrap();
-        let mut builder = TimestampMillisecondBuilder::new(values.len());
-        for odbc_value in values {
-            let ndt = NaiveDate::from_ymd(
-                odbc_value.year as i32,
-                odbc_value.month as u32,
-                odbc_value.day as u32,
-            )
-            .and_hms_milli(
-                odbc_value.hour as u32,
-                odbc_value.minute as u32,
-                odbc_value.second as u32,
-                odbc_value.fraction * 1_000_000,
-            );
-            let arrow_value = ndt.timestamp_millis();
-            builder.append_value(arrow_value).unwrap();
         }
         Arc::new(builder.finish())
     }
@@ -223,56 +196,6 @@ impl ColumnStrategy for WideText {
         }
         Arc::new(builder.finish())
     }
-}
-
-pub struct NonNullableDate;
-
-impl ColumnStrategy for NonNullableDate {
-    fn buffer_description(&self) -> BufferDescription {
-        BufferDescription {
-            nullable: false,
-            kind: BufferKind::Date,
-        }
-    }
-
-    fn fill_arrow_array(&self, column_view: AnyColumnView) -> ArrayRef {
-        let values = Date::as_slice(column_view).unwrap();
-        let mut builder = Date32Builder::new(values.len());
-        for odbc_date in values {
-            builder.append_value(days_since_epoch(odbc_date)).unwrap();
-        }
-        Arc::new(builder.finish())
-    }
-}
-
-pub struct NullableDate;
-
-impl ColumnStrategy for NullableDate {
-    fn buffer_description(&self) -> BufferDescription {
-        BufferDescription {
-            nullable: true,
-            kind: BufferKind::Date,
-        }
-    }
-
-    fn fill_arrow_array(&self, column_view: AnyColumnView) -> ArrayRef {
-        let values = Date::as_nullable_slice(column_view).unwrap();
-        let mut builder = Date32Builder::new(values.len());
-        for odbc_date in values {
-            builder
-                .append_option(odbc_date.map(days_since_epoch))
-                .unwrap();
-        }
-        Arc::new(builder.finish())
-    }
-}
-
-/// Transform date to days since unix epoch as i32
-fn days_since_epoch(date: &Date) -> i32 {
-    let unix_epoch = NaiveDate::from_ymd(1970, 1, 1);
-    let date = NaiveDate::from_ymd(date.year as i32, date.month as u32, date.day as u32);
-    let duration = date.signed_duration_since(unix_epoch);
-    duration.num_days().try_into().unwrap()
 }
 
 pub struct Decimal {

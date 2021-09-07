@@ -57,15 +57,14 @@ use arrow::{
     error::ArrowError,
     record_batch::{RecordBatch, RecordBatchReader},
 };
-use column_strategy::ColumnStrategy;
+use column_strategy::{with_conversion, ColumnStrategy, DateConversion, TimestampMsConversion};
 use odbc_api::{
     buffers::ColumnarRowSet, ColumnDescription, Cursor, DataType as OdbcDataType, RowSetCursor,
 };
 use thiserror::Error;
 
 use self::column_strategy::{
-    primitive_arrow_type_startegy, Binary, Decimal, NonNullableBoolean, NonNullableDate,
-    NonNullableTimestampMilliseconds, NullableBoolean, NullableDate, WideText,
+    no_conversion, Binary, Decimal, NonNullableBoolean, NullableBoolean, WideText,
 };
 
 mod column_strategy;
@@ -314,21 +313,14 @@ fn choose_column_strategy(
                 Box::new(NonNullableBoolean)
             }
         }
-        ArrowDataType::Int8 => primitive_arrow_type_startegy::<Int8Type>(field.is_nullable()),
-        ArrowDataType::Int16 => primitive_arrow_type_startegy::<Int16Type>(field.is_nullable()),
-        ArrowDataType::Int32 => primitive_arrow_type_startegy::<Int32Type>(field.is_nullable()),
-        ArrowDataType::Int64 => primitive_arrow_type_startegy::<Int64Type>(field.is_nullable()),
-        ArrowDataType::UInt8 => primitive_arrow_type_startegy::<UInt8Type>(field.is_nullable()),
-        ArrowDataType::Float32 => primitive_arrow_type_startegy::<Float32Type>(field.is_nullable()),
-        ArrowDataType::Float64 => primitive_arrow_type_startegy::<Float64Type>(field.is_nullable()),
-        ArrowDataType::Date32 => {
-            if field.is_nullable() {
-                Box::new(NullableDate)
-            } else {
-                Box::new(NonNullableDate)
-            }
-        }
-
+        ArrowDataType::Int8 => no_conversion::<Int8Type>(field.is_nullable()),
+        ArrowDataType::Int16 => no_conversion::<Int16Type>(field.is_nullable()),
+        ArrowDataType::Int32 => no_conversion::<Int32Type>(field.is_nullable()),
+        ArrowDataType::Int64 => no_conversion::<Int64Type>(field.is_nullable()),
+        ArrowDataType::UInt8 => no_conversion::<UInt8Type>(field.is_nullable()),
+        ArrowDataType::Float32 => no_conversion::<Float32Type>(field.is_nullable()),
+        ArrowDataType::Float64 => no_conversion::<Float64Type>(field.is_nullable()),
+        ArrowDataType::Date32 => with_conversion(field.is_nullable(), DateConversion),
         ArrowDataType::Utf8 => {
             // Currently we request text data as utf16 as this works well with both Posix and
             // Windows environments.
@@ -360,7 +352,7 @@ fn choose_column_strategy(
             Box::new(Binary::new(field.is_nullable(), length))
         }
         ArrowDataType::Timestamp(TimeUnit::Millisecond, _) => {
-            Box::new(NonNullableTimestampMilliseconds)
+            with_conversion(field.is_nullable(), TimestampMsConversion)
         }
         arrow_type
         @
