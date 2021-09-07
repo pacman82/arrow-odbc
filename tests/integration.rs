@@ -323,11 +323,11 @@ fn fetch_non_null_date_time() {
 
     // Assert that the correct values are found within the arrow batch
     assert_eq!(
-        Some(NaiveDate::from_ymd(2021, 04, 09).and_hms_milli(18,57,50,0)),
+        Some(NaiveDate::from_ymd(2021, 04, 09).and_hms_milli(18, 57, 50, 0)),
         array_vals.value_as_datetime(0)
     );
     assert_eq!(
-        Some(NaiveDate::from_ymd(2002, 09, 30).and_hms_milli(12,43,17,00)),
+        Some(NaiveDate::from_ymd(2002, 09, 30).and_hms_milli(12, 43, 17, 00)),
         array_vals.value_as_datetime(1)
     );
 }
