@@ -1,6 +1,9 @@
 use std::convert::TryInto;
 
-use arrow::datatypes::{Date32Type, TimestampMillisecondType};
+use arrow::datatypes::{
+    Date32Type, TimestampMicrosecondType, TimestampMillisecondType, TimestampNanosecondType,
+    TimestampSecondType,
+};
 use chrono::NaiveDate;
 use odbc_api::sys::{Date, Timestamp};
 
@@ -26,7 +29,20 @@ fn days_since_epoch(date: &Date) -> i32 {
     duration.num_days().try_into().unwrap()
 }
 
-/// Converts an ODBC Timestamp to an Arrow MillisecondsTimestamp
+/// Converts an ODBC Timestamp to an Arrow seconds timestamp
+pub struct TimestampSecConversion;
+
+impl Conversion for TimestampSecConversion {
+    type Odbc = Timestamp;
+    type Arrow = TimestampSecondType;
+
+    fn convert(&self, from: &Self::Odbc) -> i64 {
+        let ndt = NaiveDate::from_ymd(from.year as i32, from.month as u32, from.day as u32)
+            .and_hms(from.hour as u32, from.minute as u32, from.second as u32);
+        ndt.timestamp()
+    }
+}
+/// Converts an ODBC Timestamp to an Arrow Milliseconds timestamp
 pub struct TimestampMsConversion;
 
 impl Conversion for TimestampMsConversion {
@@ -42,5 +58,43 @@ impl Conversion for TimestampMsConversion {
                 from.fraction,
             );
         ndt.timestamp_millis()
+    }
+}
+
+/// Converts an ODBC Timestamp to an Arrow Miroseconds timestamp
+pub struct TimestampUsConversion;
+
+impl Conversion for TimestampUsConversion {
+    type Odbc = Timestamp;
+    type Arrow = TimestampMicrosecondType;
+
+    fn convert(&self, from: &Self::Odbc) -> i64 {
+        let ndt = NaiveDate::from_ymd(from.year as i32, from.month as u32, from.day as u32)
+            .and_hms_nano(
+                from.hour as u32,
+                from.minute as u32,
+                from.second as u32,
+                from.fraction,
+            );
+        ndt.timestamp_nanos() * 1_000
+    }
+}
+
+/// Converts an ODBC Timestamp to an Arrow nanoseconds timestamp
+pub struct TimestampNsConversion;
+
+impl Conversion for TimestampNsConversion {
+    type Odbc = Timestamp;
+    type Arrow = TimestampNanosecondType;
+
+    fn convert(&self, from: &Self::Odbc) -> i64 {
+        let ndt = NaiveDate::from_ymd(from.year as i32, from.month as u32, from.day as u32)
+            .and_hms_nano(
+                from.hour as u32,
+                from.minute as u32,
+                from.second as u32,
+                from.fraction,
+            );
+        ndt.timestamp_nanos()
     }
 }

@@ -57,25 +57,28 @@ fn main() -> Result<(), anyhow::Error> {
 
 ## Matching of ODBC to Arrow types
 
-| ODBC             | Arrow   |
-| ---------------- | ------- |
-| Numeric(p <= 38) | Decimal |
-| Decimal(p <= 38) | Decimal |
-| Integer          | Int32   |
-| SmallInt         | Int16   |
-| Real             | Float32 |
-| Float(p<=24)     | Float32 |
-| Double           | Float64 |
-| Float(p > 24)    | Float64 |
-| Date             | Date32  |
-| LongVarbinary    | Binary  |
-| Timestamp        | todo!   |
-| BigInt           | Int64   |
-| TinyInt          | Int8    |
-| Bit              | Boolean |
-| Varbinary        | Binary  |
-| Binary           | Binary  |
-| All others       | Utf8    |
+| ODBC               | Arrow                |
+| ------------------ | -------------------- |
+| Numeric(p <= 38)   | Decimal              |
+| Decimal(p <= 38)   | Decimal              |
+| Integer            | Int32                |
+| SmallInt           | Int16                |
+| Real               | Float32              |
+| Float(p <=24)      | Float32              |
+| Double             | Float64              |
+| Float(p > 24)      | Float64              |
+| Date               | Date32               |
+| LongVarbinary      | Binary               |
+| Timestamp(p = 0)   | TimestampSecond      |
+| Timestamp(p: 1..3) | TimestampMilliSecond |
+| Timestamp(p: 4..6) | TimestampMicroSecond |
+| Timestamp(p >= 7 ) | TimestampNanoSecond  |
+| BigInt             | Int64                |
+| TinyInt            | Int8                 |
+| Bit                | Boolean              |
+| Varbinary          | Binary               |
+| Binary             | Binary               |
+| All others         | Utf8                 |
 
 ## Supported Arrow types
 

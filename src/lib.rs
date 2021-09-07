@@ -57,7 +57,7 @@ use arrow::{
     error::ArrowError,
     record_batch::{RecordBatch, RecordBatchReader},
 };
-use column_strategy::{with_conversion, ColumnStrategy, DateConversion, TimestampMsConversion};
+use column_strategy::{ColumnStrategy, DateConversion, TimestampMsConversion, TimestampNsConversion, TimestampSecConversion, TimestampUsConversion, with_conversion};
 use odbc_api::{
     buffers::ColumnarRowSet, ColumnDescription, Cursor, DataType as OdbcDataType, RowSetCursor,
 };
@@ -170,11 +170,12 @@ impl<C: Cursor> OdbcReader<C> {
                         ArrowDataType::Float64
                     }
                     OdbcDataType::Date => ArrowDataType::Date32,
-                    // OdbcDataType::Timestamp { precision: 0 } => ArrowDataType::Timestamp(TimeUnit::Second ,None),
-                    OdbcDataType::Timestamp { precision: 0..=3 } => {
+                    OdbcDataType::Timestamp { precision: 0 } => ArrowDataType::Timestamp(TimeUnit::Second ,None),
+                    OdbcDataType::Timestamp { precision: 1..=3 } => {
                         ArrowDataType::Timestamp(TimeUnit::Millisecond, None)
                     }
-                    OdbcDataType::Timestamp { precision: _ } => todo!(),
+                    OdbcDataType::Timestamp { precision: 4..=6 } => ArrowDataType::Timestamp(TimeUnit::Microsecond, None),
+                    OdbcDataType::Timestamp { precision: _ } => ArrowDataType::Timestamp(TimeUnit::Nanosecond, None),
                     OdbcDataType::BigInt => ArrowDataType::Int64,
                     OdbcDataType::TinyInt => ArrowDataType::Int8,
                     OdbcDataType::Bit => ArrowDataType::Boolean,
@@ -351,13 +352,21 @@ fn choose_column_strategy(
             let length = sql_type.column_size();
             Box::new(Binary::new(field.is_nullable(), length))
         }
+        ArrowDataType::Timestamp(TimeUnit::Second, _) => {
+            with_conversion(field.is_nullable(), TimestampSecConversion)
+        }
         ArrowDataType::Timestamp(TimeUnit::Millisecond, _) => {
             with_conversion(field.is_nullable(), TimestampMsConversion)
+        }
+        ArrowDataType::Timestamp(TimeUnit::Microsecond, _) => {
+            with_conversion(field.is_nullable(), TimestampUsConversion)
+        }
+        ArrowDataType::Timestamp(TimeUnit::Nanosecond, _) => {
+            with_conversion(field.is_nullable(), TimestampNsConversion)
         }
         arrow_type
         @
         (ArrowDataType::Null
-        | ArrowDataType::Timestamp(_, _)
         | ArrowDataType::Date64
         | ArrowDataType::Time32(_)
         | ArrowDataType::Time64(_)

@@ -2,8 +2,7 @@ use std::{char::decode_utf16, marker::PhantomData, sync::Arc};
 
 use arrow::{
     array::{
-        ArrayRef, BinaryBuilder, BooleanBuilder, DecimalBuilder, PrimitiveBuilder,
-        StringBuilder,
+        ArrayRef, BinaryBuilder, BooleanBuilder, DecimalBuilder, PrimitiveBuilder, StringBuilder,
     },
     datatypes::ArrowPrimitiveType,
 };
@@ -13,10 +12,16 @@ use odbc_api::{
     Bit,
 };
 
-mod with_conversion;
 mod date_time;
+mod with_conversion;
 
-pub use self::{with_conversion::{Conversion, with_conversion}, date_time::{DateConversion, TimestampMsConversion}};
+pub use self::{
+    date_time::{
+        DateConversion, TimestampMsConversion, TimestampNsConversion, TimestampSecConversion,
+        TimestampUsConversion,
+    },
+    with_conversion::{with_conversion, Conversion},
+};
 
 /// All decisions needed to copy data from an ODBC buffer to an Arrow Array
 pub trait ColumnStrategy {

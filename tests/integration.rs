@@ -1,13 +1,6 @@
 use std::sync::Arc;
 
-use arrow::{
-    array::{
-        Array, ArrayRef, BinaryArray, BooleanArray, Date32Array, DecimalArray, Float32Array,
-        Int16Array, Int32Array, Int64Array, Int8Array, StringArray, TimestampMillisecondArray,
-        UInt8Array,
-    },
-    datatypes::{DataType, Field, Schema},
-};
+use arrow::{array::{Array, ArrayRef, BinaryArray, BooleanArray, Date32Array, DecimalArray, Float32Array, Int16Array, Int32Array, Int64Array, Int8Array, StringArray, TimestampMillisecondArray, TimestampNanosecondArray, UInt8Array}, datatypes::{DataType, Field, Schema}};
 use chrono::NaiveDate;
 use lazy_static::lazy_static;
 
@@ -358,6 +351,34 @@ fn fetch_date_time() {
     assert_eq!(
         Some(NaiveDate::from_ymd(2002, 09, 30).and_hms_milli(12, 43, 17, 00)),
         array_vals.value_as_datetime(2)
+    );
+}
+
+/// Fill a record batch of non nullable timestamps with nanoseconds precision
+#[test]
+fn fetch_non_null_date_time_2() {
+    let table_name = function_name!().rsplit_once(':').unwrap().1;
+
+    let array_any = fetch_arrow_data(
+        table_name,
+        "DATETIME2 NOT NULL",
+        "('2021-04-09 18:57:50.1234567'),('2002-09-30 12:43:17.456')",
+    )
+    .unwrap();
+
+    let array_vals = array_any
+        .as_any()
+        .downcast_ref::<TimestampNanosecondArray>()
+        .unwrap();
+
+    // Assert that the correct values are found within the arrow batch
+    assert_eq!(
+        Some(NaiveDate::from_ymd(2021, 04, 09).and_hms_nano(18, 57, 50, 123_456_700)),
+        array_vals.value_as_datetime(0)
+    );
+    assert_eq!(
+        Some(NaiveDate::from_ymd(2002, 09, 30).and_hms_nano(12, 43, 17, 456_000_000)),
+        array_vals.value_as_datetime(1)
     );
 }
 
