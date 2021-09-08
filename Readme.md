@@ -84,4 +84,4 @@ fn main() -> Result<(), anyhow::Error> {
 
 ## Supported Arrow types
 
-WIP
+Appart from the afformentioned Arrow types `Uint8` is also supported if specifying the Arrow schema directly.

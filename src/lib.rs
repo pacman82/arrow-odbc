@@ -77,19 +77,22 @@ mod column_strategy;
 pub use arrow;
 pub use odbc_api;
 
+/// A variation of things which can go wrong then creating an [`OdbcReader`].
 #[derive(Error, Debug)]
 pub enum Error {
+    /// The type specified in the arrow schema is not supported to be fetched from the database.
     #[error(
         "Unsupported arrow type: `{0}`. This type can currently not be fetched from an ODBC data \
         source by an instance of OdbcReader."
     )]
-    /// The type specified in the arrow schema is not supported to be fetched from the database.
     UnsupportedArrowType(ArrowDataType),
+    /// At ODBC api calls gaining information about the columns did fail.
     #[error(
         "An error occurred fetching the column description or data type from the metainformation \
         attached to the ODBC result set:\n{0}"
     )]
     FailedToDescribeColumn(#[source] odbc_api::Error),
+    /// Unable to retrieve the column display size for the column.
     #[error(
         "Unable to deduce the maximum string length for the SQL Data Type reported by the ODBC \
         driver. Reported SQL data type is: {:?}.\n Error fetching column display size: {source}",
@@ -99,8 +102,10 @@ pub enum Error {
         sql_type: OdbcDataType,
         source: odbc_api::Error,
     },
+    /// We are getting a display size from ODBC but it is not larger than 0.
     #[error("ODBC reported a display size of {0}.")]
     InvalidDisplaySize(isize),
+    /// Failure to retrieve the number of columns from the result set.
     #[error("Unable to retrieve number of columns in result set.\n{0}")]
     UnableToRetrieveNumCols(odbc_api::Error),
 }
