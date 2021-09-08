@@ -1,6 +1,13 @@
 use std::sync::Arc;
 
-use arrow::{array::{Array, ArrayRef, BinaryArray, BooleanArray, Date32Array, DecimalArray, Float32Array, Int16Array, Int32Array, Int64Array, Int8Array, StringArray, TimestampMillisecondArray, TimestampNanosecondArray, UInt8Array}, datatypes::{DataType, Field, Schema}};
+use arrow::{
+    array::{
+        Array, ArrayRef, BinaryArray, BooleanArray, Date32Array, DecimalArray, Float32Array,
+        Int16Array, Int32Array, Int64Array, Int8Array, StringArray, TimestampMillisecondArray,
+        TimestampNanosecondArray, UInt8Array,
+    },
+    datatypes::{DataType, Field, Schema},
+};
 use chrono::NaiveDate;
 use lazy_static::lazy_static;
 
@@ -162,9 +169,9 @@ fn fetch_boolean() {
     let array_vals = array_any.as_any().downcast_ref::<BooleanArray>().unwrap();
 
     // Assert that the correct values are found within the arrow batch
-    assert_eq!(true, array_vals.value(0));
-    assert_eq!(false, array_vals.value(1));
-    assert_eq!(true, array_vals.value(2));
+    assert!(array_vals.value(0));
+    assert!(!array_vals.value(1));
+    assert!(array_vals.value(2));
 }
 
 /// Fill a record batch with nullable Booleans from Bits
@@ -178,10 +185,10 @@ fn fetch_nullable_boolean() {
 
     // Assert that the correct values are found within the arrow batch
     assert!(array_vals.is_valid(0));
-    assert_eq!(true, array_vals.value(0));
+    assert!(array_vals.value(0));
     assert!(array_vals.is_null(1));
     assert!(array_vals.is_valid(2));
-    assert_eq!(false, array_vals.value(2));
+    assert!(!array_vals.value(2));
 }
 
 /// Fill a record batch with non nullable `f32` directly from the datasource
@@ -266,12 +273,12 @@ fn fetch_dates() {
 
     // Assert that the correct values are found within the arrow batch
     assert_eq!(
-        Some(NaiveDate::from_ymd(2021, 04, 09)),
+        Some(NaiveDate::from_ymd(2021, 4, 9)),
         array_vals.value_as_date(0)
     );
     assert!(array_vals.is_null(1));
     assert_eq!(
-        Some(NaiveDate::from_ymd(2002, 09, 30)),
+        Some(NaiveDate::from_ymd(2002, 9, 30)),
         array_vals.value_as_date(2)
     );
 }
@@ -288,11 +295,11 @@ fn fetch_non_null_dates() {
 
     // Assert that the correct values are found within the arrow batch
     assert_eq!(
-        Some(NaiveDate::from_ymd(2021, 04, 09)),
+        Some(NaiveDate::from_ymd(2021, 4, 9)),
         array_vals.value_as_date(0)
     );
     assert_eq!(
-        Some(NaiveDate::from_ymd(2002, 09, 30)),
+        Some(NaiveDate::from_ymd(2002, 9, 30)),
         array_vals.value_as_date(1)
     );
 }
@@ -316,11 +323,11 @@ fn fetch_non_null_date_time() {
 
     // Assert that the correct values are found within the arrow batch
     assert_eq!(
-        Some(NaiveDate::from_ymd(2021, 04, 09).and_hms_milli(18, 57, 50, 120)),
+        Some(NaiveDate::from_ymd(2021, 4, 9).and_hms_milli(18, 57, 50, 120)),
         array_vals.value_as_datetime(0)
     );
     assert_eq!(
-        Some(NaiveDate::from_ymd(2002, 09, 30).and_hms_milli(12, 43, 17, 450)),
+        Some(NaiveDate::from_ymd(2002, 9, 30).and_hms_milli(12, 43, 17, 450)),
         array_vals.value_as_datetime(1)
     );
 }
@@ -344,12 +351,12 @@ fn fetch_date_time() {
 
     // Assert that the correct values are found within the arrow batch
     assert_eq!(
-        Some(NaiveDate::from_ymd(2021, 04, 09).and_hms_milli(18, 57, 50, 0)),
+        Some(NaiveDate::from_ymd(2021, 4, 9).and_hms_milli(18, 57, 50, 0)),
         array_vals.value_as_datetime(0)
     );
     assert!(array_vals.is_null(1));
     assert_eq!(
-        Some(NaiveDate::from_ymd(2002, 09, 30).and_hms_milli(12, 43, 17, 00)),
+        Some(NaiveDate::from_ymd(2002, 9, 30).and_hms_milli(12, 43, 17, 00)),
         array_vals.value_as_datetime(2)
     );
 }
@@ -373,11 +380,11 @@ fn fetch_non_null_date_time_2() {
 
     // Assert that the correct values are found within the arrow batch
     assert_eq!(
-        Some(NaiveDate::from_ymd(2021, 04, 09).and_hms_nano(18, 57, 50, 123_456_700)),
+        Some(NaiveDate::from_ymd(2021, 4, 9).and_hms_nano(18, 57, 50, 123_456_700)),
         array_vals.value_as_datetime(0)
     );
     assert_eq!(
-        Some(NaiveDate::from_ymd(2002, 09, 30).and_hms_nano(12, 43, 17, 456_000_000)),
+        Some(NaiveDate::from_ymd(2002, 9, 30).and_hms_nano(12, 43, 17, 456_000_000)),
         array_vals.value_as_datetime(1)
     );
 }

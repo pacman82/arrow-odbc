@@ -57,7 +57,10 @@ use arrow::{
     error::ArrowError,
     record_batch::{RecordBatch, RecordBatchReader},
 };
-use column_strategy::{ColumnStrategy, DateConversion, TimestampMsConversion, TimestampNsConversion, TimestampSecConversion, TimestampUsConversion, with_conversion};
+use column_strategy::{
+    with_conversion, ColumnStrategy, DateConversion, TimestampMsConversion, TimestampNsConversion,
+    TimestampSecConversion, TimestampUsConversion,
+};
 use odbc_api::{
     buffers::ColumnarRowSet, ColumnDescription, Cursor, DataType as OdbcDataType, RowSetCursor,
 };
@@ -170,12 +173,18 @@ impl<C: Cursor> OdbcReader<C> {
                         ArrowDataType::Float64
                     }
                     OdbcDataType::Date => ArrowDataType::Date32,
-                    OdbcDataType::Timestamp { precision: 0 } => ArrowDataType::Timestamp(TimeUnit::Second ,None),
+                    OdbcDataType::Timestamp { precision: 0 } => {
+                        ArrowDataType::Timestamp(TimeUnit::Second, None)
+                    }
                     OdbcDataType::Timestamp { precision: 1..=3 } => {
                         ArrowDataType::Timestamp(TimeUnit::Millisecond, None)
                     }
-                    OdbcDataType::Timestamp { precision: 4..=6 } => ArrowDataType::Timestamp(TimeUnit::Microsecond, None),
-                    OdbcDataType::Timestamp { precision: _ } => ArrowDataType::Timestamp(TimeUnit::Nanosecond, None),
+                    OdbcDataType::Timestamp { precision: 4..=6 } => {
+                        ArrowDataType::Timestamp(TimeUnit::Microsecond, None)
+                    }
+                    OdbcDataType::Timestamp { precision: _ } => {
+                        ArrowDataType::Timestamp(TimeUnit::Nanosecond, None)
+                    }
                     OdbcDataType::BigInt => ArrowDataType::Int64,
                     OdbcDataType::TinyInt => ArrowDataType::Int8,
                     OdbcDataType::Bit => ArrowDataType::Boolean,
