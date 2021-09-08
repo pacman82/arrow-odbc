@@ -1,11 +1,6 @@
-use std::{char::decode_utf16, marker::PhantomData, sync::Arc};
+use std::{char::decode_utf16, sync::Arc};
 
-use arrow::{
-    array::{
-        ArrayRef, BinaryBuilder, BooleanBuilder, DecimalBuilder, PrimitiveBuilder, StringBuilder,
-    },
-    datatypes::ArrowPrimitiveType,
-};
+use arrow::array::{ArrayRef, BinaryBuilder, BooleanBuilder, DecimalBuilder, StringBuilder};
 use atoi::FromRadix10Signed;
 use odbc_api::{
     buffers::{AnyColumnView, BufferDescription, BufferKind, Item},
@@ -13,6 +8,7 @@ use odbc_api::{
 };
 
 mod date_time;
+mod no_conversion;
 mod with_conversion;
 
 pub use self::{
@@ -20,6 +16,7 @@ pub use self::{
         DateConversion, TimestampMsConversion, TimestampNsConversion, TimestampSecConversion,
         TimestampUsConversion,
     },
+    no_conversion::no_conversion,
     with_conversion::{with_conversion, Conversion},
 };
 
@@ -30,86 +27,6 @@ pub trait ColumnStrategy {
 
     /// Create an arrow array from an ODBC buffer described in [`Self::buffer_description`].
     fn fill_arrow_array(&self, column_view: AnyColumnView) -> ArrayRef;
-}
-
-/// This is applicable thenever there is a Primitive Arrow array whose native type is identical with
-/// the ODBC buffer type.
-pub fn no_conversion<T>(nullable: bool) -> Box<dyn ColumnStrategy>
-where
-    T: ArrowPrimitiveType,
-    T::Native: Item,
-{
-    if nullable {
-        Box::new(NullableDirectStrategy::<T>::new())
-    } else {
-        Box::new(NonNullDirectStrategy::<T>::new())
-    }
-}
-
-struct NonNullDirectStrategy<T> {
-    phantom: PhantomData<T>,
-}
-
-impl<T> NonNullDirectStrategy<T> {
-    fn new() -> Self {
-        Self {
-            phantom: PhantomData,
-        }
-    }
-}
-
-impl<T> ColumnStrategy for NonNullDirectStrategy<T>
-where
-    T: ArrowPrimitiveType,
-    T::Native: Item,
-{
-    fn buffer_description(&self) -> BufferDescription {
-        BufferDescription {
-            kind: T::Native::BUFFER_KIND,
-            nullable: false,
-        }
-    }
-
-    fn fill_arrow_array(&self, column_view: AnyColumnView) -> ArrayRef {
-        let slice = T::Native::as_slice(column_view).unwrap();
-        let mut builder = PrimitiveBuilder::<T>::new(slice.len());
-        builder.append_slice(slice).unwrap();
-        Arc::new(builder.finish())
-    }
-}
-
-struct NullableDirectStrategy<T> {
-    phantom: PhantomData<T>,
-}
-
-impl<T> NullableDirectStrategy<T> {
-    fn new() -> Self {
-        Self {
-            phantom: PhantomData,
-        }
-    }
-}
-
-impl<T> ColumnStrategy for NullableDirectStrategy<T>
-where
-    T: ArrowPrimitiveType,
-    T::Native: Item,
-{
-    fn buffer_description(&self) -> BufferDescription {
-        BufferDescription {
-            kind: T::Native::BUFFER_KIND,
-            nullable: true,
-        }
-    }
-
-    fn fill_arrow_array(&self, column_view: AnyColumnView) -> ArrayRef {
-        let values = T::Native::as_nullable_slice(column_view).unwrap();
-        let mut builder = PrimitiveBuilder::<T>::new(values.len());
-        for value in values {
-            builder.append_option(value.copied()).unwrap();
-        }
-        Arc::new(builder.finish())
-    }
 }
 
 pub struct NonNullableBoolean;
