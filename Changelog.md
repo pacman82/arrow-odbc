@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.2
+
+* Support fixed sized binary types.
+
 ## 0.1.1
 
 * Add Readme path to manifest

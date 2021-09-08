@@ -58,8 +58,8 @@ use arrow::{
     record_batch::{RecordBatch, RecordBatchReader},
 };
 use column_strategy::{
-    with_conversion, ColumnStrategy, DateConversion, TimestampMsConversion, TimestampNsConversion,
-    TimestampSecConversion, TimestampUsConversion,
+    with_conversion, ColumnStrategy, DateConversion, FixedSizedBinary, TimestampMsConversion,
+    TimestampNsConversion, TimestampSecConversion, TimestampUsConversion,
 };
 use odbc_api::{
     buffers::ColumnarRowSet, ColumnDescription, Cursor, DataType as OdbcDataType, RowSetCursor,
@@ -188,8 +188,10 @@ impl<C: Cursor> OdbcReader<C> {
                     OdbcDataType::BigInt => ArrowDataType::Int64,
                     OdbcDataType::TinyInt => ArrowDataType::Int8,
                     OdbcDataType::Bit => ArrowDataType::Boolean,
+                    OdbcDataType::Binary { length } => {
+                        ArrowDataType::FixedSizeBinary(length.try_into().unwrap())
+                    }
                     OdbcDataType::LongVarbinary { length: _ }
-                    | OdbcDataType::Binary { length: _ }
                     | OdbcDataType::Varbinary { length: _ } => ArrowDataType::Binary,
                     OdbcDataType::Unknown
                     | OdbcDataType::Time { precision: _ }
@@ -373,6 +375,10 @@ fn choose_column_strategy(
         ArrowDataType::Timestamp(TimeUnit::Nanosecond, _) => {
             with_conversion(field.is_nullable(), TimestampNsConversion)
         }
+        ArrowDataType::FixedSizeBinary(length) => Box::new(FixedSizedBinary::new(
+            field.is_nullable(),
+            (*length).try_into().unwrap(),
+        )),
         arrow_type
         @
         (ArrowDataType::Null
@@ -381,7 +387,6 @@ fn choose_column_strategy(
         | ArrowDataType::Time64(_)
         | ArrowDataType::Duration(_)
         | ArrowDataType::Interval(_)
-        | ArrowDataType::FixedSizeBinary(_)
         | ArrowDataType::LargeBinary
         | ArrowDataType::LargeUtf8
         | ArrowDataType::List(_)

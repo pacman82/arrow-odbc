@@ -1,17 +1,19 @@
 use std::{char::decode_utf16, sync::Arc};
 
-use arrow::array::{ArrayRef, BinaryBuilder, BooleanBuilder, DecimalBuilder, StringBuilder};
+use arrow::array::{ArrayRef, BooleanBuilder, DecimalBuilder, StringBuilder};
 use atoi::FromRadix10Signed;
 use odbc_api::{
     buffers::{AnyColumnView, BufferDescription, BufferKind, Item},
     Bit,
 };
 
+mod binary;
 mod date_time;
 mod no_conversion;
 mod with_conversion;
 
 pub use self::{
+    binary::{Binary, FixedSizedBinary},
     date_time::{
         DateConversion, TimestampMsConversion, TimestampNsConversion, TimestampSecConversion,
         TimestampUsConversion,
@@ -172,44 +174,5 @@ impl ColumnStrategy for Decimal {
             }
             _ => unreachable!(),
         }
-    }
-}
-
-pub struct Binary {
-    /// Maximum length in bytes of elements
-    max_len: usize,
-    nullable: bool,
-}
-
-impl Binary {
-    pub fn new(nullable: bool, max_len: usize) -> Self {
-        Self { max_len, nullable }
-    }
-}
-
-impl ColumnStrategy for Binary {
-    fn buffer_description(&self) -> BufferDescription {
-        BufferDescription {
-            nullable: self.nullable,
-            kind: BufferKind::Binary {
-                length: self.max_len,
-            },
-        }
-    }
-
-    fn fill_arrow_array(&self, column_view: AnyColumnView) -> ArrayRef {
-        let values = match column_view {
-            AnyColumnView::Binary(values) => values,
-            _ => unreachable!(),
-        };
-        let mut builder = BinaryBuilder::new(values.len());
-        for value in values {
-            if let Some(bytes) = value {
-                builder.append_value(bytes).unwrap();
-            } else {
-                builder.append_null().unwrap();
-            }
-        }
-        Arc::new(builder.finish())
     }
 }

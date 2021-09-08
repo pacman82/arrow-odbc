@@ -79,7 +79,7 @@ fn main() -> Result<(), anyhow::Error> {
 | TinyInt            | Int8                 |
 | Bit                | Boolean              |
 | Varbinary          | Binary               |
-| Binary             | Binary               |
+| Binary             | FixedSizedBinary     |
 | All others         | Utf8                 |
 
 ## Supported Arrow types
