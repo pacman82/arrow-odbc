@@ -5,6 +5,7 @@ authors = ["Markus Klein"]
 edition = "2018"
 license = "MIT"
 repository = "https://github.com/pacman82/arrow-odbc"
+documentation = "https://docs.rs/arrow-odbc/"
 
 # A short blurb about the package. This is not rendered in any format when
 # uploaded to crates.io (aka this is not markdown).
