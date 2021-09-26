@@ -1,6 +1,6 @@
-use std::{char::decode_utf16, sync::Arc};
+use std::sync::Arc;
 
-use arrow::array::{ArrayRef, BooleanBuilder, DecimalBuilder, StringBuilder};
+use arrow::array::{ArrayRef, BooleanBuilder, DecimalBuilder};
 use atoi::FromRadix10Signed;
 use odbc_api::{
     buffers::{AnyColumnView, BufferDescription, BufferKind, Item},
@@ -10,6 +10,7 @@ use odbc_api::{
 mod binary;
 mod date_time;
 mod no_conversion;
+mod text;
 mod with_conversion;
 
 pub use self::{
@@ -19,6 +20,7 @@ pub use self::{
         TimestampUsConversion,
     },
     no_conversion::no_conversion,
+    text::{WideText, NarrowText},
     with_conversion::{with_conversion, Conversion},
 };
 
@@ -68,55 +70,6 @@ impl ColumnStrategy for NullableBoolean {
             builder
                 .append_option(bit.copied().map(Bit::as_bool))
                 .unwrap()
-        }
-        Arc::new(builder.finish())
-    }
-}
-
-pub struct WideText {
-    /// Maximum string length in u16, excluding terminating zero
-    max_str_len: usize,
-    nullable: bool,
-}
-
-impl WideText {
-    pub fn new(nullable: bool, max_str_len: usize) -> Self {
-        Self {
-            max_str_len,
-            nullable,
-        }
-    }
-}
-
-impl ColumnStrategy for WideText {
-    fn buffer_description(&self) -> BufferDescription {
-        BufferDescription {
-            nullable: self.nullable,
-            kind: BufferKind::WText {
-                max_str_len: self.max_str_len,
-            },
-        }
-    }
-
-    fn fill_arrow_array(&self, column_view: AnyColumnView) -> ArrayRef {
-        let values = match column_view {
-            AnyColumnView::WText(values) => values,
-            _ => unreachable!(),
-        };
-        let mut builder = StringBuilder::new(values.len());
-        // Buffer used to convert individual values from utf16 to utf8.
-        let mut buf_utf8 = String::new();
-        for value in values {
-            buf_utf8.clear();
-            let opt = if let Some(utf16) = value {
-                for c in decode_utf16(utf16.as_slice().iter().cloned()) {
-                    buf_utf8.push(c.unwrap());
-                }
-                Some(&buf_utf8)
-            } else {
-                None
-            };
-            builder.append_option(opt).unwrap();
         }
         Arc::new(builder.finish())
     }

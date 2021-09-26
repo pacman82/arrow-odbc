@@ -57,10 +57,7 @@ use arrow::{
     error::ArrowError,
     record_batch::{RecordBatch, RecordBatchReader},
 };
-use column_strategy::{
-    with_conversion, ColumnStrategy, DateConversion, FixedSizedBinary, TimestampMsConversion,
-    TimestampNsConversion, TimestampSecConversion, TimestampUsConversion,
-};
+use column_strategy::{ColumnStrategy, DateConversion, FixedSizedBinary, NarrowText, TimestampMsConversion, TimestampNsConversion, TimestampSecConversion, TimestampUsConversion, with_conversion};
 use odbc_api::{
     buffers::ColumnarRowSet, ColumnDescription, Cursor, DataType as OdbcDataType, RowSetCursor,
 };
@@ -339,26 +336,14 @@ fn choose_column_strategy(
         ArrowDataType::Float64 => no_conversion::<Float64Type>(field.is_nullable()),
         ArrowDataType::Date32 => with_conversion(field.is_nullable(), DateConversion),
         ArrowDataType::Utf8 => {
-            // Currently we request text data as utf16 as this works well with both Posix and
-            // Windows environments.
-
-            // Use the SQL type first to determine buffer length. For character data the display
-            // length is automatically multiplied by two, to make room for characters consisting of
-            // more than one `u16`.
+            // Use the SQL type first to determine buffer length.
             let sql_type = lazy_sql_type()?;
-            let utf16_len = if let Some(len) = sql_type.utf16_len() {
-                len
+            if cfg!(target_os="windows") {
+                // Use wide text in windows as default locale can not be expected to be UTF-8
+                wide_text_strategy(sql_type, lazy_display_size, field)?
             } else {
-                // The data type does not seem to have a display size associated with it. As a final
-                // ditch effort request display size directly from the metadata.
-                let signed = lazy_display_size()
-                    .map_err(|source| Error::UnknownStringLength { sql_type, source })?;
-                if signed < 1 {
-                    return Err(Error::InvalidDisplaySize(signed));
-                }
-                signed as usize
-            };
-            Box::new(WideText::new(field.is_nullable(), utf16_len))
+                narrow_text_strategy(sql_type, lazy_display_size, field)?
+            }
         }
         ArrowDataType::Decimal(precision, scale) => {
             Box::new(Decimal::new(field.is_nullable(), *precision, *scale))
@@ -406,4 +391,46 @@ fn choose_column_strategy(
         | ArrowDataType::Float16) => return Err(Error::UnsupportedArrowType(arrow_type.clone())),
     };
     Ok(strat)
+}
+
+fn wide_text_strategy(
+    sql_type: OdbcDataType,
+    lazy_display_size: impl Fn() -> Result<isize, odbc_api::Error>,
+    field: &Field,
+) -> Result<Box<dyn ColumnStrategy>, Error> {
+    // For character data the display length is automatically multiplied by two, to make room for
+    // characters consisting of more than one `u16`.
+    let utf16_len = if let Some(len) = sql_type.utf16_len() {
+        len
+    } else {
+        // The data type does not seem to have a display size associated with it. As a final
+        // ditch effort request display size directly from the metadata.
+        let signed = lazy_display_size()
+            .map_err(|source| Error::UnknownStringLength { sql_type, source })?;
+        if signed < 1 {
+            return Err(Error::InvalidDisplaySize(signed));
+        }
+        signed as usize
+    };
+    Ok(Box::new(WideText::new(field.is_nullable(), utf16_len)))
+}
+
+fn narrow_text_strategy(
+    sql_type: OdbcDataType,
+    lazy_display_size: impl Fn() -> Result<isize, odbc_api::Error>,
+    field: &Field,
+) -> Result<Box<dyn ColumnStrategy>, Error> {
+    let utf8_len = if let Some(len) = sql_type.utf8_len() {
+        len
+    } else {
+        // The data type does not seem to have a display size associated with it. As a final
+        // ditch effort request display size directly from the metadata.
+        let signed = lazy_display_size()
+            .map_err(|source| Error::UnknownStringLength { sql_type, source })?;
+        if signed < 1 {
+            return Err(Error::InvalidDisplaySize(signed));
+        }
+        signed as usize
+    };
+    Ok(Box::new(NarrowText::new(field.is_nullable(), utf8_len)))
 }
