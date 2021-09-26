@@ -1,6 +1,6 @@
 [package]
 name = "arrow-odbc"
-version = "0.1.2"
+version = "0.2.0"
 authors = ["Markus Klein"]
 edition = "2018"
 license = "MIT"
@@ -29,14 +29,14 @@ readme = "Readme.md"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-arrow = "5.3.0"
+arrow = "5.4.0"
 atoi = "0.4.0"
 chrono = "0.4.19"
-odbc-api = "0.27.3"
+odbc-api = "0.28.0"
 thiserror = "1.0.29"
 
 [dev-dependencies]
-anyhow = "1.0.43"
+anyhow = "1.0.44"
 # Used to share one ODBC environment in tests
 lazy_static = "1.4.0"
 # Function name macro is used to ensure unique table names in test

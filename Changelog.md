@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.0
+
+* `odbc-api` version 0.28.0
+* `arrow` version 5.4.0
+
 ## 0.1.2
 
 * Support fixed sized binary types.
