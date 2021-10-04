@@ -41,5 +41,5 @@ anyhow = "1.0.44"
 lazy_static = "1.4.0"
 # Function name macro is used to ensure unique table names in test
 stdext = "0.3.1"
-float_eq = "0.6.1"
+float_eq = "0.7.0"
 
