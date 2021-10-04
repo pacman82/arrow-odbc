@@ -27,10 +27,8 @@ const CONNECTION_STRING: &str = "\
 ";
 
 fn main() -> Result<(), anyhow::Error> {
-    // Your application is fine if you spin up only one Environment.
-    let odbc_environment = unsafe {
-        Environment::new().unwrap()
-    };
+
+    let odbc_environment = Environment::new()?;
     
     // Connect with database.
     let connection = odbc_environment.connect_with_connection_string(CONNECTION_STRING)?;

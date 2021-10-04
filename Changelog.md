@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.1
+
+* Updated code examples to odbc-api use safe Environment construction introduced in `odbc-api` version 0.28.3
+
 ## 0.2.0
 
 * `odbc-api` version 0.28.0
