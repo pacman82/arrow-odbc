@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.0
+
+* Update arrow v5.4.0 -> v5.5.0
+* Update odbc-api v0.28.0 -> v0.29.0
+
 ## 0.2.1
 
 * Updated code examples to odbc-api use safe Environment construction introduced in `odbc-api` version 0.28.3
