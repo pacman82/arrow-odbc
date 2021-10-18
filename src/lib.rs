@@ -55,7 +55,10 @@ use arrow::{
     error::ArrowError,
     record_batch::{RecordBatch, RecordBatchReader},
 };
-use column_strategy::{ColumnStrategy, DateConversion, FixedSizedBinary, NarrowText, TimestampMsConversion, TimestampNsConversion, TimestampSecConversion, TimestampUsConversion, with_conversion};
+use column_strategy::{
+    with_conversion, ColumnStrategy, DateConversion, FixedSizedBinary, NarrowText,
+    TimestampMsConversion, TimestampNsConversion, TimestampSecConversion, TimestampUsConversion,
+};
 use odbc_api::{
     buffers::ColumnarRowSet, ColumnDescription, Cursor, DataType as OdbcDataType, RowSetCursor,
 };
@@ -336,7 +339,7 @@ fn choose_column_strategy(
         ArrowDataType::Utf8 => {
             // Use the SQL type first to determine buffer length.
             let sql_type = lazy_sql_type()?;
-            if cfg!(target_os="windows") {
+            if cfg!(target_os = "windows") {
                 // Use wide text in windows as default locale can not be expected to be UTF-8
                 wide_text_strategy(sql_type, lazy_display_size, field)?
             } else {
@@ -386,6 +389,7 @@ fn choose_column_strategy(
         | ArrowDataType::UInt16
         | ArrowDataType::UInt32
         | ArrowDataType::UInt64
+        | ArrowDataType::Map(_, _)
         | ArrowDataType::Float16) => return Err(Error::UnsupportedArrowType(arrow_type.clone())),
     };
     Ok(strat)

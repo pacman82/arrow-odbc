@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.0
+
+* Udpate arrow v5.4.0 -> v6.0.0
+
 ## 0.3.0
 
 * Update arrow v5.4.0 -> v5.5.0
