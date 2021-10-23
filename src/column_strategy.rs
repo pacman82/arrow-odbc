@@ -20,7 +20,7 @@ pub use self::{
         TimestampUsConversion,
     },
     no_conversion::no_conversion,
-    text::{WideText, NarrowText},
+    text::{NarrowText, WideText},
     with_conversion::{with_conversion, Conversion},
 };
 

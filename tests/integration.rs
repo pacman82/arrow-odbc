@@ -1,6 +1,13 @@
 use std::sync::Arc;
 
-use arrow::{array::{Array, ArrayRef, BinaryArray, BooleanArray, Date32Array, DecimalArray, FixedSizeBinaryArray, Float32Array, Int16Array, Int32Array, Int64Array, Int8Array, StringArray, TimestampMillisecondArray, TimestampNanosecondArray, UInt8Array}, datatypes::{DataType, Field, Schema}};
+use arrow::{
+    array::{
+        Array, ArrayRef, BinaryArray, BooleanArray, Date32Array, DecimalArray,
+        FixedSizeBinaryArray, Float32Array, Int16Array, Int32Array, Int64Array, Int8Array,
+        StringArray, TimestampMillisecondArray, TimestampNanosecondArray, UInt8Array,
+    },
+    datatypes::{DataType, Field, Schema},
+};
 use chrono::NaiveDate;
 use float_eq::assert_float_eq;
 use lazy_static::lazy_static;

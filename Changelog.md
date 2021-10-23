@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.1
+
+* Estimate memory usage of text columns more accuratly.
+
 ## 0.4.0
 
 * Udpate arrow v5.4.0 -> v6.0.0
