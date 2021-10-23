@@ -93,14 +93,15 @@ pub enum Error {
     /// Unable to retrieve the column display size for the column.
     #[error(
         "Unable to deduce the maximum string length for the SQL Data Type reported by the ODBC \
-        driver. Reported SQL data type is: {:?}.\n Error fetching column display size: {source}",
+        driver. Reported SQL data type is: {:?}.\n Error fetching column display or octet size: \
+        {source}",
         sql_type
     )]
     UnknownStringLength {
         sql_type: OdbcDataType,
         source: odbc_api::Error,
     },
-    /// We are getting a display size from ODBC but it is not larger than 0.
+    /// We are getting a display or octet size from ODBC but it is not larger than 0.
     #[error("ODBC reported a display size of {0}.")]
     InvalidDisplaySize(isize),
     /// Failure to retrieve the number of columns from the result set.
@@ -250,7 +251,13 @@ impl<C: Cursor> OdbcReader<C> {
                         .map_err(Error::FailedToDescribeColumn)
                 };
                 let lazy_display_size = || cursor.col_display_size(col_index);
-                choose_column_strategy(field, lazy_sql_data_type, lazy_display_size)
+                let lazy_octet_size = || cursor.col_octet_length(col_index);
+                choose_column_strategy(
+                    field,
+                    lazy_sql_data_type,
+                    lazy_octet_size,
+                    lazy_display_size,
+                )
             })
             .collect::<Result<_, _>>()?;
 
@@ -318,6 +325,7 @@ fn odbc_batch_to_arrow_columns(
 fn choose_column_strategy(
     field: &Field,
     lazy_sql_type: impl Fn() -> Result<OdbcDataType, Error>,
+    lazy_octet_size: impl Fn() -> Result<isize, odbc_api::Error>,
     lazy_display_size: impl Fn() -> Result<isize, odbc_api::Error>,
 ) -> Result<Box<dyn ColumnStrategy>, Error> {
     let strat: Box<dyn ColumnStrategy> = match field.data_type() {
@@ -339,11 +347,28 @@ fn choose_column_strategy(
         ArrowDataType::Utf8 => {
             // Use the SQL type first to determine buffer length.
             let sql_type = lazy_sql_type()?;
-            if cfg!(target_os = "windows") {
-                // Use wide text in windows as default locale can not be expected to be UTF-8
-                wide_text_strategy(sql_type, lazy_display_size, field)?
+            let is_text = matches!(
+                sql_type,
+                OdbcDataType::LongVarchar { .. }
+                    | OdbcDataType::Varchar { .. }
+                    | OdbcDataType::WVarchar { .. }
+                    | OdbcDataType::Char { .. }
+                    | OdbcDataType::WChar { .. }
+            );
+            if is_text {
+                let octet_len = lazy_octet_size()
+                    .map_err(|source| Error::UnknownStringLength { sql_type, source })?;
+                if cfg!(target_os = "windows") {
+                    // Use wide text in windows as default locale can not be expected to be UTF-8
+                    wide_text_strategy(octet_len, field)?
+                } else {
+                    narrow_text_strategy(octet_len, field)?
+                }
             } else {
-                narrow_text_strategy(sql_type, lazy_display_size, field)?
+                let display_size = lazy_display_size()
+                    .map_err(|source| Error::UnknownStringLength { sql_type, source })?;
+                // We assume non text type colmuns to only consist of ASCII characters.
+                narrow_text_strategy(display_size, field)?
             }
         }
         ArrowDataType::Decimal(precision, scale) => {
@@ -396,43 +421,23 @@ fn choose_column_strategy(
 }
 
 fn wide_text_strategy(
-    sql_type: OdbcDataType,
-    lazy_display_size: impl Fn() -> Result<isize, odbc_api::Error>,
+    octet_length: isize,
     field: &Field,
 ) -> Result<Box<dyn ColumnStrategy>, Error> {
-    // For character data the display length is automatically multiplied by two, to make room for
-    // characters consisting of more than one `u16`.
-    let utf16_len = if let Some(len) = sql_type.utf16_len() {
-        len
-    } else {
-        // The data type does not seem to have a display size associated with it. As a final
-        // ditch effort request display size directly from the metadata.
-        let signed = lazy_display_size()
-            .map_err(|source| Error::UnknownStringLength { sql_type, source })?;
-        if signed < 1 {
-            return Err(Error::InvalidDisplaySize(signed));
-        }
-        signed as usize
-    };
+    if octet_length < 1 {
+        return Err(Error::InvalidDisplaySize(octet_length));
+    }
+    let octet_length = octet_length as usize;
+    // An octet is a byte, a u16 consists of two bytes therefore we are dividing by
+    // two to get the correct length.
+    let utf16_len = octet_length / 2;
     Ok(Box::new(WideText::new(field.is_nullable(), utf16_len)))
 }
 
-fn narrow_text_strategy(
-    sql_type: OdbcDataType,
-    lazy_display_size: impl Fn() -> Result<isize, odbc_api::Error>,
-    field: &Field,
-) -> Result<Box<dyn ColumnStrategy>, Error> {
-    let utf8_len = if let Some(len) = sql_type.utf8_len() {
-        len
-    } else {
-        // The data type does not seem to have a display size associated with it. As a final
-        // ditch effort request display size directly from the metadata.
-        let signed = lazy_display_size()
-            .map_err(|source| Error::UnknownStringLength { sql_type, source })?;
-        if signed < 1 {
-            return Err(Error::InvalidDisplaySize(signed));
-        }
-        signed as usize
-    };
+fn narrow_text_strategy(octet_len: isize, field: &Field) -> Result<Box<dyn ColumnStrategy>, Error> {
+    if octet_len < 1 {
+        return Err(Error::InvalidDisplaySize(octet_len));
+    }
+    let utf8_len = octet_len as usize;
     Ok(Box::new(NarrowText::new(field.is_nullable(), utf8_len)))
 }
