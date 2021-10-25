@@ -13,8 +13,6 @@ Running local tests currently requires:
 
 You can install these requirements from here:
 
-Otherwise you can manually install these requirements from here:
-
 * Install Rust compiler and Cargo. Follow the instructions on [this site](https://www.rust-lang.org/en-US/install.html).
 * [Microsoft ODBC Driver 17 for SQL Server](https://docs.microsoft.com/en-us/sql/connect/odbc/download-odbc-driver-for-sql-server?view=sql-server-ver15).
 * An ODBC Driver manager if you are not on windows: <http://www.unixodbc.org/>
