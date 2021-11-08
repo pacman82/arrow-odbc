@@ -1,13 +1,10 @@
 use std::sync::Arc;
 
-use arrow::{
-    array::{
+use arrow::{array::{
         Array, ArrayRef, BinaryArray, BooleanArray, Date32Array, DecimalArray,
         FixedSizeBinaryArray, Float32Array, Int16Array, Int32Array, Int64Array, Int8Array,
         StringArray, TimestampMillisecondArray, TimestampNanosecondArray, UInt8Array,
-    },
-    datatypes::{DataType, Field, Schema},
-};
+    }, datatypes::{DataType, Field, Schema}, record_batch::RecordBatchReader};
 use chrono::NaiveDate;
 use float_eq::assert_float_eq;
 use lazy_static::lazy_static;
@@ -519,6 +516,42 @@ fn prepared_query() {
         .downcast_ref::<Float32Array>()
         .unwrap();
     assert_float_eq!(&[1., 2., 3.][..], array_vals.values(), abs_all <= 000.1);
+}
+
+#[test]
+fn fetch_schema_for_table() {
+    let table_name = function_name!().rsplit_once(':').unwrap().1;
+
+    // Setup a table on the database with some floats (so we can fetch them)
+    let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
+    setup_empty_table(&conn, table_name, &["REAL NOT NULL"]).unwrap();
+
+    // Query column with values to get a cursor
+    let sql = format!("SELECT a FROM {} WHERE 1=2", table_name);
+    let mut prepared = conn.prepare(&sql).unwrap();
+    let cursor = prepared.execute(()).unwrap().unwrap();
+
+    // Now that we have a cursor, we want to use it to query metadata.
+
+    // Batches will contain at most 1 entry.
+    let max_batch_size = 1;
+
+    // Instantiate reader with Arrow schema and ODBC cursor
+    let reader = OdbcReader::new(cursor, max_batch_size).unwrap();
+
+    // Batch for batch copy values from ODBC buffer into arrow batches
+    let schema = reader.schema();
+
+    assert_eq!(
+        "Field { \
+            name: \"a\", \
+            data_type: Float32, \
+            nullable: false, \
+            dict_id: 0, \
+            dict_is_ordered: false, \
+            metadata: None \
+        }",
+        schema.to_string())
 }
 
 /// Inserts the values in the literal into the database and returns them as an Arrow array.
