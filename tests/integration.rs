@@ -1,16 +1,20 @@
 use std::sync::Arc;
 
-use arrow::{array::{
+use arrow::{
+    array::{
         Array, ArrayRef, BinaryArray, BooleanArray, Date32Array, DecimalArray,
         FixedSizeBinaryArray, Float32Array, Int16Array, Int32Array, Int64Array, Int8Array,
         StringArray, TimestampMillisecondArray, TimestampNanosecondArray, UInt8Array,
-    }, datatypes::{DataType, Field, Schema}, record_batch::RecordBatchReader};
+    },
+    datatypes::{DataType, Field, Schema},
+};
 use chrono::NaiveDate;
 use float_eq::assert_float_eq;
 use lazy_static::lazy_static;
 
 use arrow_odbc::{
     arrow::array::Float64Array,
+    arrow_schema_from,
     odbc_api::{
         sys::{AttrConnectionPooling, AttrCpMatch},
         Connection, Environment,
@@ -526,21 +530,12 @@ fn fetch_schema_for_table() {
     let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
     setup_empty_table(&conn, table_name, &["REAL NOT NULL"]).unwrap();
 
-    // Query column with values to get a cursor
-    let sql = format!("SELECT a FROM {} WHERE 1=2", table_name);
-    let mut prepared = conn.prepare(&sql).unwrap();
-    let cursor = prepared.execute(()).unwrap().unwrap();
+    // Prepare query to get metadata
+    let sql = format!("SELECT a FROM {}", table_name);
+    let prepared = conn.prepare(&sql).unwrap();
 
-    // Now that we have a cursor, we want to use it to query metadata.
-
-    // Batches will contain at most 1 entry.
-    let max_batch_size = 1;
-
-    // Instantiate reader with Arrow schema and ODBC cursor
-    let reader = OdbcReader::new(cursor, max_batch_size).unwrap();
-
-    // Batch for batch copy values from ODBC buffer into arrow batches
-    let schema = reader.schema();
+    // Now that we have prepared statement, we want to use it to query metadata.
+    let schema = arrow_schema_from(&prepared).unwrap();
 
     assert_eq!(
         "Field { \
@@ -551,7 +546,8 @@ fn fetch_schema_for_table() {
             dict_is_ordered: false, \
             metadata: None \
         }",
-        schema.to_string())
+        schema.to_string()
+    )
 }
 
 /// Inserts the values in the literal into the database and returns them as an Arrow array.

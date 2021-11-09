@@ -44,13 +44,15 @@
 //!
 //!
 //! ```
+mod schema;
+
 use std::{convert::TryInto, sync::Arc};
 
 use arrow::{
     array::ArrayRef,
     datatypes::{
         DataType as ArrowDataType, Field, Float32Type, Float64Type, Int16Type, Int32Type,
-        Int64Type, Int8Type, Schema, SchemaRef, TimeUnit, UInt8Type,
+        Int64Type, Int8Type, SchemaRef, TimeUnit, UInt8Type,
     },
     error::ArrowError,
     record_batch::{RecordBatch, RecordBatchReader},
@@ -59,9 +61,7 @@ use column_strategy::{
     with_conversion, ColumnStrategy, DateConversion, FixedSizedBinary, NarrowText,
     TimestampMsConversion, TimestampNsConversion, TimestampSecConversion, TimestampUsConversion,
 };
-use odbc_api::{
-    buffers::ColumnarRowSet, ColumnDescription, Cursor, DataType as OdbcDataType, RowSetCursor,
-};
+use odbc_api::{buffers::ColumnarRowSet, Cursor, DataType as OdbcDataType, RowSetCursor};
 use thiserror::Error;
 
 use self::column_strategy::{
@@ -74,6 +74,8 @@ mod column_strategy;
 // mismatches
 pub use arrow;
 pub use odbc_api;
+
+pub use self::schema::arrow_schema_from;
 
 /// A variation of things which can go wrong then creating an [`OdbcReader`].
 #[derive(Error, Debug)]
@@ -116,6 +118,47 @@ pub enum Error {
 /// borrows a statement handle (most likely the case then using prepared queries), or owned
 /// statement handles (recommened then using one shot queries, to have an easier life with the
 /// borrow checker).
+/// 
+/// # Example
+/// 
+/// ```no_run
+/// use arrow_odbc::{odbc_api::Environment, OdbcReader};
+/// 
+/// const CONNECTION_STRING: &str = "\
+///     Driver={ODBC Driver 17 for SQL Server};\
+///     Server=localhost;\
+///     UID=SA;\
+///     PWD=My@Test@Password1;\
+/// ";
+/// 
+/// fn main() -> Result<(), anyhow::Error> {
+/// 
+///     let odbc_environment = Environment::new()?;
+///     
+///     // Connect with database.
+///     let connection = odbc_environment.connect_with_connection_string(CONNECTION_STRING)?;
+/// 
+///     // This SQL statement does not require any arguments.
+///     let parameters = ();
+/// 
+///     // Execute query and create result set
+///     let cursor = connection
+///         .execute("SELECT * FROM MyTable", parameters)?
+///         .expect("SELECT statement must produce a cursor");
+/// 
+///     // Each batch shall only consist of maximum 10.000 rows.
+///     let max_batch_size = 10_000;
+/// 
+///     // Read result set as arrow batches. Infer Arrow types automatically using the meta
+///     // information of `cursor`.
+///     let arrow_record_batches = OdbcReader::new(cursor, max_batch_size)?;
+/// 
+///     for batch in arrow_record_batches {
+///         // ... process batch ...
+///     }
+///     Ok(())
+/// }
+/// ```
 pub struct OdbcReader<C: Cursor> {
     /// Must contain one item for each field in [`Self::schema`]. Encapsulates all the column type
     /// specific decisions which go into filling an Arrow array from an ODBC data source.
@@ -142,83 +185,7 @@ impl<C: Cursor> OdbcReader<C> {
     pub fn new(cursor: C, max_batch_size: usize) -> Result<Self, Error> {
         // Get number of columns from result set. We know it to contain at least one column,
         // otherwise it would not have been created.
-        let num_cols: u16 = cursor
-            .num_result_cols()
-            .map_err(Error::UnableToRetrieveNumCols)?
-            .try_into()
-            .unwrap();
-        let mut fields = Vec::new();
-
-        for index in 0..num_cols {
-            let mut column_description = ColumnDescription::default();
-            cursor
-                .describe_col(index + 1, &mut column_description)
-                .map_err(Error::FailedToDescribeColumn)?;
-
-            let field = Field::new(
-                &column_description
-                    .name_to_string()
-                    .expect("Column name must be representable in utf8"),
-                match column_description.data_type {
-                    OdbcDataType::Numeric {
-                        precision: p @ 0..=38,
-                        scale,
-                    }
-                    | OdbcDataType::Decimal {
-                        precision: p @ 0..=38,
-                        scale,
-                    } => ArrowDataType::Decimal(p, scale.try_into().unwrap()),
-                    OdbcDataType::Integer => ArrowDataType::Int32,
-                    OdbcDataType::SmallInt => ArrowDataType::Int16,
-                    OdbcDataType::Real | OdbcDataType::Float { precision: 0..=24 } => {
-                        ArrowDataType::Float32
-                    }
-                    OdbcDataType::Float { precision: _ } | OdbcDataType::Double => {
-                        ArrowDataType::Float64
-                    }
-                    OdbcDataType::Date => ArrowDataType::Date32,
-                    OdbcDataType::Timestamp { precision: 0 } => {
-                        ArrowDataType::Timestamp(TimeUnit::Second, None)
-                    }
-                    OdbcDataType::Timestamp { precision: 1..=3 } => {
-                        ArrowDataType::Timestamp(TimeUnit::Millisecond, None)
-                    }
-                    OdbcDataType::Timestamp { precision: 4..=6 } => {
-                        ArrowDataType::Timestamp(TimeUnit::Microsecond, None)
-                    }
-                    OdbcDataType::Timestamp { precision: _ } => {
-                        ArrowDataType::Timestamp(TimeUnit::Nanosecond, None)
-                    }
-                    OdbcDataType::BigInt => ArrowDataType::Int64,
-                    OdbcDataType::TinyInt => ArrowDataType::Int8,
-                    OdbcDataType::Bit => ArrowDataType::Boolean,
-                    OdbcDataType::Binary { length } => {
-                        ArrowDataType::FixedSizeBinary(length.try_into().unwrap())
-                    }
-                    OdbcDataType::LongVarbinary { length: _ }
-                    | OdbcDataType::Varbinary { length: _ } => ArrowDataType::Binary,
-                    OdbcDataType::Unknown
-                    | OdbcDataType::Time { precision: _ }
-                    | OdbcDataType::Numeric { .. }
-                    | OdbcDataType::Decimal { .. }
-                    | OdbcDataType::Other {
-                        data_type: _,
-                        column_size: _,
-                        decimal_digits: _,
-                    }
-                    | OdbcDataType::WChar { length: _ }
-                    | OdbcDataType::Char { length: _ }
-                    | OdbcDataType::WVarchar { length: _ }
-                    | OdbcDataType::LongVarchar { length: _ }
-                    | OdbcDataType::Varchar { length: _ } => ArrowDataType::Utf8,
-                },
-                column_description.could_be_nullable(),
-            );
-
-            fields.push(field)
-        }
-
-        let schema = Arc::new(Schema::new(fields));
+        let schema = Arc::new(arrow_schema_from(&cursor)?);
         Self::with_arrow_schema(cursor, max_batch_size, schema)
     }
 
