@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.0
+
+* Update arrow v6.0.0 -> v6.1.0
+* Update odbc-api v0.29.0 -> v0.30.0
+* Introduced `arrow_schema_from` to support inferring arrow schemas without creating an `OdbcReader`.
+
 ## 0.4.1
 
 * Estimate memory usage of text columns more accuratly.
