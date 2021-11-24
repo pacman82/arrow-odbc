@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.6.0
+
+* Update odbc-api v0.30.0 -> v0.31.0
+
 ## 0.5.0
 
 * Update arrow v6.0.0 -> v6.1.0
