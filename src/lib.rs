@@ -118,41 +118,41 @@ pub enum Error {
 /// borrows a statement handle (most likely the case then using prepared queries), or owned
 /// statement handles (recommened then using one shot queries, to have an easier life with the
 /// borrow checker).
-/// 
+///
 /// # Example
-/// 
+///
 /// ```no_run
 /// use arrow_odbc::{odbc_api::Environment, OdbcReader};
-/// 
+///
 /// const CONNECTION_STRING: &str = "\
 ///     Driver={ODBC Driver 17 for SQL Server};\
 ///     Server=localhost;\
 ///     UID=SA;\
 ///     PWD=My@Test@Password1;\
 /// ";
-/// 
+///
 /// fn main() -> Result<(), anyhow::Error> {
-/// 
+///
 ///     let odbc_environment = Environment::new()?;
 ///     
 ///     // Connect with database.
 ///     let connection = odbc_environment.connect_with_connection_string(CONNECTION_STRING)?;
-/// 
+///
 ///     // This SQL statement does not require any arguments.
 ///     let parameters = ();
-/// 
+///
 ///     // Execute query and create result set
 ///     let cursor = connection
 ///         .execute("SELECT * FROM MyTable", parameters)?
 ///         .expect("SELECT statement must produce a cursor");
-/// 
+///
 ///     // Each batch shall only consist of maximum 10.000 rows.
 ///     let max_batch_size = 10_000;
-/// 
+///
 ///     // Read result set as arrow batches. Infer Arrow types automatically using the meta
 ///     // information of `cursor`.
 ///     let arrow_record_batches = OdbcReader::new(cursor, max_batch_size)?;
-/// 
+///
 ///     for batch in arrow_record_batches {
 ///         // ... process batch ...
 ///     }

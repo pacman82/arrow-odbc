@@ -8,14 +8,14 @@ use crate::Error;
 /// Query the metadata to create an arrow schema. This method is invoked automatically for you by
 /// [`crate::OdbcReader::new`]. You may want to call this method in situtation ther you want to
 /// create an arrow schema without creating the reader yet.
-/// 
+///
 /// # Example
-/// 
+///
 /// ```
 /// use anyhow::Error;
-/// 
+///
 /// use arrow_odbc::{arrow_schema_from, arrow::datatypes::Schema, odbc_api::Connection};
-/// 
+///
 /// fn fetch_schema_for_table(
 ///     table_name: &str,
 ///     connection: &Connection<'_>

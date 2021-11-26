@@ -7,6 +7,7 @@ use arrow::{
         StringArray, TimestampMillisecondArray, TimestampNanosecondArray, UInt8Array,
     },
     datatypes::{DataType, Field, Schema},
+    record_batch::RecordBatchReader,
 };
 use chrono::NaiveDate;
 use float_eq::assert_float_eq;
@@ -520,6 +521,32 @@ fn prepared_query() {
         .downcast_ref::<Float32Array>()
         .unwrap();
     assert_float_eq!(&[1., 2., 3.][..], array_vals.values(), abs_all <= 000.1);
+}
+
+#[test]
+fn infer_schema() {
+    let table_name = function_name!().rsplit_once(':').unwrap().1;
+
+    // Setup a table on the database with some floats (so we can fetch them)
+    let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
+    setup_empty_table(&conn, table_name, &["REAL NOT NULL"]).unwrap();
+
+    // Prepare query to get metadata
+    let sql = format!("SELECT a FROM {}", table_name);
+    let cursor = conn.execute(&sql, ()).unwrap().unwrap();
+
+    // Now that we have a cursor, we want to iterate over its rows and fill an arrow batch with it.
+
+    // Batches will contain at most 1 entries.
+    let max_batch_size = 1;
+
+    // Instantiate reader with Arrow schema and ODBC cursor
+    let reader = OdbcReader::new(cursor, max_batch_size).unwrap();
+
+    let actual = reader.schema();
+    let expected = Arc::new(Schema::new(vec![Field::new("a", DataType::Float32, false)]));
+
+    assert_eq!(expected, actual)
 }
 
 #[test]
