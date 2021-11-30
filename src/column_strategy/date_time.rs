@@ -76,7 +76,7 @@ impl Conversion for TimestampUsConversion {
                 from.second as u32,
                 from.fraction,
             );
-        ndt.timestamp_nanos() * 1_000
+        ndt.timestamp_nanos() / 1_000
     }
 }
 

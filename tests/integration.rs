@@ -4,7 +4,8 @@ use arrow::{
     array::{
         Array, ArrayRef, BinaryArray, BooleanArray, Date32Array, DecimalArray,
         FixedSizeBinaryArray, Float32Array, Int16Array, Int32Array, Int64Array, Int8Array,
-        StringArray, TimestampMillisecondArray, TimestampNanosecondArray, UInt8Array,
+        StringArray, TimestampMicrosecondArray, TimestampMillisecondArray,
+        TimestampNanosecondArray, UInt8Array,
     },
     datatypes::{DataType, Field, Schema},
     record_batch::RecordBatchReader,
@@ -337,7 +338,36 @@ fn fetch_non_null_date_time() {
 
 /// Fill a record batch of nullable timestamps with milliseconds precision
 #[test]
-fn fetch_date_time() {
+fn fetch_date_time_us() {
+    let table_name = function_name!().rsplit_once(':').unwrap().1;
+
+    let array_any = fetch_arrow_data(
+        table_name,
+        "DATETIME2(6)",
+        "('2021-04-09 18:57:50'),(NULL),('2002-09-30 12:43:17')",
+    )
+    .unwrap();
+
+    let array_vals = array_any
+        .as_any()
+        .downcast_ref::<TimestampMicrosecondArray>()
+        .unwrap();
+
+    // Assert that the correct values are found within the arrow batch
+    assert_eq!(
+        Some(NaiveDate::from_ymd(2021, 4, 9).and_hms_milli(18, 57, 50, 0)),
+        array_vals.value_as_datetime(0)
+    );
+    assert!(array_vals.is_null(1));
+    assert_eq!(
+        Some(NaiveDate::from_ymd(2002, 9, 30).and_hms_milli(12, 43, 17, 00)),
+        array_vals.value_as_datetime(2)
+    );
+}
+
+/// Fill a record batch of nullable timestamps with milliseconds precision
+#[test]
+fn fetch_date_time_ms() {
     let table_name = function_name!().rsplit_once(':').unwrap().1;
 
     let array_any = fetch_arrow_data(
@@ -366,7 +396,7 @@ fn fetch_date_time() {
 
 /// Fill a record batch of non nullable timestamps with nanoseconds precision
 #[test]
-fn fetch_non_null_date_time_2() {
+fn fetch_non_null_date_time_ns() {
     let table_name = function_name!().rsplit_once(':').unwrap().1;
 
     let array_any = fetch_arrow_data(

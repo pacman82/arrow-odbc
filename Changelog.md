@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.6.1
+
+* Fix: There had been issue causing an overflow for timestamps with Microseconds precision.
+
 ## 0.6.0
 
 * Update odbc-api v0.30.0 -> v0.31.0
