@@ -29,14 +29,14 @@ readme = "Readme.md"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-arrow = "6.2.0"
+arrow = "6.3.0"
 atoi = "0.4.0"
 chrono = "0.4.19"
-odbc-api = "0.31.0"
+odbc-api = "0.31.2"
 thiserror = "1.0.30"
 
 [dev-dependencies]
-anyhow = "1.0.48"
+anyhow = "1.0.51"
 # Used to share one ODBC environment in tests
 lazy_static = "1.4.0"
 # Function name macro is used to ensure unique table names in test
