@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.6.2
+
+* Update arrow v6.0.0 -> `>= 6.1.0, < 7`
+* Update odbc-api v0.31.0 -> `>= 0.31.0, < 0.33`
+
 ## 0.6.1
 
 * Fix: There had been issue causing an overflow for timestamps with Microseconds precision.
