@@ -607,6 +607,22 @@ fn fetch_schema_for_table() {
     )
 }
 
+/// Allocating octet length bytes is not enough if the column on the database is encoded in UTF-16
+/// since all codepoints in range from U+0800 to U+FFFF take three bytes in UTF-8 but only two bytes
+/// in UTF-16. We test this with the 'Trade Mark Sign' (`™`) (U+2122).
+#[test]
+fn should_allocate_enough_memory_for_nvarchar_column() {
+    let table_name = function_name!().rsplit_once(':').unwrap().1;
+
+    let array_any =
+        fetch_arrow_data(table_name, "NCHAR(1) NOT NULL", "('™')").unwrap();
+
+    // Assert that the correct values are found within the arrow batch
+    let array_vals = array_any.as_any().downcast_ref::<StringArray>().unwrap();
+
+    assert_eq!("™", array_vals.value(0));
+}
+
 /// Inserts the values in the literal into the database and returns them as an Arrow array.
 fn fetch_arrow_data(
     table_name: &str,
