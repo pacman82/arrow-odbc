@@ -610,8 +610,11 @@ fn fetch_schema_for_table() {
 /// Allocating octet length bytes is not enough if the column on the database is encoded in UTF-16
 /// since all codepoints in range from U+0800 to U+FFFF take three bytes in UTF-8 but only two bytes
 /// in UTF-16. We test this with the 'Trade Mark Sign' (`™`) (U+2122).
+/// 
+/// For this test to be meaningful it must run on a Linux platform, since only then we do query the
+/// wide column with a narrow buffer and therfore convert UTF-16 to UTF-8 within the dbms.
 #[test]
-fn should_allocate_enough_memory_for_nvarchar_column() {
+fn should_allocate_enough_memory_for_wchar_column_bound_to_u8() {
     let table_name = function_name!().rsplit_once(':').unwrap().1;
 
     let array_any =
@@ -621,6 +624,25 @@ fn should_allocate_enough_memory_for_nvarchar_column() {
     let array_vals = array_any.as_any().downcast_ref::<StringArray>().unwrap();
 
     assert_eq!("™", array_vals.value(0));
+}
+
+/// Allocating octet length bytes is not enough if the column on the database is encoded in UTF-8
+/// since all codepoints in range from U+0000 to U+007F take two bytes in UTF-16 but only one byte
+/// in UTF-8. We test this with the letter a (U+0061).
+/// 
+/// For this test to be meaningful it must run on a windows platform, since only then we do query the
+/// wide column with a narrow buffer and therfore convert UTF-8 to UTF-16 within the dbms.
+#[test]
+fn should_allocate_enough_memory_for_varchar_column_bound_to_u16() {
+    let table_name = function_name!().rsplit_once(':').unwrap().1;
+
+    let array_any =
+        fetch_arrow_data(table_name, "CHAR(1) NOT NULL", "('a')").unwrap();
+
+    // Assert that the correct values are found within the arrow batch
+    let array_vals = array_any.as_any().downcast_ref::<StringArray>().unwrap();
+
+    assert_eq!("a", array_vals.value(0));
 }
 
 /// Inserts the values in the literal into the database and returns them as an Arrow array.
