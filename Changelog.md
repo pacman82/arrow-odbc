@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.6.3
+
+* Fixed an issue there not enough memory to hold the maximum string size has been allocated, if querying a VARCHAR column on windows or an NVARCHAR column on a non-windows platform.
+
 ## 0.6.2
 
 * Update arrow v6.0.0 -> `>= 6.1.0, < 7`
