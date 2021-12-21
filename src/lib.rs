@@ -58,15 +58,12 @@ use arrow::{
     record_batch::{RecordBatch, RecordBatchReader},
 };
 use column_strategy::{
-    with_conversion, ColumnStrategy, DateConversion, FixedSizedBinary, NarrowText,
+    with_conversion, ColumnStrategy, DateConversion, FixedSizedBinary, choose_text_strategy,
     TimestampMsConversion, TimestampNsConversion, TimestampSecConversion, TimestampUsConversion,
+    no_conversion, Binary, Decimal, NonNullableBoolean, NullableBoolean,
 };
 use odbc_api::{buffers::ColumnarRowSet, Cursor, DataType as OdbcDataType, RowSetCursor};
 use thiserror::Error;
-
-use self::column_strategy::{
-    no_conversion, Binary, Decimal, NonNullableBoolean, NullableBoolean, WideText,
-};
 
 mod column_strategy;
 
@@ -313,30 +310,7 @@ fn choose_column_strategy(
         ArrowDataType::Date32 => with_conversion(field.is_nullable(), DateConversion),
         ArrowDataType::Utf8 => {
             // Use the SQL type first to determine buffer length.
-            let sql_type = lazy_sql_type()?;
-            let is_text = matches!(
-                sql_type,
-                OdbcDataType::LongVarchar { .. }
-                    | OdbcDataType::Varchar { .. }
-                    | OdbcDataType::WVarchar { .. }
-                    | OdbcDataType::Char { .. }
-                    | OdbcDataType::WChar { .. }
-            );
-            if is_text {
-                let octet_len = lazy_octet_size()
-                    .map_err(|source| Error::UnknownStringLength { sql_type, source })?;
-                if cfg!(target_os = "windows") {
-                    // Use wide text in windows as default locale can not be expected to be UTF-8
-                    wide_text_strategy(octet_len, field)?
-                } else {
-                    narrow_text_strategy(octet_len, field)?
-                }
-            } else {
-                let display_size = lazy_display_size()
-                    .map_err(|source| Error::UnknownStringLength { sql_type, source })?;
-                // We assume non text type colmuns to only consist of ASCII characters.
-                narrow_text_strategy(display_size, field)?
-            }
+            choose_text_strategy(lazy_sql_type, lazy_octet_size, lazy_display_size, field.is_nullable())?
         }
         ArrowDataType::Decimal(precision, scale) => {
             Box::new(Decimal::new(field.is_nullable(), *precision, *scale))
@@ -387,24 +361,3 @@ fn choose_column_strategy(
     Ok(strat)
 }
 
-fn wide_text_strategy(
-    octet_length: isize,
-    field: &Field,
-) -> Result<Box<dyn ColumnStrategy>, Error> {
-    if octet_length < 1 {
-        return Err(Error::InvalidDisplaySize(octet_length));
-    }
-    let octet_length = octet_length as usize;
-    // An octet is a byte, a u16 consists of two bytes therefore we are dividing by
-    // two to get the correct length.
-    let utf16_len = octet_length / 2;
-    Ok(Box::new(WideText::new(field.is_nullable(), utf16_len)))
-}
-
-fn narrow_text_strategy(octet_len: isize, field: &Field) -> Result<Box<dyn ColumnStrategy>, Error> {
-    if octet_len < 1 {
-        return Err(Error::InvalidDisplaySize(octet_len));
-    }
-    let utf8_len = octet_len as usize;
-    Ok(Box::new(NarrowText::new(field.is_nullable(), utf8_len)))
-}
