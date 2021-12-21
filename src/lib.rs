@@ -58,9 +58,9 @@ use arrow::{
     record_batch::{RecordBatch, RecordBatchReader},
 };
 use column_strategy::{
-    with_conversion, ColumnStrategy, DateConversion, FixedSizedBinary, choose_text_strategy,
-    TimestampMsConversion, TimestampNsConversion, TimestampSecConversion, TimestampUsConversion,
-    no_conversion, Binary, Decimal, NonNullableBoolean, NullableBoolean,
+    choose_text_strategy, no_conversion, with_conversion, Binary, ColumnStrategy, DateConversion,
+    Decimal, FixedSizedBinary, NonNullableBoolean, NullableBoolean, TimestampMsConversion,
+    TimestampNsConversion, TimestampSecConversion, TimestampUsConversion,
 };
 use odbc_api::{buffers::ColumnarRowSet, Cursor, DataType as OdbcDataType, RowSetCursor};
 use thiserror::Error;
@@ -310,7 +310,12 @@ fn choose_column_strategy(
         ArrowDataType::Date32 => with_conversion(field.is_nullable(), DateConversion),
         ArrowDataType::Utf8 => {
             // Use the SQL type first to determine buffer length.
-            choose_text_strategy(lazy_sql_type, lazy_octet_size, lazy_display_size, field.is_nullable())?
+            choose_text_strategy(
+                lazy_sql_type,
+                lazy_octet_size,
+                lazy_display_size,
+                field.is_nullable(),
+            )?
         }
         ArrowDataType::Decimal(precision, scale) => {
             Box::new(Decimal::new(field.is_nullable(), *precision, *scale))
@@ -360,4 +365,3 @@ fn choose_column_strategy(
     };
     Ok(strat)
 }
-
