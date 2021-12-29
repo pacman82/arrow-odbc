@@ -215,13 +215,7 @@ impl<C: Cursor> OdbcReader<C> {
                         .map_err(Error::FailedToDescribeColumn)
                 };
                 let lazy_display_size = || cursor.col_display_size(col_index);
-                let lazy_octet_size = || cursor.col_octet_length(col_index);
-                choose_column_strategy(
-                    field,
-                    lazy_sql_data_type,
-                    lazy_octet_size,
-                    lazy_display_size,
-                )
+                choose_column_strategy(field, lazy_sql_data_type, lazy_display_size)
             })
             .collect::<Result<_, _>>()?;
 
@@ -289,7 +283,6 @@ fn odbc_batch_to_arrow_columns(
 fn choose_column_strategy(
     field: &Field,
     lazy_sql_type: impl Fn() -> Result<OdbcDataType, Error>,
-    lazy_octet_size: impl Fn() -> Result<isize, odbc_api::Error>,
     lazy_display_size: impl Fn() -> Result<isize, odbc_api::Error>,
 ) -> Result<Box<dyn ColumnStrategy>, Error> {
     let strat: Box<dyn ColumnStrategy> = match field.data_type() {
@@ -310,12 +303,7 @@ fn choose_column_strategy(
         ArrowDataType::Date32 => with_conversion(field.is_nullable(), DateConversion),
         ArrowDataType::Utf8 => {
             // Use the SQL type first to determine buffer length.
-            choose_text_strategy(
-                lazy_sql_type,
-                lazy_octet_size,
-                lazy_display_size,
-                field.is_nullable(),
-            )?
+            choose_text_strategy(lazy_sql_type()?, lazy_display_size, field.is_nullable())?
         }
         ArrowDataType::Decimal(precision, scale) => {
             Box::new(Decimal::new(field.is_nullable(), *precision, *scale))
