@@ -1,4 +1,4 @@
-use std::{char::decode_utf16, sync::Arc};
+use std::{char::decode_utf16, convert::TryInto, sync::Arc};
 
 use arrow::array::{ArrayRef, StringBuilder};
 use odbc_api::{
@@ -11,12 +11,10 @@ use crate::Error;
 use super::ColumnStrategy;
 
 pub fn choose_text_strategy(
-    lazy_sql_type: impl Fn() -> Result<OdbcDataType, Error>,
-    lazy_octet_size: impl Fn() -> Result<isize, odbc_api::Error>,
+    sql_type: OdbcDataType,
     lazy_display_size: impl Fn() -> Result<isize, odbc_api::Error>,
     is_nullable: bool,
 ) -> Result<Box<dyn ColumnStrategy>, Error> {
-    let sql_type = lazy_sql_type()?;
     let is_narrow = matches!(
         sql_type,
         OdbcDataType::LongVarchar { .. } | OdbcDataType::Varchar { .. } | OdbcDataType::Char { .. }
@@ -27,37 +25,18 @@ pub fn choose_text_strategy(
     );
     let is_text = is_narrow || is_wide;
     Ok(if is_text {
-        let octet_len =
-            lazy_octet_size().map_err(|source| Error::UnknownStringLength { sql_type, source })?;
         if cfg!(target_os = "windows") {
-            let octet_len = if is_narrow {
-                // Narrow column queried from a windows platform => Utf8 to Utf16
-                // conversion. The letters in the range from U+0000 to U+007F take two bytes
-                // in UTF-16 but only one byte in UTF-8
-                octet_len * 2
-            } else {
-                // Wide text column on database queried from a windows platform.
-                octet_len
-            };
-            // Use wide text in windows as default locale can not be expected to be UTF-8
+            let octet_len = sql_type.utf16_len().unwrap().try_into().unwrap();
             wide_text_strategy(octet_len, is_nullable)?
         } else {
-            let octet_len = if is_wide {
-                // Wide column queried on non-window platform => Utf16 to Utf8 conversion.
-                // We must adjust the binary size reported by the database, since it assumes
-                // UTF-16 encoding. While usually an UTF-8 string is shorter for characters
-                // in the range from U+0800 to U+FFFF UTF-8 is three bytes theras UTF-16 is
-                // only two bytes large. We have to allocate enough memory to hold the
-                // largest possible string.
-                (octet_len / 2) * 3
-            } else {
-                // Narrow column queried on non-windows platform => Utf8 to Utf8
-                octet_len
-            };
+            let octet_len = sql_type.utf8_len().unwrap().try_into().unwrap();
             narrow_text_strategy(octet_len, is_nullable)?
         }
     } else {
-        let display_size = lazy_display_size()
+        let display_size = sql_type
+            .display_size()
+            .map(|ds| Ok(ds as isize))
+            .unwrap_or_else(lazy_display_size)
             .map_err(|source| Error::UnknownStringLength { sql_type, source })?;
         // We assume non text type colmuns to only consist of ASCII characters.
         narrow_text_strategy(display_size, is_nullable)?
