@@ -635,12 +635,12 @@ fn should_allocate_enough_memory_for_wchar_column_bound_to_u8() {
 fn should_allocate_enough_memory_for_varchar_column_bound_to_u16() {
     let table_name = function_name!().rsplit_once(':').unwrap().1;
 
-    let array_any = fetch_arrow_data(table_name, "CHAR(1) NOT NULL", "('a')").unwrap();
+    let array_any = fetch_arrow_data(table_name, "CHAR(1) NOT NULL", "('Ü')").unwrap();
 
     // Assert that the correct values are found within the arrow batch
     let array_vals = array_any.as_any().downcast_ref::<StringArray>().unwrap();
 
-    assert_eq!("a", array_vals.value(0));
+    assert_eq!("Ü", array_vals.value(0));
 }
 
 /// Inserts the values in the literal into the database and returns them as an Arrow array.
