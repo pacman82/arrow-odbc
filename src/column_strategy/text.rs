@@ -10,6 +10,10 @@ use crate::Error;
 
 use super::ColumnStrategy;
 
+/// This function decides wether this column will be queried as narrow (assumed to be utf-8) or
+/// wide text (assumed to be utf-16). The reason we do not always use narrow is that the encoding
+/// dependends on the system locals which is usually not UTF-8 on windows systems. Furthermore we
+/// are trying to adapt the buffer size to the maximum string length the column could contain.
 pub fn choose_text_strategy(
     sql_type: OdbcDataType,
     lazy_display_size: impl Fn() -> Result<isize, odbc_api::Error>,
