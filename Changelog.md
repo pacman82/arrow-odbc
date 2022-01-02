@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.7.0
+
+* `InvalidDisplaySize` replaced with `ZeroSizedColumn`.
+
+## 0.6.4
+
+* Base allocations of text columns on column size instead of octet length.
+
 ## 0.6.3
 
 * Fixed an issue there not enough memory to hold the maximum string size has been allocated, if querying a VARCHAR column on windows or an NVARCHAR column on a non-windows platform.

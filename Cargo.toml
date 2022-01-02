@@ -1,6 +1,6 @@
 [package]
 name = "arrow-odbc"
-version = "0.6.4"
+version = "0.7.0"
 authors = ["Markus Klein"]
 edition = "2018"
 license = "MIT"
@@ -36,7 +36,7 @@ chrono = "0.4.19"
 thiserror = "1.0.30"
 
 [dev-dependencies]
-anyhow = "1.0.51"
+anyhow = "1.0.52"
 # Used to share one ODBC environment in tests
 lazy_static = "1.4.0"
 # Function name macro is used to ensure unique table names in test

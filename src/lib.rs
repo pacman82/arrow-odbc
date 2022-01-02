@@ -101,8 +101,14 @@ pub enum Error {
         source: odbc_api::Error,
     },
     /// We are getting a display or octet size from ODBC but it is not larger than 0.
-    #[error("ODBC reported a display size of {0}.")]
-    InvalidDisplaySize(isize),
+    #[error(
+        "ODBC reported a size of '0' for the column. This might indicate that the driver cannot
+        specify a sensible upper bound for the column. E.g. for cases like VARCHAR(max). Try casting
+        the column into a type with a sensible upper bound. The type of the column causing this
+        error is {:?}.",
+        sql_type
+    )]
+    ZeroSizedColumn { sql_type: OdbcDataType },
     /// Failure to retrieve the number of columns from the result set.
     #[error("Unable to retrieve number of columns in result set.\n{0}")]
     UnableToRetrieveNumCols(odbc_api::Error),

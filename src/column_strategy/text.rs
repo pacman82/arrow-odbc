@@ -26,46 +26,42 @@ pub fn choose_text_strategy(
     let is_text = is_narrow || is_wide;
     Ok(if is_text {
         if cfg!(target_os = "windows") {
-            let octet_len = sql_type.utf16_len().unwrap().try_into().unwrap();
-            wide_text_strategy(octet_len, is_nullable)?
+            let hex_len = sql_type.utf16_len().unwrap();
+            if hex_len == 0 {
+                return Err(Error::ZeroSizedColumn { sql_type });
+            }
+            wide_text_strategy(hex_len, is_nullable)
         } else {
-            let octet_len = sql_type.utf8_len().unwrap().try_into().unwrap();
-            narrow_text_strategy(octet_len, is_nullable)?
+            let octet_len = sql_type.utf8_len().unwrap();
+            if octet_len == 0 {
+                return Err(Error::ZeroSizedColumn { sql_type });
+            }
+            narrow_text_strategy(octet_len, is_nullable)
         }
     } else {
-        let display_size = sql_type
+        let display_size: usize = sql_type
             .display_size()
             .map(|ds| Ok(ds as isize))
             .unwrap_or_else(lazy_display_size)
-            .map_err(|source| Error::UnknownStringLength { sql_type, source })?;
+            .map_err(|source| Error::UnknownStringLength { sql_type, source })?
+            .try_into()
+            .unwrap();
+
+        if display_size == 0 {
+            return Err(Error::ZeroSizedColumn { sql_type });
+        }
+
         // We assume non text type colmuns to only consist of ASCII characters.
-        narrow_text_strategy(display_size, is_nullable)?
+        narrow_text_strategy(display_size, is_nullable)
     })
 }
 
-fn wide_text_strategy(
-    octet_length: isize,
-    is_nullable: bool,
-) -> Result<Box<dyn ColumnStrategy>, Error> {
-    if octet_length < 1 {
-        return Err(Error::InvalidDisplaySize(octet_length));
-    }
-    let octet_length = octet_length as usize;
-    // An octet is a byte, a u16 consists of two bytes therefore we are dividing by
-    // two to get the correct length.
-    let utf16_len = octet_length / 2;
-    Ok(Box::new(WideText::new(is_nullable, utf16_len)))
+fn wide_text_strategy(u16_len: usize, is_nullable: bool) -> Box<dyn ColumnStrategy> {
+    Box::new(WideText::new(is_nullable, u16_len))
 }
 
-fn narrow_text_strategy(
-    octet_len: isize,
-    is_nullable: bool,
-) -> Result<Box<dyn ColumnStrategy>, Error> {
-    if octet_len < 1 {
-        return Err(Error::InvalidDisplaySize(octet_len));
-    }
-    let utf8_len = octet_len as usize;
-    Ok(Box::new(NarrowText::new(is_nullable, utf8_len)))
+fn narrow_text_strategy(octet_len: usize, is_nullable: bool) -> Box<dyn ColumnStrategy> {
+    Box::new(NarrowText::new(is_nullable, octet_len))
 }
 
 /// Strategy requesting the text from the database as UTF-16 (Wide characters) and emmitting it as
