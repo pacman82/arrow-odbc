@@ -3,7 +3,7 @@ use std::convert::TryInto;
 use arrow::datatypes::{DataType as ArrowDataType, Field, Schema, TimeUnit};
 use odbc_api::{ColumnDescription, DataType as OdbcDataType, ResultSetMetadata};
 
-use crate::Error;
+use crate::{ColumnFailure, Error};
 
 /// Query the metadata to create an arrow schema. This method is invoked automatically for you by
 /// [`crate::OdbcReader::new`]. You may want to call this method in situtation ther you want to
@@ -40,7 +40,11 @@ pub fn arrow_schema_from(resut_set_metadata: &impl ResultSetMetadata) -> Result<
         let mut column_description = ColumnDescription::default();
         resut_set_metadata
             .describe_col(index + 1, &mut column_description)
-            .map_err(Error::FailedToDescribeColumn)?;
+            .map_err(|cause| Error::ColumnFailure {
+                name: "Unknown".to_owned(),
+                index: index as usize,
+                source: ColumnFailure::FailedToDescribeColumn(cause),
+            })?;
 
         let field = Field::new(
             &column_description

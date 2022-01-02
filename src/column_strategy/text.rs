@@ -6,7 +6,7 @@ use odbc_api::{
     DataType as OdbcDataType,
 };
 
-use crate::Error;
+use crate::ColumnFailure;
 
 use super::ColumnStrategy;
 
@@ -18,7 +18,7 @@ pub fn choose_text_strategy(
     sql_type: OdbcDataType,
     lazy_display_size: impl Fn() -> Result<isize, odbc_api::Error>,
     is_nullable: bool,
-) -> Result<Box<dyn ColumnStrategy>, Error> {
+) -> Result<Box<dyn ColumnStrategy>, ColumnFailure> {
     let is_narrow = matches!(
         sql_type,
         OdbcDataType::LongVarchar { .. } | OdbcDataType::Varchar { .. } | OdbcDataType::Char { .. }
@@ -32,13 +32,13 @@ pub fn choose_text_strategy(
         if cfg!(target_os = "windows") {
             let hex_len = sql_type.utf16_len().unwrap();
             if hex_len == 0 {
-                return Err(Error::ZeroSizedColumn { sql_type });
+                return Err(ColumnFailure::ZeroSizedColumn { sql_type });
             }
             wide_text_strategy(hex_len, is_nullable)
         } else {
             let octet_len = sql_type.utf8_len().unwrap();
             if octet_len == 0 {
-                return Err(Error::ZeroSizedColumn { sql_type });
+                return Err(ColumnFailure::ZeroSizedColumn { sql_type });
             }
             narrow_text_strategy(octet_len, is_nullable)
         }
@@ -47,12 +47,12 @@ pub fn choose_text_strategy(
             .display_size()
             .map(|ds| Ok(ds as isize))
             .unwrap_or_else(lazy_display_size)
-            .map_err(|source| Error::UnknownStringLength { sql_type, source })?
+            .map_err(|source| ColumnFailure::UnknownStringLength { sql_type, source })?
             .try_into()
             .unwrap();
 
         if display_size == 0 {
-            return Err(Error::ZeroSizedColumn { sql_type });
+            return Err(ColumnFailure::ZeroSizedColumn { sql_type });
         }
 
         // We assume non text type colmuns to only consist of ASCII characters.

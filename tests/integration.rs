@@ -21,7 +21,7 @@ use arrow_odbc::{
         sys::{AttrConnectionPooling, AttrCpMatch},
         Connection, Environment,
     },
-    Error, OdbcReader,
+    ColumnFailure, Error, OdbcReader,
 };
 use odbc_api::IntoParameter;
 
@@ -159,7 +159,11 @@ fn unsupported_16bit_unsigned_integer() {
 
     assert!(matches!(
         result,
-        Err(Error::UnsupportedArrowType(DataType::UInt16))
+        Err(Error::ColumnFailure {
+            source: ColumnFailure::UnsupportedArrowType(DataType::UInt16),
+            index: 0,
+            name: _
+        })
     ))
 }
 

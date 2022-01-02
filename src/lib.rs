@@ -77,6 +77,47 @@ pub use self::schema::arrow_schema_from;
 /// A variation of things which can go wrong then creating an [`OdbcReader`].
 #[derive(Error, Debug)]
 pub enum Error {
+    /// Failure to retrieve the number of columns from the result set.
+    #[error("Unable to retrieve number of columns in result set.\n{0}")]
+    UnableToRetrieveNumCols(odbc_api::Error),
+    /// Indicates that the error is related to a specify column.
+    #[error(
+        "There is a problem with the SQL type of the column with name: {} and index {}",
+        name,
+        index
+    )]
+    ColumnFailure {
+        // Name of the erroneous column
+        name: String,
+        // Index of the erroneous column
+        index: usize,
+        // Cause of the error
+        source: ColumnFailure,
+    },
+}
+
+#[derive(Error, Debug)]
+pub enum ColumnFailure {
+    /// We are getting a display or column size from ODBC but it is not larger than 0.
+    #[error(
+        "ODBC reported a size of '0' for the column. This might indicate that the driver cannot
+        specify a sensible upper bound for the column. E.g. for cases like VARCHAR(max). Try
+        casting the column into a type with a sensible upper bound. The type of the column causing
+        this error is {:?}.",
+        sql_type
+    )]
+    ZeroSizedColumn { sql_type: OdbcDataType },
+    /// Unable to retrieve the column display size for the column.
+    #[error(
+        "Unable to deduce the maximum string length for the SQL Data Type reported by the ODBC \
+        driver. Reported SQL data type is: {:?}.\n Error fetching column display or octet size: \
+        {source}",
+        sql_type
+    )]
+    UnknownStringLength {
+        sql_type: OdbcDataType,
+        source: odbc_api::Error,
+    },
     /// The type specified in the arrow schema is not supported to be fetched from the database.
     #[error(
         "Unsupported arrow type: `{0}`. This type can currently not be fetched from an ODBC data \
@@ -89,29 +130,16 @@ pub enum Error {
         attached to the ODBC result set:\n{0}"
     )]
     FailedToDescribeColumn(#[source] odbc_api::Error),
-    /// Unable to retrieve the column display size for the column.
-    #[error(
-        "Unable to deduce the maximum string length for the SQL Data Type reported by the ODBC \
-        driver. Reported SQL data type is: {:?}.\n Error fetching column display or octet size: \
-        {source}",
-        sql_type
-    )]
-    UnknownStringLength {
-        sql_type: OdbcDataType,
-        source: odbc_api::Error,
-    },
-    /// We are getting a display or octet size from ODBC but it is not larger than 0.
-    #[error(
-        "ODBC reported a size of '0' for the column. This might indicate that the driver cannot
-        specify a sensible upper bound for the column. E.g. for cases like VARCHAR(max). Try casting
-        the column into a type with a sensible upper bound. The type of the column causing this
-        error is {:?}.",
-        sql_type
-    )]
-    ZeroSizedColumn { sql_type: OdbcDataType },
-    /// Failure to retrieve the number of columns from the result set.
-    #[error("Unable to retrieve number of columns in result set.\n{0}")]
-    UnableToRetrieveNumCols(odbc_api::Error),
+}
+
+impl ColumnFailure {
+    fn into_crate_error(self, name: String, index: usize) -> Error {
+        Error::ColumnFailure {
+            name,
+            index,
+            source: self,
+        }
+    }
 }
 
 /// Arrow ODBC reader. Implements the [`arrow::record_batch::RecordBatchReader`] trait so it can be
@@ -215,13 +243,10 @@ impl<C: Cursor> OdbcReader<C> {
             .enumerate()
             .map(|(index, field)| {
                 let col_index = (index + 1).try_into().unwrap();
-                let lazy_sql_data_type = || {
-                    cursor
-                        .col_data_type(col_index)
-                        .map_err(Error::FailedToDescribeColumn)
-                };
+                let lazy_sql_data_type = || cursor.col_data_type(col_index);
                 let lazy_display_size = || cursor.col_display_size(col_index);
                 choose_column_strategy(field, lazy_sql_data_type, lazy_display_size)
+                    .map_err(|cause| cause.into_crate_error(field.name().clone(), index))
             })
             .collect::<Result<_, _>>()?;
 
@@ -288,9 +313,9 @@ fn odbc_batch_to_arrow_columns(
 
 fn choose_column_strategy(
     field: &Field,
-    lazy_sql_type: impl Fn() -> Result<OdbcDataType, Error>,
+    lazy_sql_type: impl Fn() -> Result<OdbcDataType, odbc_api::Error>,
     lazy_display_size: impl Fn() -> Result<isize, odbc_api::Error>,
-) -> Result<Box<dyn ColumnStrategy>, Error> {
+) -> Result<Box<dyn ColumnStrategy>, ColumnFailure> {
     let strat: Box<dyn ColumnStrategy> = match field.data_type() {
         ArrowDataType::Boolean => {
             if field.is_nullable() {
@@ -308,14 +333,15 @@ fn choose_column_strategy(
         ArrowDataType::Float64 => no_conversion::<Float64Type>(field.is_nullable()),
         ArrowDataType::Date32 => with_conversion(field.is_nullable(), DateConversion),
         ArrowDataType::Utf8 => {
+            let sql_type = lazy_sql_type().map_err(ColumnFailure::FailedToDescribeColumn)?;
             // Use the SQL type first to determine buffer length.
-            choose_text_strategy(lazy_sql_type()?, lazy_display_size, field.is_nullable())?
+            choose_text_strategy(sql_type, lazy_display_size, field.is_nullable())?
         }
         ArrowDataType::Decimal(precision, scale) => {
             Box::new(Decimal::new(field.is_nullable(), *precision, *scale))
         }
         ArrowDataType::Binary => {
-            let sql_type = lazy_sql_type()?;
+            let sql_type = lazy_sql_type().map_err(ColumnFailure::FailedToDescribeColumn)?;
             let length = sql_type.column_size();
             Box::new(Binary::new(field.is_nullable(), length))
         }
@@ -355,7 +381,9 @@ fn choose_column_strategy(
         | ArrowDataType::UInt32
         | ArrowDataType::UInt64
         | ArrowDataType::Map(_, _)
-        | ArrowDataType::Float16) => return Err(Error::UnsupportedArrowType(arrow_type.clone())),
+        | ArrowDataType::Float16) => {
+            return Err(ColumnFailure::UnsupportedArrowType(arrow_type.clone()))
+        }
     };
     Ok(strat)
 }
