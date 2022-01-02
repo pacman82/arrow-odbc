@@ -3,6 +3,7 @@
 ## 0.7.0
 
 * `InvalidDisplaySize` replaced with `ZeroSizedColumn`.
+* Refactored error handling, to have separate variant for column specific errors.
 
 ## 0.6.4
 

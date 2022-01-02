@@ -6,9 +6,7 @@ use odbc_api::{
     DataType as OdbcDataType,
 };
 
-use crate::ColumnFailure;
-
-use super::ColumnStrategy;
+use super::{ColumnFailure, ColumnStrategy};
 
 /// This function decides wether this column will be queried as narrow (assumed to be utf-8) or
 /// wide text (assumed to be utf-16). The reason we do not always use narrow is that the encoding
