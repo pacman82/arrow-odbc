@@ -219,9 +219,9 @@ pub fn choose_column_strategy(
 pub enum ColumnFailure {
     /// We are getting a display or column size from ODBC but it is not larger than 0.
     #[error(
-        "ODBC reported a size of '0' for the column. This might indicate that the driver cannot
-        specify a sensible upper bound for the column. E.g. for cases like VARCHAR(max). Try
-        casting the column into a type with a sensible upper bound. The type of the column causing
+        "ODBC reported a size of '0' for the column. This might indicate that the driver cannot \
+        specify a sensible upper bound for the column. E.g. for cases like VARCHAR(max). Try \
+        casting the column into a type with a sensible upper bound. The type of the column causing \
         this error is {:?}.",
         sql_type
     )]

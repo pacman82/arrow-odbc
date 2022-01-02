@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.7.2
+
+* Fix: Formatting of error message for `ZeroSizedColumn`.
+
 ## 0.7.1
 
 * `Error::ColumnFailure` now prints also the errors cause.
