@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.7.1
+
+* `Error::ColumnFailure` now prints also the errors cause.
+
 ## 0.7.0
 
 * `InvalidDisplaySize` replaced with `ZeroSizedColumn`.

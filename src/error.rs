@@ -10,7 +10,7 @@ pub enum Error {
     UnableToRetrieveNumCols(odbc_api::Error),
     /// Indicates that the error is related to a specify column.
     #[error(
-        "There is a problem with the SQL type of the column with name: {} and index {}",
+        "There is a problem with the SQL type of the column with name: {} and index {}:\n{source}",
         name,
         index
     )]
