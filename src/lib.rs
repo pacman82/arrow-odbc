@@ -55,7 +55,10 @@ use arrow::{
     record_batch::{RecordBatch, RecordBatchReader},
 };
 use column_strategy::{choose_column_strategy, ColumnStrategy};
-use odbc_api::{buffers::ColumnarRowSet, Cursor, RowSetCursor};
+use odbc_api::{
+    buffers::{buffer_from_description, AnyColumnBuffer, ColumnarBuffer},
+    Cursor, RowSetCursor,
+};
 use thiserror::Error;
 
 mod column_strategy;
@@ -124,7 +127,7 @@ pub struct OdbcReader<C: Cursor> {
     schema: SchemaRef,
     /// Odbc cursor with a bound buffer we repeatedly fill with the batches send to us by the data
     /// source. One column buffer must be bound for each element in column_strategies.
-    cursor: RowSetCursor<C, ColumnarRowSet>,
+    cursor: RowSetCursor<C, ColumnarBuffer<AnyColumnBuffer>>,
 }
 
 impl<C: Cursor> OdbcReader<C> {
@@ -176,7 +179,7 @@ impl<C: Cursor> OdbcReader<C> {
             })
             .collect::<Result<_, _>>()?;
 
-        let row_set_buffer = ColumnarRowSet::new(
+        let row_set_buffer = buffer_from_description(
             max_batch_size,
             column_strategies.iter().map(|cs| cs.buffer_description()),
         );
@@ -225,7 +228,7 @@ where
 
 fn odbc_batch_to_arrow_columns(
     column_strategies: &[Box<dyn ColumnStrategy>],
-    batch: &ColumnarRowSet,
+    batch: &ColumnarBuffer<AnyColumnBuffer>,
 ) -> Vec<ArrayRef> {
     column_strategies
         .iter()
