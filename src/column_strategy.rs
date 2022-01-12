@@ -202,7 +202,7 @@ pub fn choose_column_strategy(
         | ArrowDataType::FixedSizeList(_, _)
         | ArrowDataType::LargeList(_)
         | ArrowDataType::Struct(_)
-        | ArrowDataType::Union(_)
+        | ArrowDataType::Union(_, _)
         | ArrowDataType::Dictionary(_, _)
         | ArrowDataType::UInt16
         | ArrowDataType::UInt32
