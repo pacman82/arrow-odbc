@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.8.1
+
+* Update arrow `>= 6.1.0, < 7` -> `>= 7.0.0, < 8`
+
 ## 0.8.0
 
 * Use Rust edition 2021
