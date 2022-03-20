@@ -111,30 +111,26 @@ impl ColumnStrategy for Decimal {
     }
 
     fn fill_arrow_array(&self, column_view: AnyColumnView) -> ArrayRef {
-        match column_view {
-            AnyColumnView::Text(values) => {
-                let capacity = values.len();
-                let mut builder = DecimalBuilder::new(capacity, self.precision, self.scale);
+        let view = column_view.as_text_view().unwrap();
+        let capacity = view.len();
+        let mut builder = DecimalBuilder::new(capacity, self.precision, self.scale);
 
-                let mut buf_digits = Vec::new();
+        let mut buf_digits = Vec::new();
 
-                for opt in values {
-                    if let Some(text) = opt {
-                        buf_digits.clear();
-                        buf_digits.extend(text.iter().filter(|&&c| c != b'.'));
+        for opt in view.iter() {
+            if let Some(text) = opt {
+                buf_digits.clear();
+                buf_digits.extend(text.iter().filter(|&&c| c != b'.'));
 
-                        let (num, _consumed) = i128::from_radix_10_signed(&buf_digits);
+                let (num, _consumed) = i128::from_radix_10_signed(&buf_digits);
 
-                        builder.append_value(num).unwrap();
-                    } else {
-                        builder.append_null().unwrap();
-                    }
-                }
-
-                Arc::new(builder.finish())
+                builder.append_value(num).unwrap();
+            } else {
+                builder.append_null().unwrap();
             }
-            _ => unreachable!(),
         }
+
+        Arc::new(builder.finish())
     }
 }
 
@@ -188,9 +184,7 @@ pub fn choose_column_strategy(
             field.is_nullable(),
             (*length).try_into().unwrap(),
         )),
-        arrow_type
-        @
-        (ArrowDataType::Null
+        arrow_type @ (ArrowDataType::Null
         | ArrowDataType::Date64
         | ArrowDataType::Time32(_)
         | ArrowDataType::Time64(_)

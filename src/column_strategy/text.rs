@@ -95,14 +95,11 @@ impl ColumnStrategy for WideText {
     }
 
     fn fill_arrow_array(&self, column_view: AnyColumnView) -> ArrayRef {
-        let values = match column_view {
-            AnyColumnView::WText(values) => values,
-            _ => unreachable!(),
-        };
-        let mut builder = StringBuilder::new(values.len());
+        let view = column_view.as_w_text_view().unwrap();
+        let mut builder = StringBuilder::new(view.len());
         // Buffer used to convert individual values from utf16 to utf8.
         let mut buf_utf8 = String::new();
-        for value in values {
+        for value in view.iter() {
             buf_utf8.clear();
             let opt = if let Some(utf16) = value {
                 for c in decode_utf16(utf16.as_slice().iter().cloned()) {
@@ -144,12 +141,9 @@ impl ColumnStrategy for NarrowText {
     }
 
     fn fill_arrow_array(&self, column_view: AnyColumnView) -> ArrayRef {
-        let values = match column_view {
-            AnyColumnView::Text(values) => values,
-            _ => unreachable!(),
-        };
-        let mut builder = StringBuilder::new(values.len());
-        for value in values {
+        let view = column_view.as_text_view().unwrap();
+        let mut builder = StringBuilder::new(view.len());
+        for value in view.iter() {
             builder
                 .append_option(value.map(|bytes| {
                     std::str::from_utf8(bytes)

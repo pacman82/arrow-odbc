@@ -28,12 +28,9 @@ impl ColumnStrategy for Binary {
     }
 
     fn fill_arrow_array(&self, column_view: AnyColumnView) -> ArrayRef {
-        let values = match column_view {
-            AnyColumnView::Binary(values) => values,
-            _ => unreachable!(),
-        };
-        let mut builder = BinaryBuilder::new(values.len());
-        for value in values {
+        let view = column_view.as_bin_view().unwrap();
+        let mut builder = BinaryBuilder::new(view.len());
+        for value in view.iter() {
             if let Some(bytes) = value {
                 builder.append_value(bytes).unwrap();
             } else {
@@ -65,12 +62,9 @@ impl ColumnStrategy for FixedSizedBinary {
     }
 
     fn fill_arrow_array(&self, column_view: AnyColumnView) -> ArrayRef {
-        let values = match column_view {
-            AnyColumnView::Binary(values) => values,
-            _ => unreachable!(),
-        };
-        let mut builder = FixedSizeBinaryBuilder::new(values.len(), self.len.try_into().unwrap());
-        for value in values {
+        let view = column_view.as_bin_view().unwrap();
+        let mut builder = FixedSizeBinaryBuilder::new(view.len(), self.len.try_into().unwrap());
+        for value in view.iter() {
             if let Some(bytes) = value {
                 builder.append_value(bytes).unwrap();
             } else {
