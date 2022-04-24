@@ -243,6 +243,14 @@ pub enum ColumnFailure {
         attached to the ODBC result set:\n{0}"
     )]
     FailedToDescribeColumn(#[source] odbc_api::Error),
+    #[error(
+        "Column buffer is too large to be allocated. Tried to alloacte {num_elements} elements \
+        with {element_size} bytes in size each."
+    )]
+    TooLarge{
+        num_elements: usize,
+        element_size: usize
+    }
 }
 
 impl ColumnFailure {

@@ -182,7 +182,32 @@ impl<C: Cursor> OdbcReader<C> {
         let row_set_buffer = buffer_from_description(
             max_batch_size,
             column_strategies.iter().map(|cs| cs.buffer_description()),
-        );
+        )
+        .map_err(|source| match source {
+            odbc_api::Error::FailedSettingConnectionPooling
+            | odbc_api::Error::FailedAllocatingEnvironment
+            | odbc_api::Error::NoDiagnostics { .. }
+            | odbc_api::Error::Diagnostics { .. }
+            | odbc_api::Error::AbortedConnectionStringCompletion
+            | odbc_api::Error::UnsupportedOdbcApiVersion(_)
+            | odbc_api::Error::FailedReadingInput(_)
+            | odbc_api::Error::InvalidRowArraySize { .. }
+            | odbc_api::Error::OracleOdbcDriverDoesNotSupport64Bit(_) => {
+                panic!("Unexpected error in upstream ODBC api error library")
+            }
+            odbc_api::Error::TooLargeColumnBufferSize {
+                buffer_index,
+                num_elements,
+                element_size,
+            } => Error::ColumnFailure {
+                name: schema.field(buffer_index as usize).name().clone(),
+                index: buffer_index as usize,
+                source: ColumnFailure::TooLarge {
+                    num_elements,
+                    element_size,
+                },
+            },
+        })?;
         let cursor = cursor.bind_buffer(row_set_buffer).unwrap();
 
         Ok(Self {

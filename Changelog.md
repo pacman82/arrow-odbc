@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.10.0
+
+* Update odbc-api `>= 0.36, < 0.37` -> `>= 0.38, < 0.39`
+* Recoverable errors if allocation for binary or text columns fails.
+
 ## 0.9.2
 
 * Update arrow `>= 7.0.0, < 10` -> `>= 7.0.0, < 13`
