@@ -192,7 +192,9 @@ impl<C: Cursor> OdbcReader<C> {
             | odbc_api::Error::UnsupportedOdbcApiVersion(_)
             | odbc_api::Error::FailedReadingInput(_)
             | odbc_api::Error::InvalidRowArraySize { .. }
-            | odbc_api::Error::OracleOdbcDriverDoesNotSupport64Bit(_) => {
+            | odbc_api::Error::OracleOdbcDriverDoesNotSupport64Bit(_)
+            | odbc_api::Error::TooLargeValueForBuffer
+            | odbc_api::Error::TooManyDiagnostics => {
                 panic!("Unexpected error in upstream ODBC api error library")
             }
             odbc_api::Error::TooLargeColumnBufferSize {
