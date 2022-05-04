@@ -3,6 +3,7 @@
 ## 0.11.0
 
 * Update odbc-api `>= 0.38, < 0.39` -> `>= 0.39, < 0.40`
+* Support for fetching values from `VARCHAR(max)` and `VARBINARY(max)` columns, through specifying upper limits using `BufferAllocationOptions` in `OdbcReader::with`.
 
 ## 0.10.0
 
