@@ -2,7 +2,7 @@ use thiserror::Error;
 
 use crate::column_strategy::ColumnFailure;
 
-/// A variation of things which can go wrong then creating an [`OdbcReader`].
+/// A variation of things which can go wrong then creating an [`crate::OdbcReader`].
 #[derive(Error, Debug)]
 pub enum Error {
     /// Failure to retrieve the number of columns from the result set.

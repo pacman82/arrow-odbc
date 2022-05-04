@@ -54,7 +54,7 @@ use arrow::{
     error::ArrowError,
     record_batch::{RecordBatch, RecordBatchReader},
 };
-use column_strategy::{choose_column_strategy, ColumnStrategy, BufferAllocationOptions};
+use column_strategy::{choose_column_strategy, ColumnStrategy};
 use odbc_api::{
     buffers::{buffer_from_description, AnyColumnBuffer, ColumnarBuffer},
     Cursor, RowSetCursor,
@@ -69,7 +69,7 @@ mod error;
 pub use arrow;
 pub use odbc_api;
 
-pub use self::{column_strategy::ColumnFailure, error::Error, schema::arrow_schema_from};
+pub use self::{column_strategy::{BufferAllocationOptions, ColumnFailure}, error::Error, schema::arrow_schema_from};
 
 /// Arrow ODBC reader. Implements the [`arrow::record_batch::RecordBatchReader`] trait so it can be
 /// used to fill Arrow arrays from an ODBC data source.
@@ -166,12 +166,17 @@ impl<C: Cursor> OdbcReader<C> {
         max_batch_size: usize,
         schema: SchemaRef,
     ) -> Result<Self, Error> {
-        let max_text_size = None;
-        let max_binary_size = None;
-        Self::with(cursor, max_batch_size, Some(schema), max_text_size, max_binary_size)
+        Self::with(
+            cursor,
+            max_batch_size,
+            Some(schema),
+            BufferAllocationOptions::default(),
+        )
     }
 
-    /// Construct a new `OdbcReader instance.
+    /// Construct a new [`crate::OdbcReader`] instance. This method allows you full control over
+    /// what options to explicitly specify, and what options you want to leave to this crate to
+    /// automatically decide.
     ///
     /// # Parameters
     ///
@@ -184,24 +189,15 @@ impl<C: Cursor> OdbcReader<C> {
     /// * `schema`: Arrow schema. Describes the type of the Arrow Arrays in the record batches, but
     ///    is also used to determine CData type requested from the data source. Set to `None` to
     ///    infer schema from the data source.
-    /// * `max_text_size`: An upper limit for the size of buffers bound to variadic text columns of
-    ///    the data source. This limit is not (directly) related to the size of the created arrow
-    ///    buffers, but rather applies to the buffers used for the data in transit. Use this option
-    ///    if you have e.g. `VARCHAR(MAX)` fields in your database schema. In such a case without an
-    ///    upper limit, up to two GiB of memory might be allocated to hold an individual value.
-    ///    Usually though, all actual entries in the data source are considerably smaller. If you
-    ///    can not adapt your database schema, this limit might be what you are looking for, in
-    ///    order to prevent memory allocation errors. On windows systems the size is double words
-    ///    (16Bit), as windows utilizes an UTF-16 encoding. So this translates to roughly the size
-    ///    in letters. On non windows systems this is the size in bytes and the datasource is
-    ///    assumed to utilize an UTF-8 encoding. `None` means no upper limit is set and the maximum
-    ///    element size, reported by ODBC is used to determine buffer sizes.
+    /// * `buffer_allocation_options`: Allows you to specify upper limits for binary and / or text
+    ///    buffer types. This is useful support fetching data from e.g. VARCHAR(max) or
+    ///    VARBINARY(max) columns, which otherwise might lead to errors, due to the ODBC driver
+    ///    having a hard time specifying a good upper bound for the largest possible expected value.
     pub fn with(
         cursor: C,
         max_batch_size: usize,
         schema: Option<SchemaRef>,
-        max_text_size: Option<usize>,
-        max_binary_size: Option<usize>,
+        buffer_allocation_options: BufferAllocationOptions,
     ) -> Result<Self, Error> {
         // Infer schema if not given by the user
         let schema = if let Some(schema) = schema {
@@ -218,12 +214,13 @@ impl<C: Cursor> OdbcReader<C> {
                 let col_index = (index + 1).try_into().unwrap();
                 let lazy_sql_data_type = || cursor.col_data_type(col_index);
                 let lazy_display_size = || cursor.col_display_size(col_index);
-                let buffer_allocation_options = BufferAllocationOptions {
-                    max_text_size,
-                    max_binary_size,
-                };
-                choose_column_strategy(field, lazy_sql_data_type, lazy_display_size, buffer_allocation_options)
-                    .map_err(|cause| cause.into_crate_error(field.name().clone(), index))
+                choose_column_strategy(
+                    field,
+                    lazy_sql_data_type,
+                    lazy_display_size,
+                    buffer_allocation_options,
+                )
+                .map_err(|cause| cause.into_crate_error(field.name().clone(), index))
             })
             .collect::<Result<_, _>>()?;
 

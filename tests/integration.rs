@@ -21,7 +21,7 @@ use arrow_odbc::{
         sys::{AttrConnectionPooling, AttrCpMatch},
         Connection, Environment,
     },
-    ColumnFailure, Error, OdbcReader,
+    ColumnFailure, Error, OdbcReader, BufferAllocationOptions,
 };
 use odbc_api::IntoParameter;
 
@@ -663,14 +663,15 @@ fn should_allow_to_fetch_from_varchar_max() {
     // When
     let max_batch_size = 100;
     let schema = None;
-    let max_text_size = Some(1024);
-    let max_binary_size = None;
+    let buffer_allocation_options = BufferAllocationOptions{
+        max_text_size: Some(1024),
+        ..Default::default()
+    };
     let result = OdbcReader::with(
         cursor,
         max_batch_size,
         schema,
-        max_text_size,
-        max_binary_size,
+        buffer_allocation_options
     );
 
     // Then
@@ -693,14 +694,15 @@ fn should_error_for_truncation() {
     // When fetching that value with a text limit of 5
     let max_batch_size = 1;
     let schema = None;
-    let max_text_size = Some(5);
-    let max_binary_size = None;
+    let buffer_allocation_options = BufferAllocationOptions{
+        max_text_size: Some(5),
+        ..Default::default()
+    };
     let mut reader = OdbcReader::with(
         cursor,
         max_batch_size,
         schema,
-        max_text_size,
-        max_binary_size,
+        buffer_allocation_options,
     )
     .unwrap();
     let result = reader.next().unwrap();
@@ -751,14 +753,15 @@ fn should_allow_to_fetch_from_varbinary_max() {
     // When
     let max_batch_size = 100;
     let schema = None;
-    let max_text_size = None;
-    let max_binary_size = Some(1024);
+    let buffer_allocation_options = BufferAllocationOptions{
+        max_binary_size: Some(1024),
+        ..Default::default()
+    };
     let result = OdbcReader::with(
         cursor,
         max_batch_size,
         schema,
-        max_text_size,
-        max_binary_size,
+        buffer_allocation_options
     );
 
     // Then

@@ -134,8 +134,32 @@ impl ColumnStrategy for Decimal {
     }
 }
 
+/// Allows setting limits for buffers bound to the ODBC data source. Check this out if you find that
+/// you get memory allocation, or zero sized column errors. Used than constructing a reader using
+/// [`crate::OdbcReader::with`].
+#[derive(Default, Debug, Clone, Copy)]
 pub struct BufferAllocationOptions {
+    /// An upper limit for the size of buffers bound to variadic text columns of the data source.
+    /// This limit does not (directly) apply to the size of the created arrow buffers, but rather
+    /// applies to the buffers used for the data in transit. Use this option if you have e.g.
+    /// `VARCHAR(MAX)` fields in your database schema. In such a case without an upper limit, the
+    /// ODBC driver of your data source is asked for the maximum size of an element, and is likely
+    /// to answer with either `0` or a value which is way larger than any actual entry in the column
+    /// If you can not adapt your database schema, this limit might be what you are looking for. On
+    /// windows systems the size is double words (16Bit), as windows utilizes an UTF-16 encoding. So
+    /// this translates to roughly the size in letters. On non windows systems this is the size in
+    /// bytes and the datasource is assumed to utilize an UTF-8 encoding. `None` means no upper
+    /// limit is set and the maximum element size, reported by ODBC is used to determine buffer
+    /// sizes.
     pub max_text_size: Option<usize>,
+    /// An upper limit for the size of buffers bound to variadic text columns of the data source.
+    /// This limit does not (directly) apply to the size of the created arrow buffers, but rather
+    /// applies to the buffers used for the data in transit. Use this option if you have e.g.
+    /// `VARBINARY(MAX)` fields in your database schema. In such a case without an upper limit, the
+    /// ODBC driver of your data source is asked for the maximum size of an element, and is likely
+    /// to answer with either `0` or a value which is way larger than any actual entry in the
+    /// column. If you can not adapt your database schema, this limit might be what you are looking
+    /// for. This is the maximum size in bytes of the binary column.
     pub max_binary_size: Option<usize>,
 }
 
