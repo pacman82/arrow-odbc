@@ -16,6 +16,7 @@ pub fn choose_text_strategy(
     sql_type: OdbcDataType,
     lazy_display_size: impl Fn() -> Result<isize, odbc_api::Error>,
     is_nullable: bool,
+    max_text_size: Option<usize>
 ) -> Result<Box<dyn ColumnStrategy>, ColumnFailure> {
     let is_narrow = matches!(
         sql_type,
@@ -26,18 +27,22 @@ pub fn choose_text_strategy(
         OdbcDataType::WVarchar { .. } | OdbcDataType::WChar { .. }
     );
     let is_text = is_narrow || is_wide;
-    Ok(if is_text {
+    let apply_buffer_limit = |len| {
+        match (len, max_text_size) {
+            (0, None) => Err(ColumnFailure::ZeroSizedColumn { sql_type }),
+            (0, Some(limit)) => Ok(limit),
+            (len, None) => Ok(len),
+            (len, Some(limit)) => Ok(if len < limit { len } else { limit }),
+        }
+    };
+    let strategy = if is_text {
         if cfg!(target_os = "windows") {
             let hex_len = sql_type.utf16_len().unwrap();
-            if hex_len == 0 {
-                return Err(ColumnFailure::ZeroSizedColumn { sql_type });
-            }
+            let hex_len = apply_buffer_limit(hex_len)?;
             wide_text_strategy(hex_len, is_nullable)
         } else {
             let octet_len = sql_type.utf8_len().unwrap();
-            if octet_len == 0 {
-                return Err(ColumnFailure::ZeroSizedColumn { sql_type });
-            }
+            let octet_len = apply_buffer_limit(octet_len)?;
             narrow_text_strategy(octet_len, is_nullable)
         }
     } else {
@@ -49,13 +54,13 @@ pub fn choose_text_strategy(
             .try_into()
             .unwrap();
 
-        if display_size == 0 {
-            return Err(ColumnFailure::ZeroSizedColumn { sql_type });
-        }
+        let display_size = apply_buffer_limit(display_size)?;
 
         // We assume non text type colmuns to only consist of ASCII characters.
         narrow_text_strategy(display_size, is_nullable)
-    })
+    };
+
+    Ok(strategy)
 }
 
 fn wide_text_strategy(u16_len: usize, is_nullable: bool) -> Box<dyn ColumnStrategy> {

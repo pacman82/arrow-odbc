@@ -134,10 +134,16 @@ impl ColumnStrategy for Decimal {
     }
 }
 
+pub struct BufferAllocationOptions {
+    pub max_text_size: Option<usize>,
+    pub max_binary_size: Option<usize>,
+}
+
 pub fn choose_column_strategy(
     field: &Field,
     lazy_sql_type: impl Fn() -> Result<OdbcDataType, odbc_api::Error>,
     lazy_display_size: impl Fn() -> Result<isize, odbc_api::Error>,
+    buffer_allocation_options: BufferAllocationOptions,
 ) -> Result<Box<dyn ColumnStrategy>, ColumnFailure> {
     let strat: Box<dyn ColumnStrategy> = match field.data_type() {
         ArrowDataType::Boolean => {
@@ -158,7 +164,7 @@ pub fn choose_column_strategy(
         ArrowDataType::Utf8 => {
             let sql_type = lazy_sql_type().map_err(ColumnFailure::FailedToDescribeColumn)?;
             // Use the SQL type first to determine buffer length.
-            choose_text_strategy(sql_type, lazy_display_size, field.is_nullable())?
+            choose_text_strategy(sql_type, lazy_display_size, field.is_nullable(), buffer_allocation_options.max_text_size)?
         }
         ArrowDataType::Decimal(precision, scale) => {
             Box::new(Decimal::new(field.is_nullable(), *precision, *scale))
@@ -247,10 +253,10 @@ pub enum ColumnFailure {
         "Column buffer is too large to be allocated. Tried to alloacte {num_elements} elements \
         with {element_size} bytes in size each."
     )]
-    TooLarge{
+    TooLarge {
         num_elements: usize,
-        element_size: usize
-    }
+        element_size: usize,
+    },
 }
 
 impl ColumnFailure {

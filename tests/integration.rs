@@ -647,6 +647,31 @@ fn should_allocate_enough_memory_for_varchar_column_bound_to_u16() {
     assert_eq!("Ü", array_vals.value(0));
 }
 
+/// Often than VARCHAR(MAX) is used the actual values in these columns are in the range of 100kb and
+/// not several kb. Sadly if we allocate the buffers, we have to assume the largest possible element
+/// this test verifies that users can specify sensible upper limits using their domain knowledge
+/// about the table in order to prevent out of memory issues.
+#[test]
+fn should_allow_to_fetch_from_varchar_max() {
+    // Given
+    let table_name = function_name!().rsplit_once(':').unwrap().1;
+    let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
+    setup_empty_table(&conn, table_name, &["VARCHAR(MAX)"]).unwrap();
+    let sql = format!("SELECT a FROM {table_name}");
+    let cursor = conn.execute(&sql, ()).unwrap().unwrap();
+
+    // When
+    // Batches will contain at most 100 entries.
+    let max_batch_size = 100;
+    let schema = None;
+    let max_text_size = Some(1024);
+    let result = OdbcReader::with(cursor, max_batch_size, schema, max_text_size);
+
+    // Then
+    // In particular we do **not** get either a zero sized column or out of memory error.
+    assert!(result.is_ok())
+}
+
 /// Inserts the values in the literal into the database and returns them as an Arrow array.
 fn fetch_arrow_data(
     table_name: &str,
@@ -657,11 +682,11 @@ fn fetch_arrow_data(
     let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
     setup_empty_table(&conn, table_name, &[column_type]).unwrap();
     // Insert values using literals
-    let sql = format!("INSERT INTO {} (a) VALUES {}", table_name, literal);
+    let sql = format!("INSERT INTO {table_name} (a) VALUES {literal}");
     conn.execute(&sql, ()).unwrap();
 
     // Query column with values to get a cursor
-    let sql = format!("SELECT a FROM {}", table_name);
+    let sql = format!("SELECT a FROM {table_name}");
     let cursor = conn.execute(&sql, ()).unwrap().unwrap();
 
     // Now that we have a cursor, we want to iterate over its rows and fill an arrow batch with it.

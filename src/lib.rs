@@ -54,7 +54,7 @@ use arrow::{
     error::ArrowError,
     record_batch::{RecordBatch, RecordBatchReader},
 };
-use column_strategy::{choose_column_strategy, ColumnStrategy};
+use column_strategy::{choose_column_strategy, ColumnStrategy, BufferAllocationOptions};
 use odbc_api::{
     buffers::{buffer_from_description, AnyColumnBuffer, ColumnarBuffer},
     Cursor, RowSetCursor,
@@ -166,6 +166,48 @@ impl<C: Cursor> OdbcReader<C> {
         max_batch_size: usize,
         schema: SchemaRef,
     ) -> Result<Self, Error> {
+        let max_text_size = None;
+        Self::with(cursor, max_batch_size, Some(schema), max_text_size)
+    }
+
+    /// Construct a new `OdbcReader instance.
+    ///
+    /// # Parameters
+    ///
+    /// * `cursor`: ODBC cursor used to fetch batches from the data source. The constructor will
+    ///   bind buffers to this cursor in order to perform bulk fetches from the source. This is
+    ///   usually faster than fetching results row by row as it saves roundtrips to the database.
+    ///   The type of these buffers will be inferred from the arrow schema. Not every arrow type is
+    ///   supported though.
+    /// * `max_batch_size`: Maximum batch size requested from the datasource.
+    /// * `schema`: Arrow schema. Describes the type of the Arrow Arrays in the record batches, but
+    ///    is also used to determine CData type requested from the data source. Set to `None` to
+    ///    infer schema from the data source.
+    /// * `max_text_size`: An upper limit for the size of buffers bound to variadic text columns of
+    ///    the data source. This limit is not (directly) related to the size of the created arrow
+    ///    buffers, but rather applies to the buffers used for the data in transit. Use this option
+    ///    if you have e.g. `VARCHAR(MAX)` fields in your database schema. In such a case without an
+    ///    upper limit, up to two GiB of memory might be allocated to hold an individual value.
+    ///    Usually though, all actual entries in the data source are considerably smaller. If you
+    ///    can not adapt your database schema, this limit might be what you are looking for, in
+    ///    order to prevent memory allocation errors. On windows systems the size is double words
+    ///    (16Bit), as windows utilizes an UTF-16 encoding. So this translates to roughly the size
+    ///    in letters. On non windows systems this is the size in bytes and the datasource is
+    ///    assumed to utilize an UTF-8 encoding. `None` means no upper limit is set and the maximum
+    ///    element size, reported by ODBC is used to determine buffer sizes.
+    pub fn with(
+        cursor: C,
+        max_batch_size: usize,
+        schema: Option<SchemaRef>,
+        max_text_size: Option<usize>,
+    ) -> Result<Self, Error> {
+        // Infer schema if not given by the user
+        let schema = if let Some(schema) = schema {
+            schema
+        } else {
+            Arc::new(arrow_schema_from(&cursor)?)
+        };
+
         let column_strategies: Vec<Box<dyn ColumnStrategy>> = schema
             .fields()
             .iter()
@@ -174,7 +216,11 @@ impl<C: Cursor> OdbcReader<C> {
                 let col_index = (index + 1).try_into().unwrap();
                 let lazy_sql_data_type = || cursor.col_data_type(col_index);
                 let lazy_display_size = || cursor.col_display_size(col_index);
-                choose_column_strategy(field, lazy_sql_data_type, lazy_display_size)
+                let buffer_allocation_options = BufferAllocationOptions {
+                    max_text_size,
+                    max_binary_size: None,
+                };
+                choose_column_strategy(field, lazy_sql_data_type, lazy_display_size, buffer_allocation_options)
                     .map_err(|cause| cause.into_crate_error(field.name().clone(), index))
             })
             .collect::<Result<_, _>>()?;
