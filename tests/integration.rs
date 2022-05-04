@@ -672,6 +672,31 @@ fn should_allow_to_fetch_from_varchar_max() {
     assert!(result.is_ok())
 }
 
+/// If column limits are too small and truncation occurs, we expect an error to be raised.
+#[test]
+fn should_error_for_truncation() {
+    // Given
+    let table_name = function_name!().rsplit_once(':').unwrap().1;
+    let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
+    setup_empty_table(&conn, table_name, &["VARCHAR(MAX)"]).unwrap();
+    let sql = format!("INSERT INTO {table_name} (a) VALUES ('123456789')");
+    conn.execute(&sql, ()).unwrap();
+    let sql = format!("SELECT a FROM {table_name}");
+    let cursor = conn.execute(&sql, ()).unwrap().unwrap();
+
+    // When
+    // Batches will contain at most 100 entries.
+    let max_batch_size = 100;
+    let schema = None;
+    let max_text_size = Some(5);
+    let mut reader = OdbcReader::with(cursor, max_batch_size, schema, max_text_size).unwrap();
+    let result = reader.next().unwrap();
+
+    // Then
+    // We do not want a truncation to occurr silently
+    assert!(result.is_err())
+}
+
 /// Inserts the values in the literal into the database and returns them as an Arrow array.
 fn fetch_arrow_data(
     table_name: &str,

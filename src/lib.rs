@@ -273,7 +273,7 @@ where
     type Item = Result<RecordBatch, ArrowError>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        match self.cursor.fetch() {
+        match self.cursor.fetch_with_truncation_check(true) {
             // We successfully fetched a batch from the database. Try to copy it into a record batch
             // and forward errors if any.
             Ok(Some(batch)) => {
