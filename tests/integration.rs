@@ -664,7 +664,14 @@ fn should_allow_to_fetch_from_varchar_max() {
     let max_batch_size = 100;
     let schema = None;
     let max_text_size = Some(1024);
-    let result = OdbcReader::with(cursor, max_batch_size, schema, max_text_size);
+    let max_binary_size = None;
+    let result = OdbcReader::with(
+        cursor,
+        max_batch_size,
+        schema,
+        max_text_size,
+        max_binary_size,
+    );
 
     // Then
     // In particular we do **not** get either a zero sized column or out of memory error.
@@ -687,7 +694,15 @@ fn should_error_for_truncation() {
     let max_batch_size = 1;
     let schema = None;
     let max_text_size = Some(5);
-    let mut reader = OdbcReader::with(cursor, max_batch_size, schema, max_text_size).unwrap();
+    let max_binary_size = None;
+    let mut reader = OdbcReader::with(
+        cursor,
+        max_batch_size,
+        schema,
+        max_text_size,
+        max_binary_size,
+    )
+    .unwrap();
     let result = reader.next().unwrap();
 
     // Then we get an error, rather than the truncation only occurring as a warning.
@@ -722,6 +737,33 @@ fn fetch_arrow_data(
     let record_batch = reader.next().unwrap()?;
 
     Ok(record_batch.column(0).clone())
+}
+
+#[test]
+fn should_allow_to_fetch_from_varbinary_max() {
+    // Given
+    let table_name = function_name!().rsplit_once(':').unwrap().1;
+    let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
+    setup_empty_table(&conn, table_name, &["VARBINARY(MAX)"]).unwrap();
+    let sql = format!("SELECT a FROM {table_name}");
+    let cursor = conn.execute(&sql, ()).unwrap().unwrap();
+
+    // When
+    let max_batch_size = 100;
+    let schema = None;
+    let max_text_size = None;
+    let max_binary_size = Some(1024);
+    let result = OdbcReader::with(
+        cursor,
+        max_batch_size,
+        schema,
+        max_text_size,
+        max_binary_size,
+    );
+
+    // Then
+    // In particular we do **not** get either a zero sized column or out of memory error.
+    assert!(result.is_ok())
 }
 
 /// Creates the table and assures it is empty. Columns are named a,b,c, etc.

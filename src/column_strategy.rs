@@ -164,7 +164,12 @@ pub fn choose_column_strategy(
         ArrowDataType::Utf8 => {
             let sql_type = lazy_sql_type().map_err(ColumnFailure::FailedToDescribeColumn)?;
             // Use the SQL type first to determine buffer length.
-            choose_text_strategy(sql_type, lazy_display_size, field.is_nullable(), buffer_allocation_options.max_text_size)?
+            choose_text_strategy(
+                sql_type,
+                lazy_display_size,
+                field.is_nullable(),
+                buffer_allocation_options.max_text_size,
+            )?
         }
         ArrowDataType::Decimal(precision, scale) => {
             Box::new(Decimal::new(field.is_nullable(), *precision, *scale))
@@ -172,6 +177,12 @@ pub fn choose_column_strategy(
         ArrowDataType::Binary => {
             let sql_type = lazy_sql_type().map_err(ColumnFailure::FailedToDescribeColumn)?;
             let length = sql_type.column_size();
+            let length = match (length, buffer_allocation_options.max_binary_size) {
+                (0, None) => return Err(ColumnFailure::ZeroSizedColumn { sql_type }),
+                (0, Some(limit)) => limit,
+                (len, None) => len,
+                (len, Some(limit)) => if len < limit { len } else { limit },
+            };
             Box::new(Binary::new(field.is_nullable(), length))
         }
         ArrowDataType::Timestamp(TimeUnit::Second, _) => {

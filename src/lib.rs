@@ -167,7 +167,8 @@ impl<C: Cursor> OdbcReader<C> {
         schema: SchemaRef,
     ) -> Result<Self, Error> {
         let max_text_size = None;
-        Self::with(cursor, max_batch_size, Some(schema), max_text_size)
+        let max_binary_size = None;
+        Self::with(cursor, max_batch_size, Some(schema), max_text_size, max_binary_size)
     }
 
     /// Construct a new `OdbcReader instance.
@@ -200,6 +201,7 @@ impl<C: Cursor> OdbcReader<C> {
         max_batch_size: usize,
         schema: Option<SchemaRef>,
         max_text_size: Option<usize>,
+        max_binary_size: Option<usize>,
     ) -> Result<Self, Error> {
         // Infer schema if not given by the user
         let schema = if let Some(schema) = schema {
@@ -218,7 +220,7 @@ impl<C: Cursor> OdbcReader<C> {
                 let lazy_display_size = || cursor.col_display_size(col_index);
                 let buffer_allocation_options = BufferAllocationOptions {
                     max_text_size,
-                    max_binary_size: None,
+                    max_binary_size,
                 };
                 choose_column_strategy(field, lazy_sql_data_type, lazy_display_size, buffer_allocation_options)
                     .map_err(|cause| cause.into_crate_error(field.name().clone(), index))
