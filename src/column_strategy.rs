@@ -152,7 +152,7 @@ pub struct BufferAllocationOptions {
     /// limit is set and the maximum element size, reported by ODBC is used to determine buffer
     /// sizes.
     pub max_text_size: Option<usize>,
-    /// An upper limit for the size of buffers bound to variadic text columns of the data source.
+    /// An upper limit for the size of buffers bound to variadic binary columns of the data source.
     /// This limit does not (directly) apply to the size of the created arrow buffers, but rather
     /// applies to the buffers used for the data in transit. Use this option if you have e.g.
     /// `VARBINARY(MAX)` fields in your database schema. In such a case without an upper limit, the
