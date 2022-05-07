@@ -16,7 +16,7 @@ pub fn choose_text_strategy(
     sql_type: OdbcDataType,
     lazy_display_size: impl Fn() -> Result<isize, odbc_api::Error>,
     is_nullable: bool,
-    max_text_size: Option<usize>
+    max_text_size: Option<usize>,
 ) -> Result<Box<dyn ColumnStrategy>, ColumnFailure> {
     let is_narrow = matches!(
         sql_type,
@@ -27,13 +27,11 @@ pub fn choose_text_strategy(
         OdbcDataType::WVarchar { .. } | OdbcDataType::WChar { .. }
     );
     let is_text = is_narrow || is_wide;
-    let apply_buffer_limit = |len| {
-        match (len, max_text_size) {
-            (0, None) => Err(ColumnFailure::ZeroSizedColumn { sql_type }),
-            (0, Some(limit)) => Ok(limit),
-            (len, None) => Ok(len),
-            (len, Some(limit)) => Ok(if len < limit { len } else { limit }),
-        }
+    let apply_buffer_limit = |len| match (len, max_text_size) {
+        (0, None) => Err(ColumnFailure::ZeroSizedColumn { sql_type }),
+        (0, Some(limit)) => Ok(limit),
+        (len, None) => Ok(len),
+        (len, Some(limit)) => Ok(if len < limit { len } else { limit }),
     };
     let strategy = if is_text {
         if cfg!(target_os = "windows") {

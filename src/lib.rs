@@ -56,7 +56,7 @@ use arrow::{
 };
 use column_strategy::{choose_column_strategy, ColumnStrategy};
 use odbc_api::{
-    buffers::{buffer_from_description, AnyColumnBuffer, ColumnarBuffer},
+    buffers::{try_buffer_from_description, AnyColumnBuffer, ColumnarBuffer},
     Cursor, RowSetCursor,
 };
 use thiserror::Error;
@@ -69,7 +69,11 @@ mod error;
 pub use arrow;
 pub use odbc_api;
 
-pub use self::{column_strategy::{BufferAllocationOptions, ColumnFailure}, error::Error, schema::arrow_schema_from};
+pub use self::{
+    column_strategy::{BufferAllocationOptions, ColumnFailure},
+    error::Error,
+    schema::arrow_schema_from,
+};
 
 /// Arrow ODBC reader. Implements the [`arrow::record_batch::RecordBatchReader`] trait so it can be
 /// used to fill Arrow arrays from an ODBC data source.
@@ -224,7 +228,7 @@ impl<C: Cursor> OdbcReader<C> {
             })
             .collect::<Result<_, _>>()?;
 
-        let row_set_buffer = buffer_from_description(
+        let row_set_buffer = try_buffer_from_description(
             max_batch_size,
             column_strategies.iter().map(|cs| cs.buffer_description()),
         )

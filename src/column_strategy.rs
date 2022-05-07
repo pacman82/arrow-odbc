@@ -205,7 +205,13 @@ pub fn choose_column_strategy(
                 (0, None) => return Err(ColumnFailure::ZeroSizedColumn { sql_type }),
                 (0, Some(limit)) => limit,
                 (len, None) => len,
-                (len, Some(limit)) => if len < limit { len } else { limit },
+                (len, Some(limit)) => {
+                    if len < limit {
+                        len
+                    } else {
+                        limit
+                    }
+                }
             };
             Box::new(Binary::new(field.is_nullable(), length))
         }

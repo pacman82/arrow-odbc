@@ -30,7 +30,7 @@ readme = "Readme.md"
 
 [dependencies]
 arrow = ">= 7.0.0, < 14"
-odbc-api = ">= 0.39.0, < 0.40"
+odbc-api = ">= 0.40.0, < 0.41"
 atoi = "1.0.0"
 chrono = "0.4.19"
 thiserror = "1.0.30"

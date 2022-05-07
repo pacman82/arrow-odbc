@@ -21,7 +21,7 @@ use arrow_odbc::{
         sys::{AttrConnectionPooling, AttrCpMatch},
         Connection, Environment,
     },
-    ColumnFailure, Error, OdbcReader, BufferAllocationOptions,
+    BufferAllocationOptions, ColumnFailure, Error, OdbcReader,
 };
 use odbc_api::IntoParameter;
 
@@ -663,16 +663,11 @@ fn should_allow_to_fetch_from_varchar_max() {
     // When
     let max_batch_size = 100;
     let schema = None;
-    let buffer_allocation_options = BufferAllocationOptions{
+    let buffer_allocation_options = BufferAllocationOptions {
         max_text_size: Some(1024),
         ..Default::default()
     };
-    let result = OdbcReader::with(
-        cursor,
-        max_batch_size,
-        schema,
-        buffer_allocation_options
-    );
+    let result = OdbcReader::with(cursor, max_batch_size, schema, buffer_allocation_options);
 
     // Then
     // In particular we do **not** get either a zero sized column or out of memory error.
@@ -694,17 +689,12 @@ fn should_error_for_truncation() {
     // When fetching that value with a text limit of 5
     let max_batch_size = 1;
     let schema = None;
-    let buffer_allocation_options = BufferAllocationOptions{
+    let buffer_allocation_options = BufferAllocationOptions {
         max_text_size: Some(5),
         ..Default::default()
     };
-    let mut reader = OdbcReader::with(
-        cursor,
-        max_batch_size,
-        schema,
-        buffer_allocation_options,
-    )
-    .unwrap();
+    let mut reader =
+        OdbcReader::with(cursor, max_batch_size, schema, buffer_allocation_options).unwrap();
     let result = reader.next().unwrap();
 
     // Then we get an error, rather than the truncation only occurring as a warning.
@@ -753,16 +743,11 @@ fn should_allow_to_fetch_from_varbinary_max() {
     // When
     let max_batch_size = 100;
     let schema = None;
-    let buffer_allocation_options = BufferAllocationOptions{
+    let buffer_allocation_options = BufferAllocationOptions {
         max_binary_size: Some(1024),
         ..Default::default()
     };
-    let result = OdbcReader::with(
-        cursor,
-        max_batch_size,
-        schema,
-        buffer_allocation_options
-    );
+    let result = OdbcReader::with(cursor, max_batch_size, schema, buffer_allocation_options);
 
     // Then
     // In particular we do **not** get either a zero sized column or out of memory error.
