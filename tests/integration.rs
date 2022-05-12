@@ -754,6 +754,40 @@ fn should_allow_to_fetch_from_varbinary_max() {
     assert!(result.is_ok())
 }
 
+#[test]
+fn fallibale_allocations() {
+    // Given
+    let table_name = function_name!().rsplit_once(':').unwrap().1;
+    let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
+    setup_empty_table(&conn, table_name, &["VARBINARY(4096)"]).unwrap();
+    let sql = format!("SELECT a FROM {table_name}");
+    let cursor = conn.execute(&sql, ()).unwrap().unwrap();
+
+    // When
+    let max_batch_size = 100_000_000;
+    let schema = None;
+    let buffer_allocation_options = BufferAllocationOptions {
+        fallibale_allocations: true,
+        ..Default::default()
+    };
+    let result = OdbcReader::with(cursor, max_batch_size, schema, buffer_allocation_options);
+
+    // Then
+    // In particular we do **not** get either a zero sized column or out of memory error.
+    assert!(result.is_err());
+    assert!(matches!(
+        result.err().unwrap(),
+        Error::ColumnFailure {
+            name: _,
+            index: 0,
+            source: ColumnFailure::TooLarge {
+                num_elements: 100_000_000,
+                element_size: 4096
+            }
+        }
+    ));
+}
+
 /// Creates the table and assures it is empty. Columns are named a,b,c, etc.
 fn setup_empty_table(
     conn: &Connection,

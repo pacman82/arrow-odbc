@@ -161,6 +161,10 @@ pub struct BufferAllocationOptions {
     /// column. If you can not adapt your database schema, this limit might be what you are looking
     /// for. This is the maximum size in bytes of the binary column.
     pub max_binary_size: Option<usize>,
+    /// Set to `true` in order to trigger an [`ColumnFailure::TooLarge`] instead of a panic in case
+    /// the buffers can not be allocated due to their size. This might have a performance cost for
+    /// constructing the reader. `false` by default.
+    pub fallibale_allocations: bool,
 }
 
 pub fn choose_column_strategy(

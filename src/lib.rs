@@ -50,13 +50,15 @@ use std::{convert::TryInto, sync::Arc};
 
 use arrow::{
     array::ArrayRef,
-    datatypes::SchemaRef,
+    datatypes::{Schema, SchemaRef},
     error::ArrowError,
     record_batch::{RecordBatch, RecordBatchReader},
 };
 use column_strategy::{choose_column_strategy, ColumnStrategy};
 use odbc_api::{
-    buffers::{try_buffer_from_description, AnyColumnBuffer, ColumnarBuffer},
+    buffers::{
+        buffer_from_description, try_buffer_from_description, AnyColumnBuffer, ColumnarBuffer,
+    },
     Cursor, RowSetCursor,
 };
 use thiserror::Error;
@@ -228,37 +230,14 @@ impl<C: Cursor> OdbcReader<C> {
             })
             .collect::<Result<_, _>>()?;
 
-        let row_set_buffer = try_buffer_from_description(
-            max_batch_size,
-            column_strategies.iter().map(|cs| cs.buffer_description()),
-        )
-        .map_err(|source| match source {
-            odbc_api::Error::FailedSettingConnectionPooling
-            | odbc_api::Error::FailedAllocatingEnvironment
-            | odbc_api::Error::NoDiagnostics { .. }
-            | odbc_api::Error::Diagnostics { .. }
-            | odbc_api::Error::AbortedConnectionStringCompletion
-            | odbc_api::Error::UnsupportedOdbcApiVersion(_)
-            | odbc_api::Error::FailedReadingInput(_)
-            | odbc_api::Error::InvalidRowArraySize { .. }
-            | odbc_api::Error::OracleOdbcDriverDoesNotSupport64Bit(_)
-            | odbc_api::Error::TooLargeValueForBuffer
-            | odbc_api::Error::TooManyDiagnostics => {
-                panic!("Unexpected error in upstream ODBC api error library")
-            }
-            odbc_api::Error::TooLargeColumnBufferSize {
-                buffer_index,
-                num_elements,
-                element_size,
-            } => Error::ColumnFailure {
-                name: schema.field(buffer_index as usize).name().clone(),
-                index: buffer_index as usize,
-                source: ColumnFailure::TooLarge {
-                    num_elements,
-                    element_size,
-                },
-            },
-        })?;
+        let descs = column_strategies.iter().map(|cs| cs.buffer_description());
+
+        let row_set_buffer = if buffer_allocation_options.fallibale_allocations {
+            try_buffer_from_description(max_batch_size, descs)
+                .map_err(|err| map_allocation_error(err, &schema))?
+        } else {
+            buffer_from_description(max_batch_size, descs)
+        };
         let cursor = cursor.bind_buffer(row_set_buffer).unwrap();
 
         Ok(Self {
@@ -266,6 +245,26 @@ impl<C: Cursor> OdbcReader<C> {
             schema,
             cursor,
         })
+    }
+}
+
+fn map_allocation_error(error: odbc_api::Error, schema: &Schema) -> Error {
+    match error {
+        odbc_api::Error::TooLargeColumnBufferSize {
+            buffer_index,
+            num_elements,
+            element_size,
+        } => Error::ColumnFailure {
+            name: schema.field(buffer_index as usize).name().clone(),
+            index: buffer_index as usize,
+            source: ColumnFailure::TooLarge {
+                num_elements,
+                element_size,
+            },
+        },
+        _ => {
+            panic!("Unexpected error in upstream ODBC api error library")
+        }
     }
 }
 
