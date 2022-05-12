@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.13.0
+
+* `panic` is now default behaviour on allocation errors. Activate `fallibale_allocations` in the `BufferAllocationOptions` in order to get a recoverable error instead.
+
 ## 0.12.0
 
 * Update odbc-api `>= 0.39, < 0.40` -> `>= 0.40 < 0.41`
