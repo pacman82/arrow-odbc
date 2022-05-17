@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.13.1
+
+* Update arrow `>= 7.0.0, < 14` -> `>= 7.0.0, < 15`
+
 ## 0.13.0
 
 * `panic` is now default behaviour on allocation errors. Activate `fallibale_allocations` in the `BufferAllocationOptions` in order to get a recoverable error instead.
