@@ -56,9 +56,7 @@ use arrow::{
 };
 use column_strategy::{choose_column_strategy, ColumnStrategy};
 use odbc_api::{
-    buffers::{
-        buffer_from_description, try_buffer_from_description, AnyColumnBuffer, ColumnarBuffer,
-    },
+    buffers::{AnyColumnBuffer, ColumnarAnyBuffer, ColumnarBuffer},
     Cursor, RowSetCursor,
 };
 use thiserror::Error;
@@ -233,10 +231,10 @@ impl<C: Cursor> OdbcReader<C> {
         let descs = column_strategies.iter().map(|cs| cs.buffer_description());
 
         let row_set_buffer = if buffer_allocation_options.fallibale_allocations {
-            try_buffer_from_description(max_batch_size, descs)
+            ColumnarAnyBuffer::try_from_description(max_batch_size, descs)
                 .map_err(|err| map_allocation_error(err, &schema))?
         } else {
-            buffer_from_description(max_batch_size, descs)
+            ColumnarAnyBuffer::from_description(max_batch_size, descs)
         };
         let cursor = cursor.bind_buffer(row_set_buffer).unwrap();
 
