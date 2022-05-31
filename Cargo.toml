@@ -1,6 +1,6 @@
 [package]
 name = "arrow-odbc"
-version = "0.13.3"
+version = "0.13.4"
 authors = ["Markus Klein"]
 edition = "2021"
 license = "MIT"
@@ -29,7 +29,7 @@ readme = "Readme.md"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-arrow = ">= 7.0.0, < 15"
+arrow = ">= 7.0.0, < 16"
 odbc-api = ">= 0.40.2, < 0.43"
 atoi = "1.0.0"
 chrono = "0.4.19"

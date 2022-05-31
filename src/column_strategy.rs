@@ -237,22 +237,22 @@ pub fn choose_column_strategy(
         )),
         arrow_type @ (ArrowDataType::Null
         | ArrowDataType::Date64
-        | ArrowDataType::Time32(_)
-        | ArrowDataType::Time64(_)
-        | ArrowDataType::Duration(_)
-        | ArrowDataType::Interval(_)
+        | ArrowDataType::Time32(..)
+        | ArrowDataType::Time64(..)
+        | ArrowDataType::Duration(..)
+        | ArrowDataType::Interval(..)
         | ArrowDataType::LargeBinary
         | ArrowDataType::LargeUtf8
-        | ArrowDataType::List(_)
-        | ArrowDataType::FixedSizeList(_, _)
-        | ArrowDataType::LargeList(_)
-        | ArrowDataType::Struct(_)
-        | ArrowDataType::Union(_, _)
-        | ArrowDataType::Dictionary(_, _)
+        | ArrowDataType::List(..)
+        | ArrowDataType::FixedSizeList(..)
+        | ArrowDataType::LargeList(..)
+        | ArrowDataType::Struct(..)
+        | ArrowDataType::Union(..)
+        | ArrowDataType::Dictionary(..)
         | ArrowDataType::UInt16
         | ArrowDataType::UInt32
         | ArrowDataType::UInt64
-        | ArrowDataType::Map(_, _)
+        | ArrowDataType::Map(..)
         | ArrowDataType::Float16) => {
             return Err(ColumnFailure::UnsupportedArrowType(arrow_type.clone()))
         }
