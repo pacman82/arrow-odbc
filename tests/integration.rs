@@ -23,7 +23,10 @@ use arrow_odbc::{
     },
     BufferAllocationOptions, ColumnFailure, Error, OdbcReader,
 };
-use odbc_api::IntoParameter;
+use odbc_api::{
+    buffers::{BufferDescription, BufferKind, TextRowSet},
+    IntoParameter, Cursor,
+};
 
 use stdext::function_name;
 
@@ -788,6 +791,40 @@ fn fallibale_allocations() {
     ));
 }
 
+/// Prototype future usecase. Inserting string data into a Database
+#[test]
+fn insert_text() {
+    // Given
+    let table_name = function_name!().rsplit_once(':').unwrap().1;
+    let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
+    setup_empty_table(&conn, table_name, &["VARCHAR(4096)"]).unwrap();
+    let array = StringArray::from(vec![Some("Hello"), None, Some("World")]);
+
+    // When
+    let insert = format!("INSERT INTO {table_name} (a) VALUES (?)");
+    let prepared = conn.prepare(&insert).unwrap();
+    let descriptions = BufferDescription {
+        nullable: true,
+        kind: BufferKind::Text { max_str_len: 4096 },
+    };
+    let num_rows = array.len();
+    let mut prebound = prepared
+        .into_any_column_inserter(num_rows, [descriptions])
+        .unwrap();
+    prebound.set_num_rows(num_rows);
+    let mut col = prebound.column_mut(0).as_text_view().unwrap();
+    for (row_index, element) in array.iter().enumerate() {
+        col.set_cell(row_index, element.map(str::as_bytes));
+    }
+    prebound.execute().unwrap();
+
+
+    // Then
+    let actual = table_to_string(&conn, table_name, &["a"]);
+    let expected = "Hello\nNULL\nWorld";
+    assert_eq!(expected, actual);
+}
+
 /// Creates the table and assures it is empty. Columns are named a,b,c, etc.
 fn setup_empty_table(
     conn: &Connection,
@@ -811,4 +848,42 @@ fn setup_empty_table(
     conn.execute(drop_table, ())?;
     conn.execute(&create_table, ())?;
     Ok(())
+}
+
+
+/// Query the table and prints it contents to a string
+pub fn table_to_string(conn: &Connection<'_>, table_name: &str, column_names: &[&str]) -> String {
+    let cols = column_names.join(", ");
+    let query = format!("SELECT {} FROM {}", cols, table_name);
+    let cursor = conn.execute(&query, ()).unwrap().unwrap();
+    cursor_to_string(cursor)
+}
+
+pub fn cursor_to_string(cursor: impl Cursor) -> String {
+    let batch_size = 20;
+    let mut buffer = TextRowSet::for_cursor(batch_size, &cursor, Some(8192)).unwrap();
+    let mut row_set_cursor = cursor.bind_buffer(&mut buffer).unwrap();
+
+    let mut text = String::new();
+
+    while let Some(row_set) = row_set_cursor.fetch().unwrap() {
+        for row_index in 0..row_set.num_rows() {
+            if row_index != 0 {
+                text.push('\n');
+            }
+            for col_index in 0..row_set.num_cols() {
+                if col_index != 0 {
+                    text.push(',');
+                }
+                text.push_str(
+                    row_set
+                        .at_as_str(col_index, row_index)
+                        .unwrap()
+                        .unwrap_or("NULL"),
+                );
+            }
+        }
+    }
+
+    text
 }
