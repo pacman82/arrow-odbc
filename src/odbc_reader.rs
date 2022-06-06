@@ -88,10 +88,10 @@ impl<C: Cursor> OdbcReader<C> {
     ///   The type of these buffers will be inferred from the arrow schema. Not every arrow type is
     ///   supported though.
     /// * `max_batch_size`: Maximum batch size requested from the datasource.
-    pub fn new(cursor: C, max_batch_size: usize) -> Result<Self, Error> {
+    pub fn new(mut cursor: C, max_batch_size: usize) -> Result<Self, Error> {
         // Get number of columns from result set. We know it to contain at least one column,
         // otherwise it would not have been created.
-        let schema = Arc::new(arrow_schema_from(&cursor)?);
+        let schema = Arc::new(arrow_schema_from(&mut cursor)?);
         Self::with_arrow_schema(cursor, max_batch_size, schema)
     }
 
@@ -149,7 +149,7 @@ impl<C: Cursor> OdbcReader<C> {
         let schema = if let Some(schema) = schema {
             schema
         } else {
-            Arc::new(arrow_schema_from(&cursor)?)
+            Arc::new(arrow_schema_from(&mut cursor)?)
         };
 
         let column_strategies: Vec<Box<dyn ColumnStrategy>> = schema
@@ -158,13 +158,8 @@ impl<C: Cursor> OdbcReader<C> {
             .enumerate()
             .map(|(index, field)| {
                 let col_index = (index + 1).try_into().unwrap();
-                choose_column_strategy(
-                    field,
-                    &mut cursor,
-                    col_index,
-                    buffer_allocation_options,
-                )
-                .map_err(|cause| cause.into_crate_error(field.name().clone(), index))
+                choose_column_strategy(field, &mut cursor, col_index, buffer_allocation_options)
+                    .map_err(|cause| cause.into_crate_error(field.name().clone(), index))
             })
             .collect::<Result<_, _>>()?;
 

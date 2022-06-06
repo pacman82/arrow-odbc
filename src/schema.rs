@@ -22,14 +22,14 @@ use crate::{ColumnFailure, Error};
 /// ) -> Result<Schema, Error> {
 ///     // Query column with values to get a cursor
 ///     let sql = format!("SELECT * FROM {}", table_name);
-///     let prepared = connection.prepare(&sql)?;
+///     let mut prepared = connection.prepare(&sql)?;
 ///     
 ///     // Now that we have prepared statement, we want to use it to query metadata.
-///     let schema = arrow_schema_from(&prepared)?;
+///     let schema = arrow_schema_from(&mut prepared)?;
 ///     Ok(schema)
 /// }
 /// ```
-pub fn arrow_schema_from(resut_set_metadata: &impl ResultSetMetadata) -> Result<Schema, Error> {
+pub fn arrow_schema_from(resut_set_metadata: &mut impl ResultSetMetadata) -> Result<Schema, Error> {
     let num_cols: u16 = resut_set_metadata
         .num_result_cols()
         .map_err(Error::UnableToRetrieveNumCols)?

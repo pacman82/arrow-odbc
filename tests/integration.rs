@@ -25,7 +25,7 @@ use arrow_odbc::{
 };
 use odbc_api::{
     buffers::{BufferDescription, BufferKind, TextRowSet},
-    IntoParameter, Cursor,
+    Cursor, IntoParameter,
 };
 
 use stdext::function_name;
@@ -596,10 +596,10 @@ fn fetch_schema_for_table() {
 
     // Prepare query to get metadata
     let sql = format!("SELECT a FROM {}", table_name);
-    let prepared = conn.prepare(&sql).unwrap();
+    let mut prepared = conn.prepare(&sql).unwrap();
 
     // Now that we have prepared statement, we want to use it to query metadata.
-    let schema = arrow_schema_from(&prepared).unwrap();
+    let schema = arrow_schema_from(&mut prepared).unwrap();
 
     assert_eq!(
         "Field { \
@@ -818,7 +818,6 @@ fn insert_text() {
     }
     prebound.execute().unwrap();
 
-
     // Then
     let actual = table_to_string(&conn, table_name, &["a"]);
     let expected = "Hello\nNULL\nWorld";
@@ -850,7 +849,6 @@ fn setup_empty_table(
     Ok(())
 }
 
-
 /// Query the table and prints it contents to a string
 pub fn table_to_string(conn: &Connection<'_>, table_name: &str, column_names: &[&str]) -> String {
     let cols = column_names.join(", ");
@@ -859,9 +857,9 @@ pub fn table_to_string(conn: &Connection<'_>, table_name: &str, column_names: &[
     cursor_to_string(cursor)
 }
 
-pub fn cursor_to_string(cursor: impl Cursor) -> String {
+pub fn cursor_to_string(mut cursor: impl Cursor) -> String {
     let batch_size = 20;
-    let mut buffer = TextRowSet::for_cursor(batch_size, &cursor, Some(8192)).unwrap();
+    let mut buffer = TextRowSet::for_cursor(batch_size, &mut cursor, Some(8192)).unwrap();
     let mut row_set_cursor = cursor.bind_buffer(&mut buffer).unwrap();
 
     let mut text = String::new();

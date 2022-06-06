@@ -1,6 +1,6 @@
 [package]
 name = "arrow-odbc"
-version = "0.13.5"
+version = "0.14.0"
 authors = ["Markus Klein"]
 edition = "2021"
 license = "MIT"
@@ -30,7 +30,7 @@ readme = "Readme.md"
 
 [dependencies]
 arrow = ">= 7.0.0, < 16"
-odbc-api = ">= 0.40.2, < 0.44"
+odbc-api = ">= 0.40.2, < 0.45"
 atoi = "1.0.0"
 chrono = "0.4.19"
 thiserror = "1.0.31"

@@ -173,8 +173,6 @@ pub fn choose_column_strategy(
     col_index: u16,
     buffer_allocation_options: BufferAllocationOptions,
 ) -> Result<Box<dyn ColumnStrategy>, ColumnFailure> {
-    let lazy_display_size = || query_metadata.col_display_size(col_index);
-
     let strat: Box<dyn ColumnStrategy> = match field.data_type() {
         ArrowDataType::Boolean => {
             if field.is_nullable() {
@@ -195,6 +193,7 @@ pub fn choose_column_strategy(
             let sql_type = query_metadata
                 .col_data_type(col_index)
                 .map_err(ColumnFailure::FailedToDescribeColumn)?;
+            let lazy_display_size = || query_metadata.col_display_size(col_index);
             // Use the SQL type first to determine buffer length.
             choose_text_strategy(
                 sql_type,
