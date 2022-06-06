@@ -11,7 +11,7 @@ use arrow::{
 use atoi::FromRadix10Signed;
 use odbc_api::{
     buffers::{AnyColumnView, BufferDescription, BufferKind, Item},
-    Bit, DataType as OdbcDataType,
+    Bit, DataType as OdbcDataType, ResultSetMetadata,
 };
 use thiserror::Error;
 
@@ -169,10 +169,12 @@ pub struct BufferAllocationOptions {
 
 pub fn choose_column_strategy(
     field: &Field,
-    lazy_sql_type: impl Fn() -> Result<OdbcDataType, odbc_api::Error>,
-    lazy_display_size: impl Fn() -> Result<isize, odbc_api::Error>,
+    query_metadata: &mut impl ResultSetMetadata,
+    col_index: u16,
     buffer_allocation_options: BufferAllocationOptions,
 ) -> Result<Box<dyn ColumnStrategy>, ColumnFailure> {
+    let lazy_display_size = || query_metadata.col_display_size(col_index);
+
     let strat: Box<dyn ColumnStrategy> = match field.data_type() {
         ArrowDataType::Boolean => {
             if field.is_nullable() {
@@ -190,7 +192,9 @@ pub fn choose_column_strategy(
         ArrowDataType::Float64 => no_conversion::<Float64Type>(field.is_nullable()),
         ArrowDataType::Date32 => with_conversion(field.is_nullable(), DateConversion),
         ArrowDataType::Utf8 => {
-            let sql_type = lazy_sql_type().map_err(ColumnFailure::FailedToDescribeColumn)?;
+            let sql_type = query_metadata
+                .col_data_type(col_index)
+                .map_err(ColumnFailure::FailedToDescribeColumn)?;
             // Use the SQL type first to determine buffer length.
             choose_text_strategy(
                 sql_type,
@@ -203,7 +207,9 @@ pub fn choose_column_strategy(
             Box::new(Decimal::new(field.is_nullable(), *precision, *scale))
         }
         ArrowDataType::Binary => {
-            let sql_type = lazy_sql_type().map_err(ColumnFailure::FailedToDescribeColumn)?;
+            let sql_type = query_metadata
+                .col_data_type(col_index)
+                .map_err(ColumnFailure::FailedToDescribeColumn)?;
             let length = sql_type.column_size();
             let length = match (length, buffer_allocation_options.max_binary_size) {
                 (0, None) => return Err(ColumnFailure::ZeroSizedColumn { sql_type }),

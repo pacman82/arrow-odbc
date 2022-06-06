@@ -14,7 +14,7 @@ use super::{ColumnFailure, ColumnStrategy};
 /// are trying to adapt the buffer size to the maximum string length the column could contain.
 pub fn choose_text_strategy(
     sql_type: OdbcDataType,
-    lazy_display_size: impl Fn() -> Result<isize, odbc_api::Error>,
+    lazy_display_size: impl FnMut() -> Result<isize, odbc_api::Error>,
     is_nullable: bool,
     max_text_size: Option<usize>,
 ) -> Result<Box<dyn ColumnStrategy>, ColumnFailure> {

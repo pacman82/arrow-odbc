@@ -140,7 +140,7 @@ impl<C: Cursor> OdbcReader<C> {
     ///    VARBINARY(max) columns, which otherwise might lead to errors, due to the ODBC driver
     ///    having a hard time specifying a good upper bound for the largest possible expected value.
     pub fn with(
-        cursor: C,
+        mut cursor: C,
         max_batch_size: usize,
         schema: Option<SchemaRef>,
         buffer_allocation_options: BufferAllocationOptions,
@@ -158,12 +158,10 @@ impl<C: Cursor> OdbcReader<C> {
             .enumerate()
             .map(|(index, field)| {
                 let col_index = (index + 1).try_into().unwrap();
-                let lazy_sql_data_type = || cursor.col_data_type(col_index);
-                let lazy_display_size = || cursor.col_display_size(col_index);
                 choose_column_strategy(
                     field,
-                    lazy_sql_data_type,
-                    lazy_display_size,
+                    &mut cursor,
+                    col_index,
                     buffer_allocation_options,
                 )
                 .map_err(|cause| cause.into_crate_error(field.name().clone(), index))
