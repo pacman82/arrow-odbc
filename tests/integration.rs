@@ -7,8 +7,8 @@ use arrow::{
         StringArray, TimestampMicrosecondArray, TimestampMillisecondArray,
         TimestampNanosecondArray, UInt8Array,
     },
-    datatypes::{DataType, Field, Schema},
-    record_batch::RecordBatchReader,
+    datatypes::{DataType, Field, Schema, SchemaRef},
+    record_batch::{RecordBatchReader, RecordBatch}, error::ArrowError,
 };
 use chrono::NaiveDate;
 use float_eq::assert_float_eq;
@@ -794,11 +794,38 @@ fn fallibale_allocations() {
 /// Prototype future usecase. Inserting string data into a Database
 #[test]
 fn insert_text() {
-    // Given
+    // Given a table and a record batch reader returning a batch with a text column.
     let table_name = function_name!().rsplit_once(':').unwrap().1;
     let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
     setup_empty_table(&conn, table_name, &["VARCHAR(4096)"]).unwrap();
     let array = StringArray::from(vec![Some("Hello"), None, Some("World")]);
+
+    struct StubBatchReader {
+        schema: SchemaRef,
+        batches: Vec<RecordBatch>
+    }
+
+    impl Iterator for StubBatchReader {
+        type Item = Result<RecordBatch, ArrowError>;
+
+        fn next(&mut self) -> Option<Self::Item> {
+            self.batches.pop().map(Ok)
+        }
+    }
+
+    impl RecordBatchReader for StubBatchReader {
+        fn schema(&self) -> SchemaRef {
+            self.schema.clone()
+        }
+    }
+
+    let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Utf8, true)]));
+    let batch = RecordBatch::try_new(schema.clone(), vec![Arc::new(array)]).unwrap();
+
+    let mut reader = StubBatchReader {
+        schema,
+        batches: vec![batch]
+    };
 
     // When
     let insert = format!("INSERT INTO {table_name} (a) VALUES (?)");
@@ -807,12 +834,17 @@ fn insert_text() {
         nullable: true,
         kind: BufferKind::Text { max_str_len: 4096 },
     };
-    let num_rows = array.len();
+
+    let batch = reader.next().unwrap().unwrap();
+    let num_rows = batch.num_rows();
+    let array = batch.column(0);
+
     let mut prebound = prepared
         .into_any_column_inserter(num_rows, [descriptions])
         .unwrap();
     prebound.set_num_rows(num_rows);
     let mut col = prebound.column_mut(0).as_text_view().unwrap();
+    let array = array.as_any().downcast_ref::<StringArray>().unwrap();
     for (row_index, element) in array.iter().enumerate() {
         col.set_cell(row_index, element.map(str::as_bytes));
     }
