@@ -21,7 +21,7 @@ use arrow_odbc::{
         sys::{AttrConnectionPooling, AttrCpMatch},
         Connection, Environment,
     },
-    BufferAllocationOptions, ColumnFailure, Error, OdbcReader,
+    BufferAllocationOptions, ColumnFailure, Error, OdbcReader, OdbcWriter,
 };
 use odbc_api::{
     buffers::{BufferDescription, BufferKind, TextRowSet},
@@ -842,13 +842,17 @@ fn insert_text() {
     let mut prebound = prepared
         .into_any_column_inserter(num_rows, [descriptions])
         .unwrap();
-    prebound.set_num_rows(num_rows);
-    let mut col = prebound.column_mut(0).as_text_view().unwrap();
+
+    let mut writer = OdbcWriter {
+        inserter: prebound
+    };
+    writer.inserter.set_num_rows(num_rows);
+    let mut col = writer.inserter.column_mut(0).as_text_view().unwrap();
     let array = array.as_any().downcast_ref::<StringArray>().unwrap();
     for (row_index, element) in array.iter().enumerate() {
         col.set_cell(row_index, element.map(str::as_bytes));
     }
-    prebound.execute().unwrap();
+    writer.inserter.execute().unwrap();
 
     // Then
     let actual = table_to_string(&conn, table_name, &["a"]);
