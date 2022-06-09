@@ -47,6 +47,7 @@
 mod column_strategy;
 mod error;
 mod odbc_reader;
+mod odbc_writer;
 mod schema;
 
 // Rexport odbc_api and arrow to make it easier for downstream crates to depend to avoid version
@@ -58,5 +59,6 @@ pub use self::{
     column_strategy::{BufferAllocationOptions, ColumnFailure},
     error::Error,
     odbc_reader::OdbcReader,
+    odbc_writer::OdbcWriter,
     schema::arrow_schema_from,
 };
