@@ -8,7 +8,8 @@ use arrow::{
         TimestampNanosecondArray, UInt8Array,
     },
     datatypes::{DataType, Field, Schema, SchemaRef},
-    record_batch::{RecordBatchReader, RecordBatch}, error::ArrowError,
+    error::ArrowError,
+    record_batch::{RecordBatch, RecordBatchReader},
 };
 use chrono::NaiveDate;
 use float_eq::assert_float_eq;
@@ -23,10 +24,7 @@ use arrow_odbc::{
     },
     BufferAllocationOptions, ColumnFailure, Error, OdbcReader, OdbcWriter,
 };
-use odbc_api::{
-    buffers::{BufferDescription, BufferKind, TextRowSet},
-    Cursor, IntoParameter,
-};
+use odbc_api::{buffers::TextRowSet, Cursor, IntoParameter};
 
 use stdext::function_name;
 
@@ -802,7 +800,7 @@ fn insert_text() {
 
     struct StubBatchReader {
         schema: SchemaRef,
-        batches: Vec<RecordBatch>
+        batches: Vec<RecordBatch>,
     }
 
     impl Iterator for StubBatchReader {
@@ -824,35 +822,19 @@ fn insert_text() {
 
     let mut reader = StubBatchReader {
         schema,
-        batches: vec![batch]
+        batches: vec![batch],
     };
 
     // When
     let insert = format!("INSERT INTO {table_name} (a) VALUES (?)");
     let prepared = conn.prepare(&insert).unwrap();
-    let descriptions = BufferDescription {
-        nullable: true,
-        kind: BufferKind::Text { max_str_len: 4096 },
-    };
 
     let batch = reader.next().unwrap().unwrap();
-    let num_rows = batch.num_rows();
-    let array = batch.column(0);
 
-    let mut prebound = prepared
-        .into_any_column_inserter(num_rows, [descriptions])
-        .unwrap();
-
-    let mut writer = OdbcWriter {
-        inserter: prebound
-    };
-    writer.inserter.set_num_rows(num_rows);
-    let mut col = writer.inserter.column_mut(0).as_text_view().unwrap();
-    let array = array.as_any().downcast_ref::<StringArray>().unwrap();
-    for (row_index, element) in array.iter().enumerate() {
-        col.set_cell(row_index, element.map(str::as_bytes));
-    }
-    writer.inserter.execute().unwrap();
+    let row_capacity = 5;
+    let mut writer = OdbcWriter::new(row_capacity, prepared, reader.schema()).unwrap();
+    writer.write_batch(&batch).unwrap();
+    writer.flush().unwrap();
 
     // Then
     let actual = table_to_string(&conn, table_name, &["a"]);
