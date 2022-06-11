@@ -1,8 +1,5 @@
 use arrow::array::{Array, StringArray};
-use odbc_api::{
-    buffers::{AnyColumnSliceMut, BufferDescription, BufferKind},
-    U16String,
-};
+use odbc_api::buffers::{AnyColumnSliceMut, BufferDescription, BufferKind};
 
 use super::{WriteStrategy, WriterError};
 
@@ -61,14 +58,16 @@ impl WriteStrategy for Utf8ToWide {
     ) -> Result<(), WriterError> {
         let from = from.as_any().downcast_ref::<StringArray>().unwrap();
         let mut to = to.as_w_text_view().unwrap();
+        // We must first encode the utf8 input to utf16. We reuse this buffer for that in order to
+        // avoid allocations.
+        let mut utf_16 = Vec::new();
         for (row_index, element) in from.iter().enumerate() {
             if let Some(text) = element {
-                to.ensure_max_element_length(text.len(), row_index)
+                utf_16.extend(text.encode_utf16());
+                to.ensure_max_element_length(utf_16.len(), row_index)
                     .map_err(WriterError::RebindBuffer)?;
-                // This allocation of the U16String might not be necessary if we could directly
-                // write the UTF-16 encoded characters to the target buffer during encoding.
-                let text = U16String::from_str(text);
-                to.set_cell(param_offset + row_index, Some(text.as_slice()))
+                to.set_cell(param_offset + row_index, Some(&utf_16));
+                utf_16.clear();
             } else {
                 to.set_cell(param_offset + row_index, None);
             }
