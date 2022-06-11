@@ -1,6 +1,6 @@
 use thiserror::Error;
 
-use crate::column_strategy::ColumnFailure;
+use crate::read_strategy::ColumnFailure;
 
 /// A variation of things which can go wrong then creating an [`crate::OdbcReader`].
 #[derive(Error, Debug)]

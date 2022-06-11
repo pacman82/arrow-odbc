@@ -6,7 +6,7 @@ use odbc_api::{
     DataType as OdbcDataType,
 };
 
-use super::{ColumnFailure, ColumnStrategy};
+use super::{ColumnFailure, ReadStrategy};
 
 /// This function decides wether this column will be queried as narrow (assumed to be utf-8) or
 /// wide text (assumed to be utf-16). The reason we do not always use narrow is that the encoding
@@ -17,7 +17,7 @@ pub fn choose_text_strategy(
     lazy_display_size: impl FnMut() -> Result<isize, odbc_api::Error>,
     is_nullable: bool,
     max_text_size: Option<usize>,
-) -> Result<Box<dyn ColumnStrategy>, ColumnFailure> {
+) -> Result<Box<dyn ReadStrategy>, ColumnFailure> {
     let is_narrow = matches!(
         sql_type,
         OdbcDataType::LongVarchar { .. } | OdbcDataType::Varchar { .. } | OdbcDataType::Char { .. }
@@ -61,11 +61,11 @@ pub fn choose_text_strategy(
     Ok(strategy)
 }
 
-fn wide_text_strategy(u16_len: usize, is_nullable: bool) -> Box<dyn ColumnStrategy> {
+fn wide_text_strategy(u16_len: usize, is_nullable: bool) -> Box<dyn ReadStrategy> {
     Box::new(WideText::new(is_nullable, u16_len))
 }
 
-fn narrow_text_strategy(octet_len: usize, is_nullable: bool) -> Box<dyn ColumnStrategy> {
+fn narrow_text_strategy(octet_len: usize, is_nullable: bool) -> Box<dyn ReadStrategy> {
     Box::new(NarrowText::new(is_nullable, octet_len))
 }
 
@@ -87,7 +87,7 @@ impl WideText {
     }
 }
 
-impl ColumnStrategy for WideText {
+impl ReadStrategy for WideText {
     fn buffer_description(&self) -> BufferDescription {
         BufferDescription {
             nullable: self.nullable,
@@ -133,7 +133,7 @@ impl NarrowText {
     }
 }
 
-impl ColumnStrategy for NarrowText {
+impl ReadStrategy for NarrowText {
     fn buffer_description(&self) -> BufferDescription {
         BufferDescription {
             nullable: self.nullable,

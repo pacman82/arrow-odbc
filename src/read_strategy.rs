@@ -33,7 +33,7 @@ pub use self::{
 };
 
 /// All decisions needed to copy data from an ODBC buffer to an Arrow Array
-pub trait ColumnStrategy {
+pub trait ReadStrategy {
     /// Describes the buffer which is bound to the ODBC cursor.
     fn buffer_description(&self) -> BufferDescription;
 
@@ -43,7 +43,7 @@ pub trait ColumnStrategy {
 
 pub struct NonNullableBoolean;
 
-impl ColumnStrategy for NonNullableBoolean {
+impl ReadStrategy for NonNullableBoolean {
     fn buffer_description(&self) -> BufferDescription {
         BufferDescription {
             nullable: false,
@@ -63,7 +63,7 @@ impl ColumnStrategy for NonNullableBoolean {
 
 pub struct NullableBoolean;
 
-impl ColumnStrategy for NullableBoolean {
+impl ReadStrategy for NullableBoolean {
     fn buffer_description(&self) -> BufferDescription {
         BufferDescription {
             nullable: true,
@@ -99,7 +99,7 @@ impl Decimal {
     }
 }
 
-impl ColumnStrategy for Decimal {
+impl ReadStrategy for Decimal {
     fn buffer_description(&self) -> BufferDescription {
         BufferDescription {
             nullable: self.nullable,
@@ -172,8 +172,8 @@ pub fn choose_column_strategy(
     query_metadata: &mut impl ResultSetMetadata,
     col_index: u16,
     buffer_allocation_options: BufferAllocationOptions,
-) -> Result<Box<dyn ColumnStrategy>, ColumnFailure> {
-    let strat: Box<dyn ColumnStrategy> = match field.data_type() {
+) -> Result<Box<dyn ReadStrategy>, ColumnFailure> {
+    let strat: Box<dyn ReadStrategy> = match field.data_type() {
         ArrowDataType::Boolean => {
             if field.is_nullable() {
                 Box::new(NullableBoolean)
