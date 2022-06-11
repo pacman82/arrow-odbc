@@ -814,7 +814,7 @@ fn insert_does_not_support_list_type() {
     ))
 }
 
-/// Prototype future usecase. Inserting string data into a Database
+/// Insert String data into database
 #[test]
 fn insert_text() {
     // Given a table and a record batch reader returning a batch with a text column.
@@ -824,18 +824,14 @@ fn insert_text() {
     let array = StringArray::from(vec![Some("Hello"), None, Some("World")]);
     let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Utf8, true)]));
     let batch = RecordBatch::try_new(schema.clone(), vec![Arc::new(array)]).unwrap();
-    let mut reader = StubBatchReader::new(schema, vec![batch]);
+    let reader = StubBatchReader::new(schema, vec![batch]);
 
     // When
     let insert = format!("INSERT INTO {table_name} (a) VALUES (?)");
     let prepared = conn.prepare(&insert).unwrap();
-
-    let batch = reader.next().unwrap().unwrap();
-
     let row_capacity = 5;
     let mut writer = OdbcWriter::new(row_capacity, reader.schema(), prepared).unwrap();
-    writer.write_batch(&batch).unwrap();
-    writer.flush().unwrap();
+    writer.write_all(reader).unwrap();
 
     // Then
     let actual = table_to_string(&conn, table_name, &["a"]);
@@ -843,7 +839,8 @@ fn insert_text() {
     assert_eq!(expected, actual);
 }
 
-/// Prototype future usecase. Inserting string data into a Database
+/// This test is most relevant on windows platforms, the UTF-8 is not the default encoding and text
+/// should be encoded as UTF-16
 #[test]
 fn insert_non_ascii_text() {
     // Given a table and a record batch reader returning a batch with a text column.
@@ -853,22 +850,68 @@ fn insert_non_ascii_text() {
     let array = StringArray::from(vec![Some("Frühstück ♥️")]);
     let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Utf8, true)]));
     let batch = RecordBatch::try_new(schema.clone(), vec![Arc::new(array)]).unwrap();
-    let mut reader = StubBatchReader::new(schema, vec![batch]);
+    let reader = StubBatchReader::new(schema, vec![batch]);
 
     // When
     let insert = format!("INSERT INTO {table_name} (a) VALUES (?)");
     let prepared = conn.prepare(&insert).unwrap();
-
-    let batch = reader.next().unwrap().unwrap();
-
     let row_capacity = 5;
     let mut writer = OdbcWriter::new(row_capacity, reader.schema(), prepared).unwrap();
-    writer.write_batch(&batch).unwrap();
-    writer.flush().unwrap();
+    writer.write_all(reader).unwrap();
 
     // Then
     let actual = table_to_string(&conn, table_name, &["a"]);
     let expected = "Frühstück ♥️";
+    assert_eq!(expected, actual);
+}
+
+/// Insert nullable booleans into db
+#[test]
+fn insert_nullable_booleans() {
+    // Given a table and a record batch reader returning a batch with a text column.
+    let table_name = function_name!().rsplit_once(':').unwrap().1;
+    let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
+    setup_empty_table(&conn, table_name, &["BIT"]).unwrap();
+    let array = BooleanArray::from(vec![Some(true), None, Some(false)]);
+    let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Boolean, true)]));
+    let batch = RecordBatch::try_new(schema.clone(), vec![Arc::new(array)]).unwrap();
+    let reader = StubBatchReader::new(schema, vec![batch.clone(), batch]);
+
+    // When
+    let insert = format!("INSERT INTO {table_name} (a) VALUES (?)");
+    let prepared = conn.prepare(&insert).unwrap();
+    let row_capacity = 5;
+    let mut writer = OdbcWriter::new(row_capacity, reader.schema(), prepared).unwrap();
+    writer.write_all(reader).unwrap();
+
+    // Then
+    let actual = table_to_string(&conn, table_name, &["a"]);
+    let expected = "1\nNULL\n0\n1\nNULL\n0";
+    assert_eq!(expected, actual);
+}
+
+/// Insert non nullable booleans into db
+#[test]
+fn insert_non_nullable_booleans() {
+    // Given a table and a record batch reader returning a batch with a text column.
+    let table_name = function_name!().rsplit_once(':').unwrap().1;
+    let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
+    setup_empty_table(&conn, table_name, &["BIT"]).unwrap();
+    let array = BooleanArray::from(vec![Some(true), Some(false), Some(false)]);
+    let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Boolean, false)]));
+    let batch = RecordBatch::try_new(schema.clone(), vec![Arc::new(array)]).unwrap();
+    let reader = StubBatchReader::new(schema, vec![batch.clone(), batch]);
+
+    // When
+    let insert = format!("INSERT INTO {table_name} (a) VALUES (?)");
+    let prepared = conn.prepare(&insert).unwrap();
+    let row_capacity = 5;
+    let mut writer = OdbcWriter::new(row_capacity, reader.schema(), prepared).unwrap();
+    writer.write_all(reader).unwrap();
+
+    // Then
+    let actual = table_to_string(&conn, table_name, &["a"]);
+    let expected = "1\n0\n0\n1\n0\n0";
     assert_eq!(expected, actual);
 }
 

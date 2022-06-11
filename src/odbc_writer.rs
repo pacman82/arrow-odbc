@@ -5,6 +5,7 @@ use thiserror::Error;
 use arrow::{
     array::Array,
     datatypes::{DataType, Field, SchemaRef},
+    error::ArrowError,
     record_batch::RecordBatch,
 };
 use odbc_api::{
@@ -13,8 +14,9 @@ use odbc_api::{
     ColumnarBulkInserter, Prepared,
 };
 
-use self::text::Utf8ToNativeText;
+use self::{boolean::boolean_to_bit, text::Utf8ToNativeText};
 
+mod boolean;
 mod text;
 
 #[derive(Debug, Error)]
@@ -27,6 +29,8 @@ pub enum WriterError {
     RebindBuffer(#[source] odbc_api::Error),
     #[error("The arrow data type {0} is not supported for insertion.")]
     UnsupportedArrowDataType(DataType),
+    #[error("An error occured extracting a record batch from an error reader.")]
+    ReadingRecordBatch(#[source] ArrowError),
 }
 
 /// Inserts batches from an [`crate::arrow::RecordBatchReader`] into a database.
@@ -62,6 +66,18 @@ impl<'o> OdbcWriter<'o> {
             inserter,
             strategies,
         })
+    }
+
+    pub fn write_all(
+        &mut self,
+        reader: impl Iterator<Item = Result<RecordBatch, ArrowError>>,
+    ) -> Result<(), WriterError> {
+        for result in reader {
+            let record_batch = result.map_err(WriterError::ReadingRecordBatch)?;
+            self.write_batch(&record_batch)?;
+        }
+        self.flush()?;
+        Ok(())
     }
 
     pub fn write_batch(&mut self, record_batch: &RecordBatch) -> Result<(), WriterError> {
@@ -104,9 +120,15 @@ impl<'o> OdbcWriter<'o> {
     }
 }
 
-trait WriteStrategy {
+pub trait WriteStrategy {
     fn buffer_description(&self) -> BufferDescription;
 
+    /// # Parameters
+    ///
+    /// * `param_offset`: Start writing parameters at that position. Number of rows in the parameter
+    ///   buffer before inserting the current chunk.
+    /// * `column_buf`: Buffer to write the data into
+    /// * `array`: Buffer to read the data from
     fn write_rows(
         &self,
         param_offset: usize,
@@ -118,39 +140,40 @@ trait WriteStrategy {
 fn field_to_write_strategy(field: &Field) -> Result<Box<dyn WriteStrategy>, WriterError> {
     let strategy = match field.data_type() {
         DataType::Utf8 => Box::new(Utf8ToNativeText {}),
-        unsupported => return Err(WriterError::UnsupportedArrowDataType(unsupported.clone())),
-        // arrow::datatypes::DataType::Null => todo!(),
-        // arrow::datatypes::DataType::Boolean => todo!(),
-        // arrow::datatypes::DataType::Int8 => todo!(),
-        // arrow::datatypes::DataType::Int16 => todo!(),
-        // arrow::datatypes::DataType::Int32 => todo!(),
-        // arrow::datatypes::DataType::Int64 => todo!(),
-        // arrow::datatypes::DataType::UInt8 => todo!(),
-        // arrow::datatypes::DataType::UInt16 => todo!(),
-        // arrow::datatypes::DataType::UInt32 => todo!(),
-        // arrow::datatypes::DataType::UInt64 => todo!(),
-        // arrow::datatypes::DataType::Float16 => todo!(),
-        // arrow::datatypes::DataType::Float32 => todo!(),
-        // arrow::datatypes::DataType::Float64 => todo!(),
-        // arrow::datatypes::DataType::Timestamp(_, _) => todo!(),
-        // arrow::datatypes::DataType::Date32 => todo!(),
-        // arrow::datatypes::DataType::Date64 => todo!(),
-        // arrow::datatypes::DataType::Time32(_) => todo!(),
-        // arrow::datatypes::DataType::Time64(_) => todo!(),
-        // arrow::datatypes::DataType::Duration(_) => todo!(),
-        // arrow::datatypes::DataType::Interval(_) => todo!(),
-        // arrow::datatypes::DataType::Binary => todo!(),
-        // arrow::datatypes::DataType::FixedSizeBinary(_) => todo!(),
-        // arrow::datatypes::DataType::LargeBinary => todo!(),
-        // arrow::datatypes::DataType::LargeUtf8 => todo!(),
-        // arrow::datatypes::DataType::List(_) => todo!(),
-        // arrow::datatypes::DataType::FixedSizeList(_, _) => todo!(),
-        // arrow::datatypes::DataType::LargeList(_) => todo!(),
-        // arrow::datatypes::DataType::Struct(_) => todo!(),
-        // arrow::datatypes::DataType::Union(_, _, _) => todo!(),
-        // arrow::datatypes::DataType::Dictionary(_, _) => todo!(),
-        // arrow::datatypes::DataType::Decimal(_, _) => todo!(),
-        // arrow::datatypes::DataType::Map(_, _) => todo!(),
+        DataType::Boolean => boolean_to_bit(field.is_nullable()),
+        DataType::Int8 => todo!(),
+        DataType::Int16 => todo!(),
+        DataType::Int32 => todo!(),
+        DataType::Int64 => todo!(),
+        DataType::UInt8 => todo!(),
+        DataType::UInt16 => todo!(),
+        DataType::UInt32 => todo!(),
+        DataType::UInt64 => todo!(),
+        DataType::Float16 => todo!(),
+        DataType::Float32 => todo!(),
+        DataType::Float64 => todo!(),
+        DataType::Timestamp(_, _) => todo!(),
+        DataType::Date32 => todo!(),
+        DataType::Date64 => todo!(),
+        DataType::Time32(_) => todo!(),
+        DataType::Time64(_) => todo!(),
+        DataType::Duration(_) => todo!(),
+        DataType::Binary => todo!(),
+        DataType::FixedSizeBinary(_) => todo!(),
+        DataType::LargeBinary => todo!(),
+        DataType::LargeUtf8 => todo!(),
+        DataType::Decimal(_, _) => todo!(),
+        unsupported @ (DataType::Null
+        | DataType::Interval(_)
+        | DataType::List(_)
+        | DataType::LargeList(_)
+        | DataType::FixedSizeList(_, _)
+        | DataType::Struct(_)
+        | DataType::Union(_, _, _)
+        | DataType::Dictionary(_, _)
+        | DataType::Map(_, _)) => {
+            return Err(WriterError::UnsupportedArrowDataType(unsupported.clone()))
+        }
     };
     Ok(strategy)
 }
