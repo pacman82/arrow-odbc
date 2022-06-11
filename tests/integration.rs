@@ -846,8 +846,8 @@ fn insert_non_ascii_text() {
     // Given a table and a record batch reader returning a batch with a text column.
     let table_name = function_name!().rsplit_once(':').unwrap().1;
     let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
-    setup_empty_table(&conn, table_name, &["NVARCHAR(50)"]).unwrap();
-    let array = StringArray::from(vec![Some("Frühstück ♥️")]);
+    setup_empty_table(&conn, table_name, &["VARCHAR(50)"]).unwrap();
+    let array = StringArray::from(vec![Some("Frühstück µ")]);
     let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Utf8, true)]));
     let batch = RecordBatch::try_new(schema.clone(), vec![Arc::new(array)]).unwrap();
     let reader = StubBatchReader::new(schema, vec![batch]);
@@ -861,7 +861,7 @@ fn insert_non_ascii_text() {
 
     // Then
     let actual = table_to_string(&conn, table_name, &["a"]);
-    let expected = "Frühstück ♥️";
+    let expected = "Frühstück µ";
     assert_eq!(expected, actual);
 }
 
