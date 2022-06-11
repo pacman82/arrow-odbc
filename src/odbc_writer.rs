@@ -14,10 +14,11 @@ use odbc_api::{
     ColumnarBulkInserter, Prepared,
 };
 
-use self::{boolean::boolean_to_bit, text::Utf8ToNativeText};
+use self::{boolean::boolean_to_bit, text::Utf8ToNativeText, identical::NullableInt8};
 
 mod boolean;
 mod text;
+mod identical;
 
 #[derive(Debug, Error)]
 pub enum WriterError {
@@ -141,7 +142,7 @@ fn field_to_write_strategy(field: &Field) -> Result<Box<dyn WriteStrategy>, Writ
     let strategy = match field.data_type() {
         DataType::Utf8 => Box::new(Utf8ToNativeText {}),
         DataType::Boolean => boolean_to_bit(field.is_nullable()),
-        DataType::Int8 => todo!(),
+        DataType::Int8 => Box::new(NullableInt8),
         DataType::Int16 => todo!(),
         DataType::Int32 => todo!(),
         DataType::Int64 => todo!(),
