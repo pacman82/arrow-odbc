@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{sync::Arc};
 
 use arrow::{
     array::{ArrayRef, PrimitiveBuilder},
@@ -6,7 +6,7 @@ use arrow::{
 };
 use odbc_api::buffers::{AnyColumnView, BufferDescription, Item};
 
-use super::ColumnStrategy;
+use super::ReadStrategy;
 
 pub trait Conversion {
     /// ODBC buffer item type
@@ -23,7 +23,7 @@ pub trait Conversion {
 pub fn with_conversion<C: Conversion + 'static>(
     nullable: bool,
     conversion: C,
-) -> Box<dyn ColumnStrategy> {
+) -> Box<dyn ReadStrategy> {
     if nullable {
         Box::new(NullableStrategy::new(conversion))
     } else {
@@ -41,7 +41,7 @@ impl<C> NonNullStrategy<C> {
     }
 }
 
-impl<C> ColumnStrategy for NonNullStrategy<C>
+impl<C> ReadStrategy for NonNullStrategy<C>
 where
     C: Conversion,
 {
@@ -74,7 +74,7 @@ impl<C> NullableStrategy<C> {
     }
 }
 
-impl<C> ColumnStrategy for NullableStrategy<C>
+impl<C> ReadStrategy for NullableStrategy<C>
 where
     C: Conversion,
 {

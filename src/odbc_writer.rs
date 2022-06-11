@@ -17,7 +17,7 @@ pub struct OdbcWriter<'o> {
     /// until they are full. Then we execute the statement. This is repeated until we run out of
     /// data.
     pub inserter: ColumnarBulkInserter<StatementImpl<'o>, AnyColumnBuffer>,
-    strategies: Vec<Box<dyn ColumnWriteStrategy>>,
+    strategies: Vec<Box<dyn WriteStrategy>>,
 }
 
 impl<'o> OdbcWriter<'o> {
@@ -78,7 +78,7 @@ impl<'o> OdbcWriter<'o> {
     }
 }
 
-trait ColumnWriteStrategy {
+trait WriteStrategy {
     fn buffer_description(&self) -> BufferDescription;
 
     fn write_rows(&self, param_offset: usize, column_buf: AnyColumnSliceMut<'_>, array: &dyn Array);
@@ -86,7 +86,7 @@ trait ColumnWriteStrategy {
 
 struct Utf8ToUtf8;
 
-impl ColumnWriteStrategy for Utf8ToUtf8 {
+impl WriteStrategy for Utf8ToUtf8 {
     fn buffer_description(&self) -> BufferDescription {
         BufferDescription {
             nullable: true,
@@ -108,7 +108,7 @@ impl ColumnWriteStrategy for Utf8ToUtf8 {
     }
 }
 
-fn field_to_write_strategy(field: &Field) -> Box<dyn ColumnWriteStrategy> {
+fn field_to_write_strategy(field: &Field) -> Box<dyn WriteStrategy> {
     match field.data_type() {
         arrow::datatypes::DataType::Null => todo!(),
         arrow::datatypes::DataType::Boolean => todo!(),

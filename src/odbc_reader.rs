@@ -13,7 +13,7 @@ use odbc_api::{
 
 use crate::{
     arrow_schema_from,
-    column_strategy::{choose_column_strategy, ColumnStrategy},
+    read_strategy::{choose_column_strategy, ReadStrategy},
     BufferAllocationOptions, ColumnFailure, Error,
 };
 
@@ -68,7 +68,7 @@ use crate::{
 pub struct OdbcReader<C: Cursor> {
     /// Must contain one item for each field in [`Self::schema`]. Encapsulates all the column type
     /// specific decisions which go into filling an Arrow array from an ODBC data source.
-    column_strategies: Vec<Box<dyn ColumnStrategy>>,
+    column_strategies: Vec<Box<dyn ReadStrategy>>,
     /// Arrow schema describing the arrays we want to fill from the Odbc data source.
     schema: SchemaRef,
     /// Odbc cursor with a bound buffer we repeatedly fill with the batches send to us by the data
@@ -152,7 +152,7 @@ impl<C: Cursor> OdbcReader<C> {
             Arc::new(arrow_schema_from(&mut cursor)?)
         };
 
-        let column_strategies: Vec<Box<dyn ColumnStrategy>> = schema
+        let column_strategies: Vec<Box<dyn ReadStrategy>> = schema
             .fields()
             .iter()
             .enumerate()
@@ -235,7 +235,7 @@ where
 }
 
 fn odbc_batch_to_arrow_columns(
-    column_strategies: &[Box<dyn ColumnStrategy>],
+    column_strategies: &[Box<dyn ReadStrategy>],
     batch: &ColumnarBuffer<AnyColumnBuffer>,
 ) -> Vec<ArrayRef> {
     column_strategies

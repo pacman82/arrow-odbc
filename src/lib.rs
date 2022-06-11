@@ -44,7 +44,7 @@
 //!
 //!
 //! ```
-mod column_strategy;
+mod read_strategy;
 mod error;
 mod odbc_reader;
 mod odbc_writer;
@@ -56,7 +56,7 @@ pub use arrow;
 pub use odbc_api;
 
 pub use self::{
-    column_strategy::{BufferAllocationOptions, ColumnFailure},
+    read_strategy::{BufferAllocationOptions, ColumnFailure},
     error::Error,
     odbc_reader::OdbcReader,
     odbc_writer::OdbcWriter,

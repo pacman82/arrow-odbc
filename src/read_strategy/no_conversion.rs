@@ -6,11 +6,11 @@ use arrow::{
 };
 use odbc_api::buffers::{AnyColumnView, BufferDescription, Item};
 
-use super::ColumnStrategy;
+use super::ReadStrategy;
 
 /// This is applicable thenever there is a Primitive Arrow array whose native type is identical with
 /// the ODBC buffer type.
-pub fn no_conversion<T>(nullable: bool) -> Box<dyn ColumnStrategy>
+pub fn no_conversion<T>(nullable: bool) -> Box<dyn ReadStrategy>
 where
     T: ArrowPrimitiveType,
     T::Native: Item,
@@ -34,7 +34,7 @@ impl<T> NonNullDirectStrategy<T> {
     }
 }
 
-impl<T> ColumnStrategy for NonNullDirectStrategy<T>
+impl<T> ReadStrategy for NonNullDirectStrategy<T>
 where
     T: ArrowPrimitiveType,
     T::Native: Item,
@@ -66,7 +66,7 @@ impl<T> NullableDirectStrategy<T> {
     }
 }
 
-impl<T> ColumnStrategy for NullableDirectStrategy<T>
+impl<T> ReadStrategy for NullableDirectStrategy<T>
 where
     T: ArrowPrimitiveType,
     T::Native: Item,

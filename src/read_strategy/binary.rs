@@ -3,7 +3,7 @@ use std::{convert::TryInto, sync::Arc};
 use arrow::array::{ArrayRef, BinaryBuilder, FixedSizeBinaryBuilder};
 use odbc_api::buffers::{AnyColumnView, BufferDescription, BufferKind};
 
-use super::ColumnStrategy;
+use super::ReadStrategy;
 
 pub struct Binary {
     /// Maximum length in bytes of elements
@@ -17,7 +17,7 @@ impl Binary {
     }
 }
 
-impl ColumnStrategy for Binary {
+impl ReadStrategy for Binary {
     fn buffer_description(&self) -> BufferDescription {
         BufferDescription {
             nullable: self.nullable,
@@ -53,7 +53,7 @@ impl FixedSizedBinary {
     }
 }
 
-impl ColumnStrategy for FixedSizedBinary {
+impl ReadStrategy for FixedSizedBinary {
     fn buffer_description(&self) -> BufferDescription {
         BufferDescription {
             nullable: self.nullable,
