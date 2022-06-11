@@ -1,15 +1,19 @@
 use std::cmp::min;
 
 use arrow::{
-    array::{Array, StringArray},
+    array::{Array},
     datatypes::{Field, SchemaRef},
     record_batch::RecordBatch,
 };
 use odbc_api::{
-    buffers::{AnyColumnBuffer, AnyColumnSliceMut, BufferDescription, BufferKind},
+    buffers::{AnyColumnBuffer, AnyColumnSliceMut, BufferDescription},
     handles::StatementImpl,
     ColumnarBulkInserter, Prepared,
 };
+
+use self::utf8_to_narrow::Utf8ToNarrow;
+
+mod utf8_to_narrow;
 
 /// Inserts batches from an [`crate::arrow::RecordBatchReader`] into a database.
 pub struct OdbcWriter<'o> {
@@ -84,30 +88,6 @@ trait WriteStrategy {
     fn write_rows(&self, param_offset: usize, column_buf: AnyColumnSliceMut<'_>, array: &dyn Array);
 }
 
-struct Utf8ToUtf8;
-
-impl WriteStrategy for Utf8ToUtf8 {
-    fn buffer_description(&self) -> BufferDescription {
-        BufferDescription {
-            nullable: true,
-            kind: BufferKind::Text { max_str_len: 1 },
-        }
-    }
-
-    fn write_rows(&self, param_offset: usize, to: AnyColumnSliceMut<'_>, from: &dyn Array) {
-        let from = from.as_any().downcast_ref::<StringArray>().unwrap();
-        let mut to = to.as_text_view().unwrap();
-        for (row_index, element) in from.iter().enumerate() {
-            if let Some(text) = element {
-                to.ensure_max_element_length(text.len(), row_index).unwrap();
-                to.set_cell(param_offset + row_index, Some(text.as_bytes()))
-            } else {
-                to.set_cell(param_offset + row_index, None);
-            }
-        }
-    }
-}
-
 fn field_to_write_strategy(field: &Field) -> Box<dyn WriteStrategy> {
     match field.data_type() {
         arrow::datatypes::DataType::Null => todo!(),
@@ -133,7 +113,7 @@ fn field_to_write_strategy(field: &Field) -> Box<dyn WriteStrategy> {
         arrow::datatypes::DataType::Binary => todo!(),
         arrow::datatypes::DataType::FixedSizeBinary(_) => todo!(),
         arrow::datatypes::DataType::LargeBinary => todo!(),
-        arrow::datatypes::DataType::Utf8 => Box::new(Utf8ToUtf8),
+        arrow::datatypes::DataType::Utf8 => Box::new(Utf8ToNarrow),
         arrow::datatypes::DataType::LargeUtf8 => todo!(),
         arrow::datatypes::DataType::List(_) => todo!(),
         arrow::datatypes::DataType::FixedSizeList(_, _) => todo!(),
