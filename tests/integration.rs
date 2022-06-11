@@ -843,6 +843,35 @@ fn insert_text() {
     assert_eq!(expected, actual);
 }
 
+/// Prototype future usecase. Inserting string data into a Database
+#[test]
+fn insert_non_ascii_text() {
+    // Given a table and a record batch reader returning a batch with a text column.
+    let table_name = function_name!().rsplit_once(':').unwrap().1;
+    let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
+    setup_empty_table(&conn, table_name, &["NVARCHAR(50)"]).unwrap();
+    let array = StringArray::from(vec![Some("Frühstück ♥️")]);
+    let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Utf8, true)]));
+    let batch = RecordBatch::try_new(schema.clone(), vec![Arc::new(array)]).unwrap();
+    let mut reader = StubBatchReader::new(schema, vec![batch]);
+
+    // When
+    let insert = format!("INSERT INTO {table_name} (a) VALUES (?)");
+    let prepared = conn.prepare(&insert).unwrap();
+
+    let batch = reader.next().unwrap().unwrap();
+
+    let row_capacity = 5;
+    let mut writer = OdbcWriter::new(row_capacity, reader.schema(), prepared).unwrap();
+    writer.write_batch(&batch).unwrap();
+    writer.flush().unwrap();
+
+    // Then
+    let actual = table_to_string(&conn, table_name, &["a"]);
+    let expected = "Frühstück ♥️";
+    assert_eq!(expected, actual);
+}
+
 /// Creates the table and assures it is empty. Columns are named a,b,c, etc.
 fn setup_empty_table(
     conn: &Connection,

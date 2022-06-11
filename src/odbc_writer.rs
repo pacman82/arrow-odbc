@@ -13,9 +13,9 @@ use odbc_api::{
     ColumnarBulkInserter, Prepared,
 };
 
-use self::utf8_to_narrow::Utf8ToNarrow;
+use self::text::Utf8ToNativeText;
 
-mod utf8_to_narrow;
+mod text;
 
 #[derive(Debug, Error)]
 pub enum WriterError {
@@ -117,7 +117,7 @@ trait WriteStrategy {
 
 fn field_to_write_strategy(field: &Field) -> Result<Box<dyn WriteStrategy>, WriterError> {
     let strategy = match field.data_type() {
-        DataType::Utf8 => Box::new(Utf8ToNarrow),
+        DataType::Utf8 => Box::new(Utf8ToNativeText {}),
         unsupported => return Err(WriterError::UnsupportedArrowDataType(unsupported.clone())),
         // arrow::datatypes::DataType::Null => todo!(),
         // arrow::datatypes::DataType::Boolean => todo!(),
