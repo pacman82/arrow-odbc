@@ -22,7 +22,7 @@ use arrow_odbc::{
         sys::{AttrConnectionPooling, AttrCpMatch},
         Connection, Environment,
     },
-    BufferAllocationOptions, ColumnFailure, Error, OdbcReader, OdbcWriter,
+    BufferAllocationOptions, ColumnFailure, Error, OdbcReader, OdbcWriter, WriterError,
 };
 use odbc_api::{buffers::TextRowSet, Cursor, IntoParameter};
 
@@ -789,6 +789,31 @@ fn fallibale_allocations() {
     ));
 }
 
+#[test]
+fn insert_does_not_support_list_type() {
+    // Given a table and a db connection.
+    let table_name = function_name!().rsplit_once(':').unwrap().1;
+    let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
+    setup_empty_table(&conn, table_name, &["VARCHAR(4096)"]).unwrap();
+
+    // When we try to create an OdbcWriter inserting an Arrow List
+    let schema = Arc::new(Schema::new(vec![Field::new(
+        "a",
+        DataType::List(Box::new(Field::new("b", DataType::Utf8, true))),
+        true,
+    )]));
+
+    let insert = format!("INSERT INTO {table_name} (a) VALUES (?)");
+    let prepared = conn.prepare(&insert).unwrap();
+    let result = OdbcWriter::new(10, schema, prepared);
+
+    // Then we recive an unsupported error
+    assert!(matches!(
+        result,
+        Err(WriterError::UnsupportedArrowDataType(_))
+    ))
+}
+
 /// Prototype future usecase. Inserting string data into a Database
 #[test]
 fn insert_text() {
@@ -808,7 +833,7 @@ fn insert_text() {
     let batch = reader.next().unwrap().unwrap();
 
     let row_capacity = 5;
-    let mut writer = OdbcWriter::new(row_capacity, prepared, reader.schema()).unwrap();
+    let mut writer = OdbcWriter::new(row_capacity, reader.schema(), prepared).unwrap();
     writer.write_batch(&batch).unwrap();
     writer.flush().unwrap();
 
