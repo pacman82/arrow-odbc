@@ -1,7 +1,9 @@
 use std::cmp::min;
 
+use thiserror::Error;
+
 use arrow::{
-    array::{Array},
+    array::Array,
     datatypes::{Field, SchemaRef},
     record_batch::RecordBatch,
 };
@@ -15,12 +17,25 @@ use self::utf8_to_narrow::Utf8ToNarrow;
 
 mod utf8_to_narrow;
 
+#[derive(Debug, Error)]
+pub enum WriterError {
+    #[error("Failure to bind the array parameter buffers to the statement.")]
+    BindParameterBuffers(#[source] odbc_api::Error),
+    #[error("Failure to execute the sql statement, sending the data to the database.")]
+    ExecuteStatment(#[source] odbc_api::Error),
+    #[error("An error occured rebinding a parameter buffer to the sql statement.")]
+    RebindBuffer(#[source] odbc_api::Error),
+}
+
 /// Inserts batches from an [`crate::arrow::RecordBatchReader`] into a database.
 pub struct OdbcWriter<'o> {
     /// Prepared statement with bound array parameter buffers. Data is copied into these buffers
     /// until they are full. Then we execute the statement. This is repeated until we run out of
     /// data.
     pub inserter: ColumnarBulkInserter<StatementImpl<'o>, AnyColumnBuffer>,
+    /// For each field in the arrow schema we decide on which buffer to use to send the parameters
+    /// to the database, and need to remember how to copy the data from an arrow array to an odbc
+    /// mutable buffer slice for any column.
     strategies: Vec<Box<dyn WriteStrategy>>,
 }
 
@@ -29,14 +44,16 @@ impl<'o> OdbcWriter<'o> {
         row_capacity: usize,
         statment: Prepared<'o>,
         schema: SchemaRef,
-    ) -> Result<Self, odbc_api::Error> {
+    ) -> Result<Self, WriterError> {
         let strategies: Vec<_> = schema
             .fields()
             .iter()
             .map(field_to_write_strategy)
             .collect();
         let descriptions = strategies.iter().map(|cws| cws.buffer_description());
-        let inserter = statment.into_any_column_inserter(row_capacity, descriptions)?;
+        let inserter = statment
+            .into_any_column_inserter(row_capacity, descriptions)
+            .map_err(WriterError::BindParameterBuffers)?;
 
         Ok(Self {
             inserter,
@@ -44,7 +61,7 @@ impl<'o> OdbcWriter<'o> {
         })
     }
 
-    pub fn write_batch(&mut self, record_batch: &RecordBatch) -> Result<(), odbc_api::Error> {
+    pub fn write_batch(&mut self, record_batch: &RecordBatch) -> Result<(), WriterError> {
         let capacity = self.inserter.capacity();
         let mut remanining_rows = record_batch.num_rows();
         // The record batch may contain more rows than the capacity of our writer can hold. So we
@@ -61,7 +78,7 @@ impl<'o> OdbcWriter<'o> {
                 .zip(self.strategies.iter())
                 .enumerate()
             {
-                strategy.write_rows(param_offset, self.inserter.column_mut(index), array)
+                strategy.write_rows(param_offset, self.inserter.column_mut(index), array)?
             }
 
             // If we used up all capacity we send the parameters to the database and reset the
@@ -75,8 +92,8 @@ impl<'o> OdbcWriter<'o> {
         Ok(())
     }
 
-    pub fn flush(&mut self) -> Result<(), odbc_api::Error> {
-        self.inserter.execute()?;
+    pub fn flush(&mut self) -> Result<(), WriterError> {
+        self.inserter.execute().map_err(WriterError::ExecuteStatment)?;
         self.inserter.clear();
         Ok(())
     }
@@ -85,7 +102,7 @@ impl<'o> OdbcWriter<'o> {
 trait WriteStrategy {
     fn buffer_description(&self) -> BufferDescription;
 
-    fn write_rows(&self, param_offset: usize, column_buf: AnyColumnSliceMut<'_>, array: &dyn Array);
+    fn write_rows(&self, param_offset: usize, column_buf: AnyColumnSliceMut<'_>, array: &dyn Array) -> Result<(), WriterError>;
 }
 
 fn field_to_write_strategy(field: &Field) -> Box<dyn WriteStrategy> {
