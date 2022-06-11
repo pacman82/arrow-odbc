@@ -4,7 +4,7 @@ use thiserror::Error;
 
 use arrow::{
     array::Array,
-    datatypes::{DataType, Field, Int8Type, SchemaRef, Int16Type},
+    datatypes::{DataType, Field, Int8Type, SchemaRef, Int16Type, Int32Type},
     error::ArrowError,
     record_batch::RecordBatch,
 };
@@ -144,7 +144,7 @@ fn field_to_write_strategy(field: &Field) -> Result<Box<dyn WriteStrategy>, Writ
         DataType::Boolean => boolean_to_bit(field.is_nullable()),
         DataType::Int8 => identical::<Int8Type>(field.is_nullable()),
         DataType::Int16 => identical::<Int16Type>(field.is_nullable()),
-        DataType::Int32 => todo!(),
+        DataType::Int32 => identical::<Int32Type>(field.is_nullable()),
         DataType::Int64 => todo!(),
         DataType::UInt8 => todo!(),
         DataType::UInt16 => todo!(),
