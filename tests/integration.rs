@@ -975,7 +975,7 @@ fn insert_nullable_int16() {
     // Given a table and a record batch reader returning a batch with a text column.
     let table_name = function_name!().rsplit_once(':').unwrap().1;
     let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
-    setup_empty_table(&conn, table_name, &["TINYINT"]).unwrap();
+    setup_empty_table(&conn, table_name, &["SMALLINT"]).unwrap();
     let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Int16, true)]));
     let array1 = Int16Array::from(vec![Some(1), None, Some(3)]);
     let batch1 = RecordBatch::try_new(schema.clone(), vec![Arc::new(array1)]).unwrap();
@@ -1000,7 +1000,7 @@ fn insert_nullable_int32() {
     // Given a table and a record batch reader returning a batch with a text column.
     let table_name = function_name!().rsplit_once(':').unwrap().1;
     let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
-    setup_empty_table(&conn, table_name, &["TINYINT"]).unwrap();
+    setup_empty_table(&conn, table_name, &["INTEGER"]).unwrap();
     let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Int32, true)]));
     let array1 = Int32Array::from(vec![Some(1), None, Some(3)]);
     let batch1 = RecordBatch::try_new(schema.clone(), vec![Arc::new(array1)]).unwrap();
@@ -1025,7 +1025,7 @@ fn insert_nullable_int64() {
     // Given a table and a record batch reader returning a batch with a text column.
     let table_name = function_name!().rsplit_once(':').unwrap().1;
     let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
-    setup_empty_table(&conn, table_name, &["TINYINT"]).unwrap();
+    setup_empty_table(&conn, table_name, &["BIGINT"]).unwrap();
     let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Int64, true)]));
     let array1 = Int64Array::from(vec![Some(1), None, Some(3)]);
     let batch1 = RecordBatch::try_new(schema.clone(), vec![Arc::new(array1)]).unwrap();
@@ -1044,6 +1044,30 @@ fn insert_nullable_int64() {
     assert_eq!(expected, actual);
 }
 
+/// Insert non nullable 8 Bit Integers into db
+#[test]
+fn insert_non_nullable_unsigned_int8() {
+    // Given a table and a record batch reader returning a batch with a text column.
+    let table_name = function_name!().rsplit_once(':').unwrap().1;
+    let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
+    setup_empty_table(&conn, table_name, &["SMALLINT"]).unwrap();
+    let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::UInt8, false)]));
+    let array1 = UInt8Array::from(vec![Some(1), Some(2), Some(3)]);
+    let batch1 = RecordBatch::try_new(schema.clone(), vec![Arc::new(array1)]).unwrap();
+    let reader = StubBatchReader::new(schema, vec![batch1]);
+
+    // When
+    let insert = format!("INSERT INTO {table_name} (a) VALUES (?)");
+    let prepared = conn.prepare(&insert).unwrap();
+    let row_capacity = 5;
+    let mut writer = OdbcWriter::new(row_capacity, reader.schema(), prepared).unwrap();
+    writer.write_all(reader).unwrap();
+
+    // Then
+    let actual = table_to_string(&conn, table_name, &["a"]);
+    let expected = "1\n2\n3";
+    assert_eq!(expected, actual);
+}
 
 /// Creates the table and assures it is empty. Columns are named a,b,c, etc.
 fn setup_empty_table(
