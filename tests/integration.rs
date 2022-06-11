@@ -797,33 +797,9 @@ fn insert_text() {
     let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
     setup_empty_table(&conn, table_name, &["VARCHAR(4096)"]).unwrap();
     let array = StringArray::from(vec![Some("Hello"), None, Some("World")]);
-
-    struct StubBatchReader {
-        schema: SchemaRef,
-        batches: Vec<RecordBatch>,
-    }
-
-    impl Iterator for StubBatchReader {
-        type Item = Result<RecordBatch, ArrowError>;
-
-        fn next(&mut self) -> Option<Self::Item> {
-            self.batches.pop().map(Ok)
-        }
-    }
-
-    impl RecordBatchReader for StubBatchReader {
-        fn schema(&self) -> SchemaRef {
-            self.schema.clone()
-        }
-    }
-
     let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Utf8, true)]));
     let batch = RecordBatch::try_new(schema.clone(), vec![Arc::new(array)]).unwrap();
-
-    let mut reader = StubBatchReader {
-        schema,
-        batches: vec![batch],
-    };
+    let mut reader = StubBatchReader::new(schema, vec![batch]);
 
     // When
     let insert = format!("INSERT INTO {table_name} (a) VALUES (?)");
@@ -902,4 +878,30 @@ pub fn cursor_to_string(mut cursor: impl Cursor) -> String {
     }
 
     text
+}
+
+/// An arrow batch reader emitting predefined batches. Used to test insertion.
+struct StubBatchReader {
+    schema: SchemaRef,
+    batches: Vec<RecordBatch>,
+}
+
+impl StubBatchReader {
+    pub fn new(schema: SchemaRef, batches: Vec<RecordBatch>) -> Self {
+        Self { schema, batches }
+    }
+}
+
+impl Iterator for StubBatchReader {
+    type Item = Result<RecordBatch, ArrowError>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.batches.pop().map(Ok)
+    }
+}
+
+impl RecordBatchReader for StubBatchReader {
+    fn schema(&self) -> SchemaRef {
+        self.schema.clone()
+    }
 }
