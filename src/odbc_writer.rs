@@ -18,13 +18,12 @@ use odbc_api::{
 };
 
 use self::{
-    boolean::boolean_to_bit, identical::identical, map::MapArrowToOdbc,
+    boolean::boolean_to_bit, map_arrow_to_odbc::MapArrowToOdbc,
     text::Utf8ToNativeText,
 };
 
 mod boolean;
-mod identical;
-mod map;
+mod map_arrow_to_odbc;
 mod text;
 
 #[derive(Debug, Error)]
@@ -149,14 +148,14 @@ fn field_to_write_strategy(field: &Field) -> Result<Box<dyn WriteStrategy>, Writ
     let strategy = match field.data_type() {
         DataType::LargeUtf8 | DataType::Utf8 => Box::new(Utf8ToNativeText {}),
         DataType::Boolean => boolean_to_bit(field.is_nullable()),
-        DataType::Int8 => identical::<Int8Type>(field.is_nullable()),
-        DataType::Int16 => identical::<Int16Type>(field.is_nullable()),
-        DataType::Int32 => identical::<Int32Type>(field.is_nullable()),
-        DataType::Int64 => identical::<Int64Type>(field.is_nullable()),
-        DataType::UInt8 => identical::<UInt8Type>(field.is_nullable()),
+        DataType::Int8 => Int8Type::identical(field.is_nullable()),
+        DataType::Int16 => Int16Type::identical(field.is_nullable()),
+        DataType::Int32 => Int32Type::identical(field.is_nullable()),
+        DataType::Int64 => Int64Type::identical(field.is_nullable()),
+        DataType::UInt8 => UInt8Type::identical(field.is_nullable()),
         DataType::Float16 => Float16Type::map_with(field.is_nullable(), |half| half.to_f32()),
-        DataType::Float32 => identical::<Float32Type>(field.is_nullable()),
-        DataType::Float64 => identical::<Float64Type>(field.is_nullable()),
+        DataType::Float32 => Float32Type::identical(field.is_nullable()),
+        DataType::Float64 => Float64Type::identical(field.is_nullable()),
         DataType::Timestamp(_, _) => todo!(),
         DataType::Date32 => todo!(),
         DataType::Date64 => todo!(),
