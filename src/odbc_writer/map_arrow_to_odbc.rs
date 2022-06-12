@@ -20,7 +20,9 @@ pub trait MapArrowToOdbc {
     where
         U: Item;
 
-    fn identical(nullable: bool) -> Box<dyn WriteStrategy> where Self::Native: Item;
+    fn identical(nullable: bool) -> Box<dyn WriteStrategy>
+    where
+        Self::Native: Item;
 }
 
 impl<T> MapArrowToOdbc for T
@@ -43,7 +45,10 @@ where
         }
     }
 
-    fn identical(nullable: bool) -> Box<dyn WriteStrategy> where Self::Native: Item {
+    fn identical(nullable: bool) -> Box<dyn WriteStrategy>
+    where
+        Self::Native: Item,
+    {
         if nullable {
             Box::new(NullableIdentical::<Self>::new())
         } else {
