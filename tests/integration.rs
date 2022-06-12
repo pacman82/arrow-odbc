@@ -3,8 +3,8 @@ use std::sync::Arc;
 use arrow::{
     array::{
         Array, ArrayRef, BinaryArray, BooleanArray, Date32Array, DecimalArray,
-        FixedSizeBinaryArray, Float32Array, Int16Array, Int32Array, Int64Array, Int8Array,
-        StringArray, TimestampMicrosecondArray, TimestampMillisecondArray,
+        FixedSizeBinaryArray, Float16Array, Float32Array, Int16Array, Int32Array, Int64Array,
+        Int8Array, StringArray, TimestampMicrosecondArray, TimestampMillisecondArray,
         TimestampNanosecondArray, UInt8Array,
     },
     datatypes::{DataType, Field, Schema, SchemaRef},
@@ -13,6 +13,7 @@ use arrow::{
 };
 use chrono::NaiveDate;
 use float_eq::assert_float_eq;
+use half::f16;
 use lazy_static::lazy_static;
 
 use arrow_odbc::{
@@ -865,7 +866,6 @@ fn insert_non_ascii_text() {
     assert_eq!(expected, actual);
 }
 
-/// Insert nullable booleans into db
 #[test]
 fn insert_nullable_booleans() {
     // Given a table and a record batch reader returning a batch with a text column.
@@ -890,7 +890,6 @@ fn insert_nullable_booleans() {
     assert_eq!(expected, actual);
 }
 
-/// Insert non nullable booleans into db
 #[test]
 fn insert_non_nullable_booleans() {
     // Given a table and a record batch reader returning a batch with a text column.
@@ -915,7 +914,6 @@ fn insert_non_nullable_booleans() {
     assert_eq!(expected, actual);
 }
 
-/// Insert nullable 8Bit Integers into db
 #[test]
 fn insert_nullable_int8() {
     // Given a table and a record batch reader returning a batch with a text column.
@@ -942,7 +940,6 @@ fn insert_nullable_int8() {
     assert_eq!(expected, actual);
 }
 
-/// Insert non nullable 8Bit Integers into db
 #[test]
 fn insert_non_nullable_int8() {
     // Given a table and a record batch reader returning a batch with a text column.
@@ -969,7 +966,6 @@ fn insert_non_nullable_int8() {
     assert_eq!(expected, actual);
 }
 
-/// Insert nullable 16Bit Integers into db
 #[test]
 fn insert_nullable_int16() {
     // Given a table and a record batch reader returning a batch with a text column.
@@ -994,7 +990,6 @@ fn insert_nullable_int16() {
     assert_eq!(expected, actual);
 }
 
-/// Insert nullable 32Bit Integers into db
 #[test]
 fn insert_nullable_int32() {
     // Given a table and a record batch reader returning a batch with a text column.
@@ -1019,7 +1014,6 @@ fn insert_nullable_int32() {
     assert_eq!(expected, actual);
 }
 
-/// Insert nullable 64Bit Integers into db
 #[test]
 fn insert_nullable_int64() {
     // Given a table and a record batch reader returning a batch with a text column.
@@ -1044,7 +1038,6 @@ fn insert_nullable_int64() {
     assert_eq!(expected, actual);
 }
 
-/// Insert non nullable 8 Bit Integers into db
 #[test]
 fn insert_non_nullable_unsigned_int8() {
     // Given a table and a record batch reader returning a batch with a text column.
@@ -1069,7 +1062,6 @@ fn insert_non_nullable_unsigned_int8() {
     assert_eq!(expected, actual);
 }
 
-/// Insert nullable Float 32 into db
 #[test]
 fn insert_nullable_f32() {
     // Given a table and a record batch reader returning a batch with a text column.
@@ -1094,7 +1086,6 @@ fn insert_nullable_f32() {
     assert_eq!(expected, actual);
 }
 
-/// Insert nullable Float 64 into db
 #[test]
 fn insert_nullable_f64() {
     // Given a table and a record batch reader returning a batch with a text column.
@@ -1116,6 +1107,58 @@ fn insert_nullable_f64() {
     // Then
     let actual = table_to_string(&conn, table_name, &["a"]);
     let expected = "1.0\nNULL\n3.0";
+    assert_eq!(expected, actual);
+}
+
+#[test]
+fn insert_nullable_f16() {
+    // Given a table and a record batch reader returning a batch with a text column.
+    let table_name = function_name!().rsplit_once(':').unwrap().1;
+    let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
+    setup_empty_table(&conn, table_name, &["REAL"]).unwrap();
+    let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Float16, true)]));
+    let array1: Float16Array = [Some(f16::from_f32(1.0)), None, Some(f16::from_f32(3.0))]
+        .into_iter()
+        .collect();
+    let batch1 = RecordBatch::try_new(schema.clone(), vec![Arc::new(array1)]).unwrap();
+    let reader = StubBatchReader::new(schema, vec![batch1]);
+
+    // When
+    let insert = format!("INSERT INTO {table_name} (a) VALUES (?)");
+    let prepared = conn.prepare(&insert).unwrap();
+    let row_capacity = 5;
+    let mut writer = OdbcWriter::new(row_capacity, reader.schema(), prepared).unwrap();
+    writer.write_all(reader).unwrap();
+
+    // Then
+    let actual = table_to_string(&conn, table_name, &["a"]);
+    let expected = "1.0\nNULL\n3.0";
+    assert_eq!(expected, actual);
+}
+
+#[test]
+fn insert_non_nullable_f16() {
+    // Given a table and a record batch reader returning a batch with a text column.
+    let table_name = function_name!().rsplit_once(':').unwrap().1;
+    let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
+    setup_empty_table(&conn, table_name, &["REAL"]).unwrap();
+    let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Float16, false)]));
+    let array1: Float16Array = [Some(f16::from_f32(1.0)), Some(f16::from_f32(2.0)), Some(f16::from_f32(3.0))]
+        .into_iter()
+        .collect();
+    let batch1 = RecordBatch::try_new(schema.clone(), vec![Arc::new(array1)]).unwrap();
+    let reader = StubBatchReader::new(schema, vec![batch1]);
+
+    // When
+    let insert = format!("INSERT INTO {table_name} (a) VALUES (?)");
+    let prepared = conn.prepare(&insert).unwrap();
+    let row_capacity = 5;
+    let mut writer = OdbcWriter::new(row_capacity, reader.schema(), prepared).unwrap();
+    writer.write_all(reader).unwrap();
+
+    // Then
+    let actual = table_to_string(&conn, table_name, &["a"]);
+    let expected = "1.0\n2.0\n3.0";
     assert_eq!(expected, actual);
 }
 
