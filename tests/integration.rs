@@ -1069,6 +1069,56 @@ fn insert_non_nullable_unsigned_int8() {
     assert_eq!(expected, actual);
 }
 
+/// Insert nullable Float 32 into db
+#[test]
+fn insert_nullable_f32() {
+    // Given a table and a record batch reader returning a batch with a text column.
+    let table_name = function_name!().rsplit_once(':').unwrap().1;
+    let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
+    setup_empty_table(&conn, table_name, &["REAL"]).unwrap();
+    let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Float32, true)]));
+    let array1 = Float32Array::from(vec![Some(1.), None, Some(3.)]);
+    let batch1 = RecordBatch::try_new(schema.clone(), vec![Arc::new(array1)]).unwrap();
+    let reader = StubBatchReader::new(schema, vec![batch1]);
+
+    // When
+    let insert = format!("INSERT INTO {table_name} (a) VALUES (?)");
+    let prepared = conn.prepare(&insert).unwrap();
+    let row_capacity = 5;
+    let mut writer = OdbcWriter::new(row_capacity, reader.schema(), prepared).unwrap();
+    writer.write_all(reader).unwrap();
+
+    // Then
+    let actual = table_to_string(&conn, table_name, &["a"]);
+    let expected = "1.0\nNULL\n3.0";
+    assert_eq!(expected, actual);
+}
+
+/// Insert nullable Float 64 into db
+#[test]
+fn insert_nullable_f64() {
+    // Given a table and a record batch reader returning a batch with a text column.
+    let table_name = function_name!().rsplit_once(':').unwrap().1;
+    let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
+    setup_empty_table(&conn, table_name, &["FLOAT(25)"]).unwrap();
+    let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Float64, true)]));
+    let array1 = Float64Array::from(vec![Some(1.), None, Some(3.)]);
+    let batch1 = RecordBatch::try_new(schema.clone(), vec![Arc::new(array1)]).unwrap();
+    let reader = StubBatchReader::new(schema, vec![batch1]);
+
+    // When
+    let insert = format!("INSERT INTO {table_name} (a) VALUES (?)");
+    let prepared = conn.prepare(&insert).unwrap();
+    let row_capacity = 5;
+    let mut writer = OdbcWriter::new(row_capacity, reader.schema(), prepared).unwrap();
+    writer.write_all(reader).unwrap();
+
+    // Then
+    let actual = table_to_string(&conn, table_name, &["a"]);
+    let expected = "1.0\nNULL\n3.0";
+    assert_eq!(expected, actual);
+}
+
 /// Creates the table and assures it is empty. Columns are named a,b,c, etc.
 fn setup_empty_table(
     conn: &Connection,

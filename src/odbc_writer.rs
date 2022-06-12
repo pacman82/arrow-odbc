@@ -4,7 +4,7 @@ use thiserror::Error;
 
 use arrow::{
     array::Array,
-    datatypes::{DataType, Field, Int8Type, SchemaRef, Int16Type, Int32Type, Int64Type, UInt8Type},
+    datatypes::{DataType, Field, Int16Type, Int32Type, Int64Type, Int8Type, SchemaRef, UInt8Type, Float32Type, Float64Type},
     error::ArrowError,
     record_batch::RecordBatch,
 };
@@ -140,7 +140,7 @@ pub trait WriteStrategy {
 
 fn field_to_write_strategy(field: &Field) -> Result<Box<dyn WriteStrategy>, WriterError> {
     let strategy = match field.data_type() {
-        DataType::Utf8 => Box::new(Utf8ToNativeText {}),
+        DataType::LargeUtf8 | DataType::Utf8 => Box::new(Utf8ToNativeText {}),
         DataType::Boolean => boolean_to_bit(field.is_nullable()),
         DataType::Int8 => identical::<Int8Type>(field.is_nullable()),
         DataType::Int16 => identical::<Int16Type>(field.is_nullable()),
@@ -151,8 +151,8 @@ fn field_to_write_strategy(field: &Field) -> Result<Box<dyn WriteStrategy>, Writ
         DataType::UInt32 => todo!(),
         DataType::UInt64 => todo!(),
         DataType::Float16 => todo!(),
-        DataType::Float32 => todo!(),
-        DataType::Float64 => todo!(),
+        DataType::Float32 => identical::<Float32Type>(field.is_nullable()),
+        DataType::Float64 => identical::<Float64Type>(field.is_nullable()),
         DataType::Timestamp(_, _) => todo!(),
         DataType::Date32 => todo!(),
         DataType::Date64 => todo!(),
@@ -162,7 +162,6 @@ fn field_to_write_strategy(field: &Field) -> Result<Box<dyn WriteStrategy>, Writ
         DataType::Binary => todo!(),
         DataType::FixedSizeBinary(_) => todo!(),
         DataType::LargeBinary => todo!(),
-        DataType::LargeUtf8 => todo!(),
         DataType::Decimal(_, _) => todo!(),
         unsupported @ (DataType::Null
         | DataType::Interval(_)
