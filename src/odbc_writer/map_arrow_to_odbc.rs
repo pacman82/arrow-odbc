@@ -11,29 +11,29 @@ use crate::WriterError;
 use super::WriteStrategy;
 
 pub trait MapArrowToOdbc {
-    type Native;
+    type ArrowElement;
 
     fn map_with<U>(
         nullable: bool,
-        arrow_to_odbc: impl Fn(Self::Native) -> U + 'static,
+        arrow_to_odbc: impl Fn(Self::ArrowElement) -> U + 'static,
     ) -> Box<dyn WriteStrategy>
     where
         U: Item;
 
     fn identical(nullable: bool) -> Box<dyn WriteStrategy>
     where
-        Self::Native: Item;
+        Self::ArrowElement: Item;
 }
 
 impl<T> MapArrowToOdbc for T
 where
     T: ArrowPrimitiveType,
 {
-    type Native = T::Native;
+    type ArrowElement = T::Native;
 
     fn map_with<U>(
         nullable: bool,
-        arrow_to_odbc: impl Fn(Self::Native) -> U + 'static,
+        arrow_to_odbc: impl Fn(Self::ArrowElement) -> U + 'static,
     ) -> Box<dyn WriteStrategy>
     where
         U: Item,
@@ -47,7 +47,7 @@ where
 
     fn identical(nullable: bool) -> Box<dyn WriteStrategy>
     where
-        Self::Native: Item,
+        Self::ArrowElement: Item,
     {
         if nullable {
             Box::new(NullableIdentical::<Self>::new())

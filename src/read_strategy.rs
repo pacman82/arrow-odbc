@@ -3,8 +3,9 @@ use std::{convert::TryInto, sync::Arc};
 use arrow::{
     array::{ArrayRef, BooleanBuilder, DecimalBuilder},
     datatypes::{
-        DataType as ArrowDataType, Field, Float32Type, Float64Type, Int16Type, Int32Type,
-        Int64Type, Int8Type, TimeUnit, UInt8Type,
+        DataType as ArrowDataType, Date32Type, Field, Float32Type, Float64Type, Int16Type,
+        Int32Type, Int64Type, Int8Type, TimeUnit, TimestampMicrosecondType,
+        TimestampMillisecondType, TimestampNanosecondType, TimestampSecondType, UInt8Type,
     },
 };
 
@@ -17,19 +18,18 @@ use thiserror::Error;
 
 mod binary;
 mod date_time;
-mod no_conversion;
+mod map_odbc_to_arrow;
 mod text;
-mod with_conversion;
 
 pub use self::{
     binary::{Binary, FixedSizedBinary},
-    date_time::{
-        DateConversion, TimestampMsConversion, TimestampNsConversion, TimestampSecConversion,
-        TimestampUsConversion,
-    },
-    no_conversion::no_conversion,
     text::choose_text_strategy,
-    with_conversion::{with_conversion, Conversion},
+};
+use self::{
+    date_time::{
+        days_since_epoch, ms_since_epoch, ns_since_epoch, seconds_since_epoch, us_since_epoch,
+    },
+    map_odbc_to_arrow::MapOdbcToArrow,
 };
 
 /// All decisions needed to copy data from an ODBC buffer to an Arrow Array
@@ -181,14 +181,14 @@ pub fn choose_column_strategy(
                 Box::new(NonNullableBoolean)
             }
         }
-        ArrowDataType::Int8 => no_conversion::<Int8Type>(field.is_nullable()),
-        ArrowDataType::Int16 => no_conversion::<Int16Type>(field.is_nullable()),
-        ArrowDataType::Int32 => no_conversion::<Int32Type>(field.is_nullable()),
-        ArrowDataType::Int64 => no_conversion::<Int64Type>(field.is_nullable()),
-        ArrowDataType::UInt8 => no_conversion::<UInt8Type>(field.is_nullable()),
-        ArrowDataType::Float32 => no_conversion::<Float32Type>(field.is_nullable()),
-        ArrowDataType::Float64 => no_conversion::<Float64Type>(field.is_nullable()),
-        ArrowDataType::Date32 => with_conversion(field.is_nullable(), DateConversion),
+        ArrowDataType::Int8 => Int8Type::identical(field.is_nullable()),
+        ArrowDataType::Int16 => Int16Type::identical(field.is_nullable()),
+        ArrowDataType::Int32 => Int32Type::identical(field.is_nullable()),
+        ArrowDataType::Int64 => Int64Type::identical(field.is_nullable()),
+        ArrowDataType::UInt8 => UInt8Type::identical(field.is_nullable()),
+        ArrowDataType::Float32 => Float32Type::identical(field.is_nullable()),
+        ArrowDataType::Float64 => Float64Type::identical(field.is_nullable()),
+        ArrowDataType::Date32 => Date32Type::map_with(field.is_nullable(), days_since_epoch),
         ArrowDataType::Utf8 => {
             let sql_type = query_metadata
                 .col_data_type(col_index)
@@ -225,16 +225,16 @@ pub fn choose_column_strategy(
             Box::new(Binary::new(field.is_nullable(), length))
         }
         ArrowDataType::Timestamp(TimeUnit::Second, _) => {
-            with_conversion(field.is_nullable(), TimestampSecConversion)
+            TimestampSecondType::map_with(field.is_nullable(), seconds_since_epoch)
         }
         ArrowDataType::Timestamp(TimeUnit::Millisecond, _) => {
-            with_conversion(field.is_nullable(), TimestampMsConversion)
+            TimestampMillisecondType::map_with(field.is_nullable(), ms_since_epoch)
         }
         ArrowDataType::Timestamp(TimeUnit::Microsecond, _) => {
-            with_conversion(field.is_nullable(), TimestampUsConversion)
+            TimestampMicrosecondType::map_with(field.is_nullable(), us_since_epoch)
         }
         ArrowDataType::Timestamp(TimeUnit::Nanosecond, _) => {
-            with_conversion(field.is_nullable(), TimestampNsConversion)
+            TimestampNanosecondType::map_with(field.is_nullable(), ns_since_epoch)
         }
         ArrowDataType::FixedSizeBinary(length) => Box::new(FixedSizedBinary::new(
             field.is_nullable(),
