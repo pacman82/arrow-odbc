@@ -1143,9 +1143,13 @@ fn insert_non_nullable_f16() {
     let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
     setup_empty_table(&conn, table_name, &["REAL"]).unwrap();
     let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Float16, false)]));
-    let array1: Float16Array = [Some(f16::from_f32(1.0)), Some(f16::from_f32(2.0)), Some(f16::from_f32(3.0))]
-        .into_iter()
-        .collect();
+    let array1: Float16Array = [
+        Some(f16::from_f32(1.0)),
+        Some(f16::from_f32(2.0)),
+        Some(f16::from_f32(3.0)),
+    ]
+    .into_iter()
+    .collect();
     let batch1 = RecordBatch::try_new(schema.clone(), vec![Arc::new(array1)]).unwrap();
     let reader = StubBatchReader::new(schema, vec![batch1]);
 

@@ -17,10 +17,7 @@ use odbc_api::{
     ColumnarBulkInserter, Prepared,
 };
 
-use self::{
-    boolean::boolean_to_bit, map_arrow_to_odbc::MapArrowToOdbc,
-    text::Utf8ToNativeText,
-};
+use self::{boolean::boolean_to_bit, map_arrow_to_odbc::MapArrowToOdbc, text::Utf8ToNativeText};
 
 mod boolean;
 mod map_arrow_to_odbc;
