@@ -4,7 +4,10 @@ use thiserror::Error;
 
 use arrow::{
     array::Array,
-    datatypes::{DataType, Field, Int16Type, Int32Type, Int64Type, Int8Type, SchemaRef, UInt8Type, Float32Type, Float64Type},
+    datatypes::{
+        DataType, Field, Float16Type, Float32Type, Float64Type, Int16Type, Int32Type, Int64Type,
+        Int8Type, SchemaRef, UInt8Type,
+    },
     error::ArrowError,
     record_batch::RecordBatch,
 };
@@ -14,10 +17,14 @@ use odbc_api::{
     ColumnarBulkInserter, Prepared,
 };
 
-use self::{boolean::boolean_to_bit, identical::identical, text::Utf8ToNativeText};
+use self::{
+    boolean::boolean_to_bit, identical::identical, map::ExtArrowPrimitiveType,
+    text::Utf8ToNativeText,
+};
 
 mod boolean;
 mod identical;
+mod map;
 mod text;
 
 #[derive(Debug, Error)]
@@ -147,7 +154,7 @@ fn field_to_write_strategy(field: &Field) -> Result<Box<dyn WriteStrategy>, Writ
         DataType::Int32 => identical::<Int32Type>(field.is_nullable()),
         DataType::Int64 => identical::<Int64Type>(field.is_nullable()),
         DataType::UInt8 => identical::<UInt8Type>(field.is_nullable()),
-        DataType::Float16 => todo!(),
+        DataType::Float16 => Float16Type::map_with(field.is_nullable(), |half| half.to_f32()),
         DataType::Float32 => identical::<Float32Type>(field.is_nullable()),
         DataType::Float64 => identical::<Float64Type>(field.is_nullable()),
         DataType::Timestamp(_, _) => todo!(),
