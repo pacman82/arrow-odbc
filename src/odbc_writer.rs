@@ -18,7 +18,7 @@ use odbc_api::{
 };
 
 use self::{
-    boolean::boolean_to_bit, identical::identical, map::ExtArrowPrimitiveType,
+    boolean::boolean_to_bit, identical::identical, map::MapArrowToOdbc,
     text::Utf8ToNativeText,
 };
 

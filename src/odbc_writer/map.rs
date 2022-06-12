@@ -10,7 +10,7 @@ use crate::WriterError;
 
 use super::WriteStrategy;
 
-pub trait ExtArrowPrimitiveType {
+pub trait MapArrowToOdbc {
     type Native;
 
     fn map_with<U>(
@@ -21,7 +21,7 @@ pub trait ExtArrowPrimitiveType {
         U: Item;
 }
 
-impl<T> ExtArrowPrimitiveType for T
+impl<T> MapArrowToOdbc for T
 where
     T: ArrowPrimitiveType,
 {
