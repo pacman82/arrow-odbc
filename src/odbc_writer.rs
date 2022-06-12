@@ -147,9 +147,6 @@ fn field_to_write_strategy(field: &Field) -> Result<Box<dyn WriteStrategy>, Writ
         DataType::Int32 => identical::<Int32Type>(field.is_nullable()),
         DataType::Int64 => identical::<Int64Type>(field.is_nullable()),
         DataType::UInt8 => identical::<UInt8Type>(field.is_nullable()),
-        DataType::UInt16 => todo!(),
-        DataType::UInt32 => todo!(),
-        DataType::UInt64 => todo!(),
         DataType::Float16 => todo!(),
         DataType::Float32 => identical::<Float32Type>(field.is_nullable()),
         DataType::Float64 => identical::<Float64Type>(field.is_nullable()),
@@ -164,6 +161,12 @@ fn field_to_write_strategy(field: &Field) -> Result<Box<dyn WriteStrategy>, Writ
         DataType::LargeBinary => todo!(),
         DataType::Decimal(_, _) => todo!(),
         unsupported @ (DataType::Null
+        // We could support u64 with upstream changes, but best if user supplies the sql data type.
+        | DataType::UInt64
+        // We could support u32 with upstream changes, but best if user supplies the sql data type.
+        | DataType::UInt32
+        // We could support u16 with upstream changes, but best if user supplies the sql data type.
+        | DataType::UInt16
         | DataType::Interval(_)
         | DataType::List(_)
         | DataType::LargeList(_)
