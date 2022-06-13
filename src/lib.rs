@@ -49,6 +49,7 @@ mod odbc_reader;
 mod odbc_writer;
 mod read_strategy;
 mod schema;
+mod date_time;
 
 // Rexport odbc_api and arrow to make it easier for downstream crates to depend to avoid version
 // mismatches

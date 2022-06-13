@@ -17,7 +17,6 @@ use odbc_api::{
 use thiserror::Error;
 
 mod binary;
-mod date_time;
 mod map_odbc_to_arrow;
 mod text;
 
@@ -25,11 +24,13 @@ pub use self::{
     binary::{Binary, FixedSizedBinary},
     text::choose_text_strategy,
 };
-use self::{
+
+use self::map_odbc_to_arrow::MapOdbcToArrow;
+
+use crate::{
     date_time::{
         days_since_epoch, ms_since_epoch, ns_since_epoch, seconds_since_epoch, us_since_epoch,
     },
-    map_odbc_to_arrow::MapOdbcToArrow,
 };
 
 /// All decisions needed to copy data from an ODBC buffer to an Arrow Array

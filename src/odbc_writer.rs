@@ -6,7 +6,7 @@ use arrow::{
     array::Array,
     datatypes::{
         DataType, Field, Float16Type, Float32Type, Float64Type, Int16Type, Int32Type, Int64Type,
-        Int8Type, SchemaRef, UInt8Type,
+        Int8Type, SchemaRef, UInt8Type, TimeUnit,
     },
     error::ArrowError,
     record_batch::RecordBatch,
@@ -153,7 +153,12 @@ fn field_to_write_strategy(field: &Field) -> Result<Box<dyn WriteStrategy>, Writ
         DataType::Float16 => Float16Type::map_with(field.is_nullable(), |half| half.to_f32()),
         DataType::Float32 => Float32Type::identical(field.is_nullable()),
         DataType::Float64 => Float64Type::identical(field.is_nullable()),
-        DataType::Timestamp(_, _) => todo!(),
+        DataType::Timestamp(tu, tz) => match tu {
+            TimeUnit::Second => todo!(),
+            TimeUnit::Millisecond => todo!(),
+            TimeUnit::Microsecond => todo!(),
+            TimeUnit::Nanosecond => todo!(),
+        },
         DataType::Date32 => todo!(),
         DataType::Date64 => todo!(),
         DataType::Time32(_) => todo!(),
