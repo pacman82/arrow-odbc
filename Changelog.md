@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.15.0
+
+* Update odbc-api = `>= 0.40.2, < 0.45` -> `>= 0.44.3, < 0.45`
+* Prototype for inserting arrow arrays into ODBC
+
 ## 0.14.0
 
 * `arrow_schema_from` now requires an exclusive reference (`&mut`) to `ResultSetMetadata`.
