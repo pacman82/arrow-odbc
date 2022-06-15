@@ -5,9 +5,9 @@ use arrow::{
         Array, ArrayRef, BinaryArray, BooleanArray, Date32Array, DecimalArray,
         FixedSizeBinaryArray, Float16Array, Float32Array, Int16Array, Int32Array, Int64Array,
         Int8Array, StringArray, TimestampMicrosecondArray, TimestampMillisecondArray,
-        TimestampNanosecondArray, UInt8Array,
+        TimestampNanosecondArray, UInt8Array, TimestampSecondArray,
     },
-    datatypes::{DataType, Field, Schema, SchemaRef},
+    datatypes::{DataType, Field, Schema, SchemaRef, TimeUnit},
     error::ArrowError,
     record_batch::{RecordBatch, RecordBatchReader},
 };
@@ -1163,6 +1163,31 @@ fn insert_non_nullable_f16() {
     // Then
     let actual = table_to_string(&conn, table_name, &["a"]);
     let expected = "1.0\n2.0\n3.0";
+    assert_eq!(expected, actual);
+}
+
+#[test]
+fn insert_timestamp_with_seconds_precisions() {
+    // Given a table and a record batch reader returning a batch with a text column.
+    let table_name = function_name!().rsplit_once(':').unwrap().1;
+    let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
+    setup_empty_table(&conn, table_name, &["DATETIME2(0)"]).unwrap();
+    let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Timestamp(TimeUnit::Second, None), false)]));
+    // Corresponds to single element array with entry 1970-05-09T14:25:11+0:00
+    let array = TimestampSecondArray::from_vec(vec![11111111], None);
+    let batch = RecordBatch::try_new(schema.clone(), vec![Arc::new(array)]).unwrap();
+    let reader = StubBatchReader::new(schema, vec![batch]);
+
+    // When
+    let insert = format!("INSERT INTO {table_name} (a) VALUES (?)");
+    let prepared = conn.prepare(&insert).unwrap();
+    let row_capacity = 5;
+    let mut writer = OdbcWriter::new(row_capacity, reader.schema(), prepared).unwrap();
+    writer.write_all(reader).unwrap();
+
+    // Then
+    let actual = table_to_string(&conn, table_name, &["a"]);
+    let expected = "1970-05-09 14:25:11";
     assert_eq!(expected, actual);
 }
 

@@ -6,7 +6,7 @@ use arrow::{
     array::Array,
     datatypes::{
         DataType, Field, Float16Type, Float32Type, Float64Type, Int16Type, Int32Type, Int64Type,
-        Int8Type, SchemaRef, UInt8Type, TimeUnit,
+        Int8Type, SchemaRef, TimeUnit, TimestampSecondType, UInt8Type,
     },
     error::ArrowError,
     record_batch::RecordBatch,
@@ -16,6 +16,8 @@ use odbc_api::{
     handles::StatementImpl,
     ColumnarBulkInserter, Prepared,
 };
+
+use crate::date_time::epoch_to_timestamp;
 
 use self::{boolean::boolean_to_bit, map_arrow_to_odbc::MapArrowToOdbc, text::Utf8ToNativeText};
 
@@ -142,23 +144,20 @@ pub trait WriteStrategy {
 }
 
 fn field_to_write_strategy(field: &Field) -> Result<Box<dyn WriteStrategy>, WriterError> {
+    let is_nullable = field.is_nullable();
     let strategy = match field.data_type() {
         DataType::LargeUtf8 | DataType::Utf8 => Box::new(Utf8ToNativeText {}),
-        DataType::Boolean => boolean_to_bit(field.is_nullable()),
-        DataType::Int8 => Int8Type::identical(field.is_nullable()),
-        DataType::Int16 => Int16Type::identical(field.is_nullable()),
-        DataType::Int32 => Int32Type::identical(field.is_nullable()),
-        DataType::Int64 => Int64Type::identical(field.is_nullable()),
-        DataType::UInt8 => UInt8Type::identical(field.is_nullable()),
-        DataType::Float16 => Float16Type::map_with(field.is_nullable(), |half| half.to_f32()),
-        DataType::Float32 => Float32Type::identical(field.is_nullable()),
-        DataType::Float64 => Float64Type::identical(field.is_nullable()),
-        DataType::Timestamp(tu, tz) => match tu {
-            TimeUnit::Second => todo!(),
-            TimeUnit::Millisecond => todo!(),
-            TimeUnit::Microsecond => todo!(),
-            TimeUnit::Nanosecond => todo!(),
-        },
+        DataType::Boolean => boolean_to_bit(is_nullable),
+        DataType::Int8 => Int8Type::identical(is_nullable),
+        DataType::Int16 => Int16Type::identical(is_nullable),
+        DataType::Int32 => Int32Type::identical(is_nullable),
+        DataType::Int64 => Int64Type::identical(is_nullable),
+        DataType::UInt8 => UInt8Type::identical(is_nullable),
+        DataType::Float16 => Float16Type::map_with(is_nullable, |half| half.to_f32()),
+        DataType::Float32 => Float32Type::identical(is_nullable),
+        DataType::Float64 => Float64Type::identical(is_nullable),
+        DataType::Timestamp(TimeUnit::Second, None) => TimestampSecondType::map_with(is_nullable, epoch_to_timestamp),
+        DataType::Timestamp(_, _) => todo!(),
         DataType::Date32 => todo!(),
         DataType::Date64 => todo!(),
         DataType::Time32(_) => todo!(),

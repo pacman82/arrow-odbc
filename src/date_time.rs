@@ -1,6 +1,6 @@
 use std::convert::TryInto;
 
-use chrono::NaiveDate;
+use chrono::{Datelike, NaiveDate, NaiveDateTime, Timelike};
 use odbc_api::sys::{Date, Timestamp};
 
 /// Transform date to days since unix epoch as i32
@@ -51,4 +51,19 @@ pub fn ns_since_epoch(from: &Timestamp) -> i64 {
             from.fraction,
         );
     ndt.timestamp_nanos()
+}
+
+pub fn epoch_to_timestamp(from: i64) -> Timestamp {
+    let ndt = NaiveDateTime::from_timestamp(from, 0);
+    let date = ndt.date();
+    let time = ndt.time();
+    Timestamp {
+        year: date.year().try_into().unwrap(),
+        month: date.month().try_into().unwrap(),
+        day: date.day().try_into().unwrap(),
+        hour: time.hour().try_into().unwrap(),
+        minute: time.minute().try_into().unwrap(),
+        second: time.second().try_into().unwrap(),
+        fraction: time.nanosecond(),
+    }
 }
