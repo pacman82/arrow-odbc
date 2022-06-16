@@ -1210,6 +1210,31 @@ fn insert_timestamp_with_nanoseconds_precisions() {
     assert_eq!(expected, actual);
 }
 
+#[test]
+fn insert_date32_array() {
+    // Given a table and a record batch reader returning a batch with a text column.
+    let table_name = function_name!().rsplit_once(':').unwrap().1;
+    let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
+    setup_empty_table(&conn, table_name, &["DATE"]).unwrap();
+    let schema = Arc::new(Schema::new(vec![Field::new(
+        "a",
+        DataType::Date32,
+        false,
+    )]));
+    // Corresponds to single element array with entry 1970-01-01
+    let array: Date32Array = [Some(0)].into_iter().collect();
+    let batch = RecordBatch::try_new(schema.clone(), vec![Arc::new(array)]).unwrap();
+    let mut reader = StubBatchReader::new(schema, vec![batch]);
+
+    // When
+    insert_into_table(&conn, &mut reader, table_name, 5).unwrap();
+
+    // Then
+    let actual = table_to_string(&conn, table_name, &["a"]);
+    let expected = "1970-01-01";
+    assert_eq!(expected, actual);
+}
+
 /// Creates the table and assures it is empty. Columns are named a,b,c, etc.
 fn setup_empty_table(
     conn: &Connection,

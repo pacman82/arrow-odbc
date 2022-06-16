@@ -7,7 +7,7 @@ use arrow::{
     datatypes::{
         DataType, Field, Float16Type, Float32Type, Float64Type, Int16Type, Int32Type, Int64Type,
         Int8Type, Schema, TimeUnit, TimestampMicrosecondType, TimestampMillisecondType,
-        TimestampNanosecondType, TimestampSecondType, UInt8Type,
+        TimestampNanosecondType, TimestampSecondType, UInt8Type, Date32Type,
     },
     error::ArrowError,
     record_batch::{RecordBatch, RecordBatchReader},
@@ -18,7 +18,7 @@ use odbc_api::{
     ColumnarBulkInserter, Connection, Prepared,
 };
 
-use crate::date_time::epoch_to_timestamp;
+use crate::date_time::{epoch_to_timestamp, epoch_to_date};
 
 use self::{boolean::boolean_to_bit, map_arrow_to_odbc::MapArrowToOdbc, text::Utf8ToNativeText};
 
@@ -214,7 +214,7 @@ fn field_to_write_strategy(field: &Field) -> Result<Box<dyn WriteStrategy>, Writ
             // Drop the last to digits of precision, since we bind it with precision 7 and not 9.
             epoch_to_timestamp::<10_000_000>(ns / 100)
         })},
-        DataType::Date32 => todo!(),
+        DataType::Date32 => Date32Type::map_with(is_nullable, epoch_to_date),
         DataType::Date64 => todo!(),
         DataType::Time32(_) => todo!(),
         DataType::Time64(_) => todo!(),

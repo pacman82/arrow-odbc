@@ -72,3 +72,14 @@ pub fn epoch_to_timestamp<const UNIT_FACTOR: i64>(from: i64) -> Timestamp {
         fraction: time.nanosecond(),
     }
 }
+
+pub fn epoch_to_date(from: i32) -> Date {
+    // Offset between between ce and unix epoch
+    const OFFSET: i32 = 719_163;
+    let nd = NaiveDate::from_num_days_from_ce(from + OFFSET);
+    Date {
+        year: nd.year().try_into().unwrap(),
+        month: nd.month().try_into().unwrap(),
+        day: nd.day().try_into().unwrap(),
+    }
+}
