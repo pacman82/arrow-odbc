@@ -53,8 +53,26 @@ pub fn ns_since_epoch(from: &Timestamp) -> i64 {
     ndt.timestamp_nanos()
 }
 
-pub fn epoch_to_timestamp(from: i64) -> Timestamp {
+pub fn epoch_sec_to_timestamp(from: i64) -> Timestamp {
     let ndt = NaiveDateTime::from_timestamp(from, 0);
+    let date = ndt.date();
+    let time = ndt.time();
+    Timestamp {
+        year: date.year().try_into().unwrap(),
+        month: date.month().try_into().unwrap(),
+        day: date.day().try_into().unwrap(),
+        hour: time.hour().try_into().unwrap(),
+        minute: time.minute().try_into().unwrap(),
+        second: time.second().try_into().unwrap(),
+        fraction: time.nanosecond(),
+    }
+}
+
+pub fn epoch_ms_to_timestamp(from: i64) -> Timestamp {
+    let ndt = NaiveDateTime::from_timestamp(
+        from / 1_000,
+        ((from % 1_000) * 1_000_000).try_into().unwrap(),
+    );
     let date = ndt.date();
     let time = ndt.time();
     Timestamp {

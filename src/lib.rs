@@ -59,7 +59,7 @@ pub use odbc_api;
 pub use self::{
     error::Error,
     odbc_reader::OdbcReader,
-    odbc_writer::{OdbcWriter, WriterError},
+    odbc_writer::{OdbcWriter, WriterError, insert_into_table},
     read_strategy::{BufferAllocationOptions, ColumnFailure},
     schema::arrow_schema_from,
 };

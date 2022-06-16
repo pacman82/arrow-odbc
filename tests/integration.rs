@@ -23,7 +23,7 @@ use arrow_odbc::{
         sys::{AttrConnectionPooling, AttrCpMatch},
         Connection, Environment,
     },
-    BufferAllocationOptions, ColumnFailure, Error, OdbcReader, OdbcWriter, WriterError,
+    BufferAllocationOptions, ColumnFailure, Error, OdbcReader, OdbcWriter, WriterError, insert_into_table,
 };
 use odbc_api::{buffers::TextRowSet, Cursor, IntoParameter};
 
@@ -806,7 +806,7 @@ fn insert_does_not_support_list_type() {
 
     let insert = format!("INSERT INTO {table_name} (a) VALUES (?)");
     let prepared = conn.prepare(&insert).unwrap();
-    let result = OdbcWriter::new(10, schema, prepared);
+    let result = OdbcWriter::new(10, schema.as_ref(), prepared);
 
     // Then we recive an unsupported error
     assert!(matches!(
@@ -825,14 +825,10 @@ fn insert_text() {
     let array = StringArray::from(vec![Some("Hello"), None, Some("World")]);
     let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Utf8, true)]));
     let batch = RecordBatch::try_new(schema.clone(), vec![Arc::new(array)]).unwrap();
-    let reader = StubBatchReader::new(schema, vec![batch]);
+    let mut reader = StubBatchReader::new(schema, vec![batch]);
 
     // When
-    let insert = format!("INSERT INTO {table_name} (a) VALUES (?)");
-    let prepared = conn.prepare(&insert).unwrap();
-    let row_capacity = 5;
-    let mut writer = OdbcWriter::new(row_capacity, reader.schema(), prepared).unwrap();
-    writer.write_all(reader).unwrap();
+    insert_into_table(&conn, &mut reader, table_name, 5).unwrap();
 
     // Then
     let actual = table_to_string(&conn, table_name, &["a"]);
@@ -851,14 +847,10 @@ fn insert_non_ascii_text() {
     let array = StringArray::from(vec![Some("Frühstück µ")]);
     let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Utf8, true)]));
     let batch = RecordBatch::try_new(schema.clone(), vec![Arc::new(array)]).unwrap();
-    let reader = StubBatchReader::new(schema, vec![batch]);
+    let mut reader = StubBatchReader::new(schema, vec![batch]);
 
     // When
-    let insert = format!("INSERT INTO {table_name} (a) VALUES (?)");
-    let prepared = conn.prepare(&insert).unwrap();
-    let row_capacity = 5;
-    let mut writer = OdbcWriter::new(row_capacity, reader.schema(), prepared).unwrap();
-    writer.write_all(reader).unwrap();
+    insert_into_table(&conn, &mut reader, table_name, 5).unwrap();
 
     // Then
     let actual = table_to_string(&conn, table_name, &["a"]);
@@ -875,14 +867,10 @@ fn insert_nullable_booleans() {
     let array = BooleanArray::from(vec![Some(true), None, Some(false)]);
     let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Boolean, true)]));
     let batch = RecordBatch::try_new(schema.clone(), vec![Arc::new(array)]).unwrap();
-    let reader = StubBatchReader::new(schema, vec![batch.clone(), batch]);
+    let mut reader = StubBatchReader::new(schema, vec![batch.clone(), batch]);
 
     // When
-    let insert = format!("INSERT INTO {table_name} (a) VALUES (?)");
-    let prepared = conn.prepare(&insert).unwrap();
-    let row_capacity = 5;
-    let mut writer = OdbcWriter::new(row_capacity, reader.schema(), prepared).unwrap();
-    writer.write_all(reader).unwrap();
+    insert_into_table(&conn, &mut reader, table_name, 5).unwrap();
 
     // Then
     let actual = table_to_string(&conn, table_name, &["a"]);
@@ -899,14 +887,10 @@ fn insert_non_nullable_booleans() {
     let array = BooleanArray::from(vec![Some(true), Some(false), Some(false)]);
     let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Boolean, false)]));
     let batch = RecordBatch::try_new(schema.clone(), vec![Arc::new(array)]).unwrap();
-    let reader = StubBatchReader::new(schema, vec![batch.clone(), batch]);
+    let mut reader = StubBatchReader::new(schema, vec![batch.clone(), batch]);
 
     // When
-    let insert = format!("INSERT INTO {table_name} (a) VALUES (?)");
-    let prepared = conn.prepare(&insert).unwrap();
-    let row_capacity = 5;
-    let mut writer = OdbcWriter::new(row_capacity, reader.schema(), prepared).unwrap();
-    writer.write_all(reader).unwrap();
+    insert_into_table(&conn, &mut reader, table_name, 5).unwrap();
 
     // Then
     let actual = table_to_string(&conn, table_name, &["a"]);
@@ -925,14 +909,10 @@ fn insert_nullable_int8() {
     let batch1 = RecordBatch::try_new(schema.clone(), vec![Arc::new(array1)]).unwrap();
     let array2 = Int8Array::from(vec![Some(4), None, Some(6)]);
     let batch2 = RecordBatch::try_new(schema.clone(), vec![Arc::new(array2)]).unwrap();
-    let reader = StubBatchReader::new(schema, vec![batch1, batch2]);
+    let mut reader = StubBatchReader::new(schema, vec![batch1, batch2]);
 
     // When
-    let insert = format!("INSERT INTO {table_name} (a) VALUES (?)");
-    let prepared = conn.prepare(&insert).unwrap();
-    let row_capacity = 5;
-    let mut writer = OdbcWriter::new(row_capacity, reader.schema(), prepared).unwrap();
-    writer.write_all(reader).unwrap();
+    insert_into_table(&conn, &mut reader, table_name, 5).unwrap();
 
     // Then
     let actual = table_to_string(&conn, table_name, &["a"]);
@@ -951,14 +931,10 @@ fn insert_non_nullable_int8() {
     let batch1 = RecordBatch::try_new(schema.clone(), vec![Arc::new(array1)]).unwrap();
     let array2 = Int8Array::from(vec![Some(4), Some(5), Some(6)]);
     let batch2 = RecordBatch::try_new(schema.clone(), vec![Arc::new(array2)]).unwrap();
-    let reader = StubBatchReader::new(schema, vec![batch1, batch2]);
+    let mut reader = StubBatchReader::new(schema, vec![batch1, batch2]);
 
     // When
-    let insert = format!("INSERT INTO {table_name} (a) VALUES (?)");
-    let prepared = conn.prepare(&insert).unwrap();
-    let row_capacity = 5;
-    let mut writer = OdbcWriter::new(row_capacity, reader.schema(), prepared).unwrap();
-    writer.write_all(reader).unwrap();
+    insert_into_table(&conn, &mut reader, table_name, 5).unwrap();
 
     // Then
     let actual = table_to_string(&conn, table_name, &["a"]);
@@ -975,14 +951,10 @@ fn insert_nullable_int16() {
     let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Int16, true)]));
     let array1 = Int16Array::from(vec![Some(1), None, Some(3)]);
     let batch1 = RecordBatch::try_new(schema.clone(), vec![Arc::new(array1)]).unwrap();
-    let reader = StubBatchReader::new(schema, vec![batch1]);
+    let mut reader = StubBatchReader::new(schema, vec![batch1]);
 
     // When
-    let insert = format!("INSERT INTO {table_name} (a) VALUES (?)");
-    let prepared = conn.prepare(&insert).unwrap();
-    let row_capacity = 5;
-    let mut writer = OdbcWriter::new(row_capacity, reader.schema(), prepared).unwrap();
-    writer.write_all(reader).unwrap();
+    insert_into_table(&conn, &mut reader, table_name, 5).unwrap();
 
     // Then
     let actual = table_to_string(&conn, table_name, &["a"]);
@@ -999,14 +971,10 @@ fn insert_nullable_int32() {
     let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Int32, true)]));
     let array1 = Int32Array::from(vec![Some(1), None, Some(3)]);
     let batch1 = RecordBatch::try_new(schema.clone(), vec![Arc::new(array1)]).unwrap();
-    let reader = StubBatchReader::new(schema, vec![batch1]);
+    let mut reader = StubBatchReader::new(schema, vec![batch1]);
 
     // When
-    let insert = format!("INSERT INTO {table_name} (a) VALUES (?)");
-    let prepared = conn.prepare(&insert).unwrap();
-    let row_capacity = 5;
-    let mut writer = OdbcWriter::new(row_capacity, reader.schema(), prepared).unwrap();
-    writer.write_all(reader).unwrap();
+    insert_into_table(&conn, &mut reader, table_name, 5).unwrap();
 
     // Then
     let actual = table_to_string(&conn, table_name, &["a"]);
@@ -1023,14 +991,10 @@ fn insert_nullable_int64() {
     let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Int64, true)]));
     let array1 = Int64Array::from(vec![Some(1), None, Some(3)]);
     let batch1 = RecordBatch::try_new(schema.clone(), vec![Arc::new(array1)]).unwrap();
-    let reader = StubBatchReader::new(schema, vec![batch1]);
+    let mut reader = StubBatchReader::new(schema, vec![batch1]);
 
     // When
-    let insert = format!("INSERT INTO {table_name} (a) VALUES (?)");
-    let prepared = conn.prepare(&insert).unwrap();
-    let row_capacity = 5;
-    let mut writer = OdbcWriter::new(row_capacity, reader.schema(), prepared).unwrap();
-    writer.write_all(reader).unwrap();
+    insert_into_table(&conn, &mut reader, table_name, 5).unwrap();
 
     // Then
     let actual = table_to_string(&conn, table_name, &["a"]);
@@ -1047,14 +1011,10 @@ fn insert_non_nullable_unsigned_int8() {
     let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::UInt8, false)]));
     let array1 = UInt8Array::from(vec![Some(1), Some(2), Some(3)]);
     let batch1 = RecordBatch::try_new(schema.clone(), vec![Arc::new(array1)]).unwrap();
-    let reader = StubBatchReader::new(schema, vec![batch1]);
+    let mut reader = StubBatchReader::new(schema, vec![batch1]);
 
     // When
-    let insert = format!("INSERT INTO {table_name} (a) VALUES (?)");
-    let prepared = conn.prepare(&insert).unwrap();
-    let row_capacity = 5;
-    let mut writer = OdbcWriter::new(row_capacity, reader.schema(), prepared).unwrap();
-    writer.write_all(reader).unwrap();
+    insert_into_table(&conn, &mut reader, table_name, 5).unwrap();
 
     // Then
     let actual = table_to_string(&conn, table_name, &["a"]);
@@ -1071,14 +1031,10 @@ fn insert_nullable_f32() {
     let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Float32, true)]));
     let array1 = Float32Array::from(vec![Some(1.), None, Some(3.)]);
     let batch1 = RecordBatch::try_new(schema.clone(), vec![Arc::new(array1)]).unwrap();
-    let reader = StubBatchReader::new(schema, vec![batch1]);
+    let mut reader = StubBatchReader::new(schema, vec![batch1]);
 
     // When
-    let insert = format!("INSERT INTO {table_name} (a) VALUES (?)");
-    let prepared = conn.prepare(&insert).unwrap();
-    let row_capacity = 5;
-    let mut writer = OdbcWriter::new(row_capacity, reader.schema(), prepared).unwrap();
-    writer.write_all(reader).unwrap();
+    insert_into_table(&conn, &mut reader, table_name, 5).unwrap();
 
     // Then
     let actual = table_to_string(&conn, table_name, &["a"]);
@@ -1095,14 +1051,10 @@ fn insert_nullable_f64() {
     let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Float64, true)]));
     let array1 = Float64Array::from(vec![Some(1.), None, Some(3.)]);
     let batch1 = RecordBatch::try_new(schema.clone(), vec![Arc::new(array1)]).unwrap();
-    let reader = StubBatchReader::new(schema, vec![batch1]);
+    let mut reader = StubBatchReader::new(schema, vec![batch1]);
 
     // When
-    let insert = format!("INSERT INTO {table_name} (a) VALUES (?)");
-    let prepared = conn.prepare(&insert).unwrap();
-    let row_capacity = 5;
-    let mut writer = OdbcWriter::new(row_capacity, reader.schema(), prepared).unwrap();
-    writer.write_all(reader).unwrap();
+    insert_into_table(&conn, &mut reader, table_name, 5).unwrap();
 
     // Then
     let actual = table_to_string(&conn, table_name, &["a"]);
@@ -1121,14 +1073,10 @@ fn insert_nullable_f16() {
         .into_iter()
         .collect();
     let batch1 = RecordBatch::try_new(schema.clone(), vec![Arc::new(array1)]).unwrap();
-    let reader = StubBatchReader::new(schema, vec![batch1]);
+    let mut reader = StubBatchReader::new(schema, vec![batch1]);
 
     // When
-    let insert = format!("INSERT INTO {table_name} (a) VALUES (?)");
-    let prepared = conn.prepare(&insert).unwrap();
-    let row_capacity = 5;
-    let mut writer = OdbcWriter::new(row_capacity, reader.schema(), prepared).unwrap();
-    writer.write_all(reader).unwrap();
+    insert_into_table(&conn, &mut reader, table_name, 5).unwrap();
 
     // Then
     let actual = table_to_string(&conn, table_name, &["a"]);
@@ -1151,14 +1099,10 @@ fn insert_non_nullable_f16() {
     .into_iter()
     .collect();
     let batch1 = RecordBatch::try_new(schema.clone(), vec![Arc::new(array1)]).unwrap();
-    let reader = StubBatchReader::new(schema, vec![batch1]);
+    let mut reader = StubBatchReader::new(schema, vec![batch1]);
 
     // When
-    let insert = format!("INSERT INTO {table_name} (a) VALUES (?)");
-    let prepared = conn.prepare(&insert).unwrap();
-    let row_capacity = 5;
-    let mut writer = OdbcWriter::new(row_capacity, reader.schema(), prepared).unwrap();
-    writer.write_all(reader).unwrap();
+    insert_into_table(&conn, &mut reader, table_name, 5).unwrap();
 
     // Then
     let actual = table_to_string(&conn, table_name, &["a"]);
@@ -1176,18 +1120,35 @@ fn insert_timestamp_with_seconds_precisions() {
     // Corresponds to single element array with entry 1970-05-09T14:25:11+0:00
     let array = TimestampSecondArray::from_vec(vec![11111111], None);
     let batch = RecordBatch::try_new(schema.clone(), vec![Arc::new(array)]).unwrap();
-    let reader = StubBatchReader::new(schema, vec![batch]);
+    let mut reader = StubBatchReader::new(schema, vec![batch]);
 
     // When
-    let insert = format!("INSERT INTO {table_name} (a) VALUES (?)");
-    let prepared = conn.prepare(&insert).unwrap();
-    let row_capacity = 5;
-    let mut writer = OdbcWriter::new(row_capacity, reader.schema(), prepared).unwrap();
-    writer.write_all(reader).unwrap();
+    insert_into_table(&conn, &mut reader, table_name, 5).unwrap();
 
     // Then
     let actual = table_to_string(&conn, table_name, &["a"]);
     let expected = "1970-05-09 14:25:11";
+    assert_eq!(expected, actual);
+}
+
+#[test]
+fn insert_timestamp_with_milliseconds_precisions() {
+    // Given a table and a record batch reader returning a batch with a text column.
+    let table_name = function_name!().rsplit_once(':').unwrap().1;
+    let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
+    setup_empty_table(&conn, table_name, &["DATETIME2(3)"]).unwrap();
+    let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Timestamp(TimeUnit::Millisecond, None), false)]));
+    // Corresponds to single element array with entry 1970-05-09T14:25:11+0:00
+    let array = TimestampMillisecondArray::from_vec(vec![11111111111], None);
+    let batch = RecordBatch::try_new(schema.clone(), vec![Arc::new(array)]).unwrap();
+    let mut reader = StubBatchReader::new(schema, vec![batch]);
+
+    // When
+    insert_into_table(&conn, &mut reader, table_name, 5).unwrap();
+
+    // Then
+    let actual = table_to_string(&conn, table_name, &["a"]);
+    let expected = "1970-05-09 14:25:11.111";
     assert_eq!(expected, actual);
 }
 

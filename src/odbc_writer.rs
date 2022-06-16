@@ -6,24 +6,47 @@ use arrow::{
     array::Array,
     datatypes::{
         DataType, Field, Float16Type, Float32Type, Float64Type, Int16Type, Int32Type, Int64Type,
-        Int8Type, SchemaRef, TimeUnit, TimestampSecondType, UInt8Type,
+        Int8Type, TimeUnit, TimestampSecondType, UInt8Type, Schema, TimestampMillisecondType
     },
     error::ArrowError,
-    record_batch::RecordBatch,
+    record_batch::{RecordBatch, RecordBatchReader},
 };
 use odbc_api::{
     buffers::{AnyColumnBuffer, AnyColumnSliceMut, BufferDescription},
     handles::StatementImpl,
-    ColumnarBulkInserter, Prepared,
+    ColumnarBulkInserter, Connection, Prepared,
 };
 
-use crate::date_time::epoch_to_timestamp;
+use crate::date_time::{epoch_sec_to_timestamp, epoch_ms_to_timestamp};
 
 use self::{boolean::boolean_to_bit, map_arrow_to_odbc::MapArrowToOdbc, text::Utf8ToNativeText};
 
 mod boolean;
 mod map_arrow_to_odbc;
 mod text;
+
+/// Consumes the batches in the reader and inserts it into a table on a database.
+pub fn insert_into_table(
+    connection: &Connection,
+    batches: &mut impl RecordBatchReader,
+    table_name: &str,
+    batch_size: usize,
+) -> Result<(), WriterError> {
+    let schema = batches.schema();
+    let mut inserter = OdbcWriter::with_connection(connection, schema.as_ref(), table_name, batch_size)?;
+    inserter.write_all(batches)
+}
+
+fn insert_statement_text(table: &str, column_names: &[&'_ str]) -> String {
+    // Generate statement text from table name and headline
+    let columns = column_names.join(", ");
+    let values = column_names
+        .iter()
+        .map(|_| "?")
+        .collect::<Vec<_>>()
+        .join(", ");
+    format!("INSERT INTO {} ({}) VALUES ({});", table, columns, values)
+}
 
 #[derive(Debug, Error)]
 pub enum WriterError {
@@ -37,6 +60,12 @@ pub enum WriterError {
     UnsupportedArrowDataType(DataType),
     #[error("An error occured extracting a record batch from an error reader.")]
     ReadingRecordBatch(#[source] ArrowError),
+    #[error("An error occurred preparing SQL statement: {0}", sql)]
+    PreparingInsertStatement {
+        #[source]
+        source: odbc_api::Error,
+        sql: String,
+    },
 }
 
 /// Inserts batches from an [`crate::arrow::RecordBatchReader`] into a database.
@@ -55,8 +84,8 @@ impl<'o> OdbcWriter<'o> {
     /// Construct a new ODBC writer using an alredy existing prepared statement.
     pub fn new(
         row_capacity: usize,
-        schema: SchemaRef,
-        statment: Prepared<'o>,
+        schema: &Schema,
+        statement: Prepared<'o>,
     ) -> Result<Self, WriterError> {
         let strategies: Vec<_> = schema
             .fields()
@@ -64,7 +93,7 @@ impl<'o> OdbcWriter<'o> {
             .map(field_to_write_strategy)
             .collect::<Result<_, _>>()?;
         let descriptions = strategies.iter().map(|cws| cws.buffer_description());
-        let inserter = statment
+        let inserter = statement
             .into_any_column_inserter(row_capacity, descriptions)
             .map_err(WriterError::BindParameterBuffers)?;
 
@@ -72,6 +101,19 @@ impl<'o> OdbcWriter<'o> {
             inserter,
             strategies,
         })
+    }
+
+    pub fn with_connection(connection: &'o Connection<'o>, schema: &Schema, table_name: &str, row_capacity: usize) -> Result<Self, WriterError> {
+        let fields = schema.fields();
+        let num_columns = fields.len();
+        let column_names: Vec<_> = (0..num_columns)
+            .map(|i| fields[i].name().as_str())
+            .collect();
+        let sql = insert_statement_text(table_name, &column_names);
+        let statement = connection
+            .prepare(&sql)
+            .map_err(|source| WriterError::PreparingInsertStatement { source, sql })?;
+        Self::new(row_capacity, schema, statement)
     }
 
     pub fn write_all(
@@ -156,7 +198,8 @@ fn field_to_write_strategy(field: &Field) -> Result<Box<dyn WriteStrategy>, Writ
         DataType::Float16 => Float16Type::map_with(is_nullable, |half| half.to_f32()),
         DataType::Float32 => Float32Type::identical(is_nullable),
         DataType::Float64 => Float64Type::identical(is_nullable),
-        DataType::Timestamp(TimeUnit::Second, None) => TimestampSecondType::map_with(is_nullable, epoch_to_timestamp),
+        DataType::Timestamp(TimeUnit::Second, None) => TimestampSecondType::map_with(is_nullable, epoch_sec_to_timestamp),
+        DataType::Timestamp(TimeUnit::Millisecond, None) => TimestampMillisecondType::map_with(is_nullable, epoch_ms_to_timestamp),
         DataType::Timestamp(_, _) => todo!(),
         DataType::Date32 => todo!(),
         DataType::Date64 => todo!(),
