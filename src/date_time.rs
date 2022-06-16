@@ -56,7 +56,9 @@ pub fn ns_since_epoch(from: &Timestamp) -> i64 {
 pub fn epoch_to_timestamp<const UNIT_FACTOR: i64>(from: i64) -> Timestamp {
     let ndt = NaiveDateTime::from_timestamp(
         from / UNIT_FACTOR,
-        ((from % UNIT_FACTOR) * (1_000_000_000 / UNIT_FACTOR)).try_into().unwrap(),
+        ((from % UNIT_FACTOR) * (1_000_000_000 / UNIT_FACTOR))
+            .try_into()
+            .unwrap(),
     );
     let date = ndt.date();
     let time = ndt.time();

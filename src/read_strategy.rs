@@ -27,10 +27,8 @@ pub use self::{
 
 use self::map_odbc_to_arrow::MapOdbcToArrow;
 
-use crate::{
-    date_time::{
-        days_since_epoch, ms_since_epoch, ns_since_epoch, seconds_since_epoch, us_since_epoch,
-    },
+use crate::date_time::{
+    days_since_epoch, ms_since_epoch, ns_since_epoch, seconds_since_epoch, us_since_epoch,
 };
 
 /// All decisions needed to copy data from an ODBC buffer to an Arrow Array

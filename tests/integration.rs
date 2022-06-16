@@ -5,7 +5,7 @@ use arrow::{
         Array, ArrayRef, BinaryArray, BooleanArray, Date32Array, DecimalArray,
         FixedSizeBinaryArray, Float16Array, Float32Array, Int16Array, Int32Array, Int64Array,
         Int8Array, StringArray, TimestampMicrosecondArray, TimestampMillisecondArray,
-        TimestampNanosecondArray, UInt8Array, TimestampSecondArray,
+        TimestampNanosecondArray, TimestampSecondArray, UInt8Array,
     },
     datatypes::{DataType, Field, Schema, SchemaRef, TimeUnit},
     error::ArrowError,
@@ -18,12 +18,12 @@ use lazy_static::lazy_static;
 
 use arrow_odbc::{
     arrow::array::Float64Array,
-    arrow_schema_from,
+    arrow_schema_from, insert_into_table,
     odbc_api::{
         sys::{AttrConnectionPooling, AttrCpMatch},
         Connection, Environment,
     },
-    BufferAllocationOptions, ColumnFailure, Error, OdbcReader, OdbcWriter, WriterError, insert_into_table,
+    BufferAllocationOptions, ColumnFailure, Error, OdbcReader, OdbcWriter, WriterError,
 };
 use odbc_api::{buffers::TextRowSet, Cursor, IntoParameter};
 
@@ -1116,7 +1116,11 @@ fn insert_timestamp_with_seconds_precisions() {
     let table_name = function_name!().rsplit_once(':').unwrap().1;
     let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
     setup_empty_table(&conn, table_name, &["DATETIME2(0)"]).unwrap();
-    let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Timestamp(TimeUnit::Second, None), false)]));
+    let schema = Arc::new(Schema::new(vec![Field::new(
+        "a",
+        DataType::Timestamp(TimeUnit::Second, None),
+        false,
+    )]));
     // Corresponds to single element array with entry 1970-05-09T14:25:11+0:00
     let array = TimestampSecondArray::from_vec(vec![11111111], None);
     let batch = RecordBatch::try_new(schema.clone(), vec![Arc::new(array)]).unwrap();
@@ -1137,7 +1141,11 @@ fn insert_timestamp_with_milliseconds_precisions() {
     let table_name = function_name!().rsplit_once(':').unwrap().1;
     let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
     setup_empty_table(&conn, table_name, &["DATETIME2(3)"]).unwrap();
-    let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Timestamp(TimeUnit::Millisecond, None), false)]));
+    let schema = Arc::new(Schema::new(vec![Field::new(
+        "a",
+        DataType::Timestamp(TimeUnit::Millisecond, None),
+        false,
+    )]));
     // Corresponds to single element array with entry 1970-05-09T14:25:11.111
     let array = TimestampMillisecondArray::from_vec(vec![11111111111], None);
     let batch = RecordBatch::try_new(schema.clone(), vec![Arc::new(array)]).unwrap();
@@ -1158,7 +1166,11 @@ fn insert_timestamp_with_microseconds_precisions() {
     let table_name = function_name!().rsplit_once(':').unwrap().1;
     let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
     setup_empty_table(&conn, table_name, &["DATETIME2(6)"]).unwrap();
-    let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Timestamp(TimeUnit::Microsecond, None), false)]));
+    let schema = Arc::new(Schema::new(vec![Field::new(
+        "a",
+        DataType::Timestamp(TimeUnit::Microsecond, None),
+        false,
+    )]));
     // Corresponds to single element array with entry 1970-05-09T14:25:11.111111
     let array = TimestampMicrosecondArray::from_vec(vec![11111111111111], None);
     let batch = RecordBatch::try_new(schema.clone(), vec![Arc::new(array)]).unwrap();
@@ -1170,6 +1182,31 @@ fn insert_timestamp_with_microseconds_precisions() {
     // Then
     let actual = table_to_string(&conn, table_name, &["a"]);
     let expected = "1970-05-09 14:25:11.111111";
+    assert_eq!(expected, actual);
+}
+
+#[test]
+fn insert_timestamp_with_nanoseconds_precisions() {
+    // Given a table and a record batch reader returning a batch with a text column.
+    let table_name = function_name!().rsplit_once(':').unwrap().1;
+    let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
+    setup_empty_table(&conn, table_name, &["DATETIME2(7)"]).unwrap();
+    let schema = Arc::new(Schema::new(vec![Field::new(
+        "a",
+        DataType::Timestamp(TimeUnit::Nanosecond, None),
+        false,
+    )]));
+    // Corresponds to single element array with entry 1970-05-09T14:25:11.111111111
+    let array = TimestampNanosecondArray::from_vec(vec![11111111111111111], None);
+    let batch = RecordBatch::try_new(schema.clone(), vec![Arc::new(array)]).unwrap();
+    let mut reader = StubBatchReader::new(schema, vec![batch]);
+
+    // When
+    insert_into_table(&conn, &mut reader, table_name, 5).unwrap();
+
+    // Then
+    let actual = table_to_string(&conn, table_name, &["a"]);
+    let expected = "1970-05-09 14:25:11.1111111";
     assert_eq!(expected, actual);
 }
 

@@ -6,7 +6,8 @@ use arrow::{
     array::Array,
     datatypes::{
         DataType, Field, Float16Type, Float32Type, Float64Type, Int16Type, Int32Type, Int64Type,
-        Int8Type, TimeUnit, TimestampSecondType, UInt8Type, Schema, TimestampMillisecondType, TimestampMicrosecondType
+        Int8Type, Schema, TimeUnit, TimestampMicrosecondType, TimestampMillisecondType,
+        TimestampNanosecondType, TimestampSecondType, UInt8Type,
     },
     error::ArrowError,
     record_batch::{RecordBatch, RecordBatchReader},
@@ -33,7 +34,8 @@ pub fn insert_into_table(
     batch_size: usize,
 ) -> Result<(), WriterError> {
     let schema = batches.schema();
-    let mut inserter = OdbcWriter::with_connection(connection, schema.as_ref(), table_name, batch_size)?;
+    let mut inserter =
+        OdbcWriter::with_connection(connection, schema.as_ref(), table_name, batch_size)?;
     inserter.write_all(batches)
 }
 
@@ -66,6 +68,8 @@ pub enum WriterError {
         source: odbc_api::Error,
         sql: String,
     },
+    #[error("Inserting arrays with timestamp information is currently not supported.")]
+    TimeZonesNotSupported,
 }
 
 /// Inserts batches from an [`crate::arrow::RecordBatchReader`] into a database.
@@ -103,7 +107,12 @@ impl<'o> OdbcWriter<'o> {
         })
     }
 
-    pub fn with_connection(connection: &'o Connection<'o>, schema: &Schema, table_name: &str, row_capacity: usize) -> Result<Self, WriterError> {
+    pub fn with_connection(
+        connection: &'o Connection<'o>,
+        schema: &Schema,
+        table_name: &str,
+        row_capacity: usize,
+    ) -> Result<Self, WriterError> {
         let fields = schema.fields();
         let num_columns = fields.len();
         let column_names: Vec<_> = (0..num_columns)
@@ -201,7 +210,10 @@ fn field_to_write_strategy(field: &Field) -> Result<Box<dyn WriteStrategy>, Writ
         DataType::Timestamp(TimeUnit::Second, None) => TimestampSecondType::map_with(is_nullable, epoch_to_timestamp::<1>),
         DataType::Timestamp(TimeUnit::Millisecond, None) => TimestampMillisecondType::map_with(is_nullable, epoch_to_timestamp::<1_000>),
         DataType::Timestamp(TimeUnit::Microsecond, None) => TimestampMicrosecondType::map_with(is_nullable, epoch_to_timestamp::<1_000_000>),
-        DataType::Timestamp(_, _) => todo!(),
+        DataType::Timestamp(TimeUnit::Nanosecond, None) => {TimestampNanosecondType::map_with(is_nullable, |ns| {
+            // Drop the last to digits of precision, since we bind it with precision 7 and not 9.
+            epoch_to_timestamp::<10_000_000>(ns / 100)
+        })},
         DataType::Date32 => todo!(),
         DataType::Date64 => todo!(),
         DataType::Time32(_) => todo!(),
@@ -211,6 +223,7 @@ fn field_to_write_strategy(field: &Field) -> Result<Box<dyn WriteStrategy>, Writ
         DataType::FixedSizeBinary(_) => todo!(),
         DataType::LargeBinary => todo!(),
         DataType::Decimal(_, _) => todo!(),
+        DataType::Timestamp(_, Some(_)) => return Err(WriterError::TimeZonesNotSupported),
         unsupported @ (DataType::Null
         // We could support u64 with upstream changes, but best if user supplies the sql data type.
         | DataType::UInt64

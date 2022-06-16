@@ -44,12 +44,12 @@
 //!
 //!
 //! ```
+mod date_time;
 mod error;
 mod odbc_reader;
 mod odbc_writer;
 mod read_strategy;
 mod schema;
-mod date_time;
 
 // Rexport odbc_api and arrow to make it easier for downstream crates to depend to avoid version
 // mismatches
@@ -59,7 +59,7 @@ pub use odbc_api;
 pub use self::{
     error::Error,
     odbc_reader::OdbcReader,
-    odbc_writer::{OdbcWriter, WriterError, insert_into_table},
+    odbc_writer::{insert_into_table, OdbcWriter, WriterError},
     read_strategy::{BufferAllocationOptions, ColumnFailure},
     schema::arrow_schema_from,
 };
