@@ -5,9 +5,9 @@ use thiserror::Error;
 use arrow::{
     array::Array,
     datatypes::{
-        DataType, Field, Float16Type, Float32Type, Float64Type, Int16Type, Int32Type, Int64Type,
-        Int8Type, Schema, TimeUnit, TimestampMicrosecondType, TimestampMillisecondType,
-        TimestampNanosecondType, TimestampSecondType, UInt8Type, Date32Type,
+        DataType, Date32Type, Date64Type, Field, Float16Type, Float32Type, Float64Type, Int16Type,
+        Int32Type, Int64Type, Int8Type, Schema, TimeUnit, TimestampMicrosecondType,
+        TimestampMillisecondType, TimestampNanosecondType, TimestampSecondType, UInt8Type,
     },
     error::ArrowError,
     record_batch::{RecordBatch, RecordBatchReader},
@@ -18,7 +18,7 @@ use odbc_api::{
     ColumnarBulkInserter, Connection, Prepared,
 };
 
-use crate::date_time::{epoch_to_timestamp, epoch_to_date};
+use crate::date_time::{epoch_to_date, epoch_to_timestamp};
 
 use self::{boolean::boolean_to_bit, map_arrow_to_odbc::MapArrowToOdbc, text::Utf8ToNativeText};
 
@@ -215,7 +215,7 @@ fn field_to_write_strategy(field: &Field) -> Result<Box<dyn WriteStrategy>, Writ
             epoch_to_timestamp::<10_000_000>(ns / 100)
         })},
         DataType::Date32 => Date32Type::map_with(is_nullable, epoch_to_date),
-        DataType::Date64 => todo!(),
+        DataType::Date64 => Date64Type::map_with(is_nullable, |days_since_epoch| epoch_to_date(days_since_epoch.try_into().unwrap())),
         DataType::Time32(_) => todo!(),
         DataType::Time64(_) => todo!(),
         DataType::Duration(_) => todo!(),
