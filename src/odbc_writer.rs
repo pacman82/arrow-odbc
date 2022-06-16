@@ -17,7 +17,7 @@ use odbc_api::{
     ColumnarBulkInserter, Connection, Prepared,
 };
 
-use crate::date_time::{epoch_sec_to_timestamp, epoch_ms_to_timestamp, epoch_us_to_timestamp};
+use crate::date_time::epoch_to_timestamp;
 
 use self::{boolean::boolean_to_bit, map_arrow_to_odbc::MapArrowToOdbc, text::Utf8ToNativeText};
 
@@ -198,9 +198,9 @@ fn field_to_write_strategy(field: &Field) -> Result<Box<dyn WriteStrategy>, Writ
         DataType::Float16 => Float16Type::map_with(is_nullable, |half| half.to_f32()),
         DataType::Float32 => Float32Type::identical(is_nullable),
         DataType::Float64 => Float64Type::identical(is_nullable),
-        DataType::Timestamp(TimeUnit::Second, None) => TimestampSecondType::map_with(is_nullable, epoch_sec_to_timestamp),
-        DataType::Timestamp(TimeUnit::Millisecond, None) => TimestampMillisecondType::map_with(is_nullable, epoch_ms_to_timestamp),
-        DataType::Timestamp(TimeUnit::Microsecond, None) => TimestampMicrosecondType::map_with(is_nullable, epoch_us_to_timestamp),
+        DataType::Timestamp(TimeUnit::Second, None) => TimestampSecondType::map_with(is_nullable, epoch_to_timestamp::<1>),
+        DataType::Timestamp(TimeUnit::Millisecond, None) => TimestampMillisecondType::map_with(is_nullable, epoch_to_timestamp::<1_000>),
+        DataType::Timestamp(TimeUnit::Microsecond, None) => TimestampMicrosecondType::map_with(is_nullable, epoch_to_timestamp::<1_000_000>),
         DataType::Timestamp(_, _) => todo!(),
         DataType::Date32 => todo!(),
         DataType::Date64 => todo!(),
