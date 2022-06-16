@@ -6,7 +6,7 @@ use arrow::{
     array::Array,
     datatypes::{
         DataType, Field, Float16Type, Float32Type, Float64Type, Int16Type, Int32Type, Int64Type,
-        Int8Type, TimeUnit, TimestampSecondType, UInt8Type, Schema, TimestampMillisecondType
+        Int8Type, TimeUnit, TimestampSecondType, UInt8Type, Schema, TimestampMillisecondType, TimestampMicrosecondType
     },
     error::ArrowError,
     record_batch::{RecordBatch, RecordBatchReader},
@@ -17,7 +17,7 @@ use odbc_api::{
     ColumnarBulkInserter, Connection, Prepared,
 };
 
-use crate::date_time::{epoch_sec_to_timestamp, epoch_ms_to_timestamp};
+use crate::date_time::{epoch_sec_to_timestamp, epoch_ms_to_timestamp, epoch_us_to_timestamp};
 
 use self::{boolean::boolean_to_bit, map_arrow_to_odbc::MapArrowToOdbc, text::Utf8ToNativeText};
 
@@ -200,6 +200,7 @@ fn field_to_write_strategy(field: &Field) -> Result<Box<dyn WriteStrategy>, Writ
         DataType::Float64 => Float64Type::identical(is_nullable),
         DataType::Timestamp(TimeUnit::Second, None) => TimestampSecondType::map_with(is_nullable, epoch_sec_to_timestamp),
         DataType::Timestamp(TimeUnit::Millisecond, None) => TimestampMillisecondType::map_with(is_nullable, epoch_ms_to_timestamp),
+        DataType::Timestamp(TimeUnit::Microsecond, None) => TimestampMicrosecondType::map_with(is_nullable, epoch_us_to_timestamp),
         DataType::Timestamp(_, _) => todo!(),
         DataType::Date32 => todo!(),
         DataType::Date64 => todo!(),
