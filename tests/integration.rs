@@ -18,13 +18,16 @@ use lazy_static::lazy_static;
 
 use arrow_odbc::{
     arrow::array::Float64Array,
-    arrow_schema_from, insert_into_table,
+    arrow_schema_from,
     odbc_api::{
         sys::{AttrConnectionPooling, AttrCpMatch},
         Connection, Environment,
     },
-    BufferAllocationOptions, ColumnFailure, Error, OdbcReader, OdbcWriter, WriterError,
+    BufferAllocationOptions, ColumnFailure, Error, OdbcReader,
 };
+#[cfg(feature = "unstable")]
+use arrow_odbc::{insert_into_table, OdbcWriter, WriteError};
+
 use odbc_api::{buffers::TextRowSet, Cursor, IntoParameter};
 
 use stdext::function_name;
@@ -790,6 +793,7 @@ fn fallibale_allocations() {
     ));
 }
 
+#[cfg(feature = "unstable")]
 #[test]
 fn insert_does_not_support_list_type() {
     // Given a table and a db connection.
@@ -816,6 +820,7 @@ fn insert_does_not_support_list_type() {
 }
 
 /// Insert String data into database
+#[cfg(feature = "unstable")]
 #[test]
 fn insert_text() {
     // Given a table and a record batch reader returning a batch with a text column.
@@ -838,6 +843,7 @@ fn insert_text() {
 
 /// This test is most relevant on windows platforms, the UTF-8 is not the default encoding and text
 /// should be encoded as UTF-16
+#[cfg(feature = "unstable")]
 #[test]
 fn insert_non_ascii_text() {
     // Given a table and a record batch reader returning a batch with a text column.
@@ -858,6 +864,7 @@ fn insert_non_ascii_text() {
     assert_eq!(expected, actual);
 }
 
+#[cfg(feature = "unstable")]
 #[test]
 fn insert_nullable_booleans() {
     // Given a table and a record batch reader returning a batch with a text column.
@@ -878,6 +885,7 @@ fn insert_nullable_booleans() {
     assert_eq!(expected, actual);
 }
 
+#[cfg(feature = "unstable")]
 #[test]
 fn insert_non_nullable_booleans() {
     // Given a table and a record batch reader returning a batch with a text column.
@@ -898,6 +906,7 @@ fn insert_non_nullable_booleans() {
     assert_eq!(expected, actual);
 }
 
+#[cfg(feature = "unstable")]
 #[test]
 fn insert_nullable_int8() {
     // Given a table and a record batch reader returning a batch with a text column.
@@ -920,6 +929,7 @@ fn insert_nullable_int8() {
     assert_eq!(expected, actual);
 }
 
+#[cfg(feature = "unstable")]
 #[test]
 fn insert_non_nullable_int8() {
     // Given a table and a record batch reader returning a batch with a text column.
@@ -942,6 +952,7 @@ fn insert_non_nullable_int8() {
     assert_eq!(expected, actual);
 }
 
+#[cfg(feature = "unstable")]
 #[test]
 fn insert_nullable_int16() {
     // Given a table and a record batch reader returning a batch with a text column.
@@ -962,6 +973,7 @@ fn insert_nullable_int16() {
     assert_eq!(expected, actual);
 }
 
+#[cfg(feature = "unstable")]
 #[test]
 fn insert_nullable_int32() {
     // Given a table and a record batch reader returning a batch with a text column.
@@ -982,6 +994,7 @@ fn insert_nullable_int32() {
     assert_eq!(expected, actual);
 }
 
+#[cfg(feature = "unstable")]
 #[test]
 fn insert_nullable_int64() {
     // Given a table and a record batch reader returning a batch with a text column.
@@ -1002,6 +1015,7 @@ fn insert_nullable_int64() {
     assert_eq!(expected, actual);
 }
 
+#[cfg(feature = "unstable")]
 #[test]
 fn insert_non_nullable_unsigned_int8() {
     // Given a table and a record batch reader returning a batch with a text column.
@@ -1022,6 +1036,7 @@ fn insert_non_nullable_unsigned_int8() {
     assert_eq!(expected, actual);
 }
 
+#[cfg(feature = "unstable")]
 #[test]
 fn insert_nullable_f32() {
     // Given a table and a record batch reader returning a batch with a text column.
@@ -1042,6 +1057,7 @@ fn insert_nullable_f32() {
     assert_eq!(expected, actual);
 }
 
+#[cfg(feature = "unstable")]
 #[test]
 fn insert_nullable_f64() {
     // Given a table and a record batch reader returning a batch with a text column.
@@ -1062,6 +1078,7 @@ fn insert_nullable_f64() {
     assert_eq!(expected, actual);
 }
 
+#[cfg(feature = "unstable")]
 #[test]
 fn insert_nullable_f16() {
     // Given a table and a record batch reader returning a batch with a text column.
@@ -1084,6 +1101,7 @@ fn insert_nullable_f16() {
     assert_eq!(expected, actual);
 }
 
+#[cfg(feature = "unstable")]
 #[test]
 fn insert_non_nullable_f16() {
     // Given a table and a record batch reader returning a batch with a text column.
@@ -1110,6 +1128,7 @@ fn insert_non_nullable_f16() {
     assert_eq!(expected, actual);
 }
 
+#[cfg(feature = "unstable")]
 #[test]
 fn insert_timestamp_with_seconds_precisions() {
     // Given a table and a record batch reader returning a batch with a text column.
@@ -1135,6 +1154,7 @@ fn insert_timestamp_with_seconds_precisions() {
     assert_eq!(expected, actual);
 }
 
+#[cfg(feature = "unstable")]
 #[test]
 fn insert_timestamp_with_milliseconds_precisions() {
     // Given a table and a record batch reader returning a batch with a text column.
@@ -1160,6 +1180,7 @@ fn insert_timestamp_with_milliseconds_precisions() {
     assert_eq!(expected, actual);
 }
 
+#[cfg(feature = "unstable")]
 #[test]
 fn insert_timestamp_with_microseconds_precisions() {
     // Given a table and a record batch reader returning a batch with a text column.
@@ -1185,6 +1206,7 @@ fn insert_timestamp_with_microseconds_precisions() {
     assert_eq!(expected, actual);
 }
 
+#[cfg(feature = "unstable")]
 #[test]
 fn insert_timestamp_with_nanoseconds_precisions() {
     // Given a table and a record batch reader returning a batch with a text column.
@@ -1210,6 +1232,7 @@ fn insert_timestamp_with_nanoseconds_precisions() {
     assert_eq!(expected, actual);
 }
 
+#[cfg(feature = "unstable")]
 #[test]
 fn insert_date32_array() {
     // Given a table and a record batch reader returning a batch with a text column.
@@ -1231,6 +1254,7 @@ fn insert_date32_array() {
     assert_eq!(expected, actual);
 }
 
+#[cfg(feature = "unstable")]
 #[test]
 fn insert_date64_array() {
     // Given a table and a record batch reader returning a batch with a text column.
