@@ -47,7 +47,7 @@
 mod date_time;
 mod error;
 mod odbc_reader;
-#[cfg(feature = "unstable")]
+
 mod odbc_writer;
 mod read_strategy;
 mod schema;
@@ -60,9 +60,7 @@ pub use odbc_api;
 pub use self::{
     error::Error,
     odbc_reader::OdbcReader,
+    odbc_writer::{insert_into_table, OdbcWriter, WriterError},
     read_strategy::{BufferAllocationOptions, ColumnFailure},
     schema::arrow_schema_from,
 };
-
-#[cfg(feature = "unstable")]
-pub use self::odbc_writer::{insert_into_table, OdbcWriter, WriterError};
