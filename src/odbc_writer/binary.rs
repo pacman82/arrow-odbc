@@ -1,17 +1,23 @@
 use arrow::array::{Array, BinaryArray};
 use odbc_api::buffers::{AnyColumnSliceMut, BufferDescription, BufferKind};
 
-use crate::WriterError;
+use super::{WriteStrategy, WriterError};
 
-use super::WriteStrategy;
+pub struct VariadicBinary {
+    buffer_start_size: usize
+}
 
-pub struct VariadicBinary;
+impl VariadicBinary {
+    pub fn new(buffer_start_size: usize) -> Self {
+        VariadicBinary { buffer_start_size }
+    }
+}
 
 impl WriteStrategy for VariadicBinary {
     fn buffer_description(&self) -> BufferDescription {
         BufferDescription {
             nullable: true,
-            kind: BufferKind::Binary { length: 1 },
+            kind: BufferKind::Binary { length: self.buffer_start_size },
         }
     }
 

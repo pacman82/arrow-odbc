@@ -201,7 +201,7 @@ pub trait WriteStrategy {
 fn field_to_write_strategy(field: &Field) -> Result<Box<dyn WriteStrategy>, WriterError> {
     let is_nullable = field.is_nullable();
     let strategy = match field.data_type() {
-        DataType::LargeUtf8 | DataType::Utf8 => Box::new(Utf8ToNativeText {}),
+        DataType::Utf8 => Box::new(Utf8ToNativeText {}),
         DataType::Boolean => boolean_to_bit(is_nullable),
         DataType::Int8 => Int8Type::identical(is_nullable),
         DataType::Int16 => Int16Type::identical(is_nullable),
@@ -224,14 +224,15 @@ fn field_to_write_strategy(field: &Field) -> Result<Box<dyn WriteStrategy>, Writ
         DataType::Time32(TimeUnit::Millisecond) => Box::new(NullableTimeAsText::<Time32MillisecondType>::new()),
         DataType::Time64(TimeUnit::Microsecond) => Box::new(NullableTimeAsText::<Time64MicrosecondType>::new()),
         DataType::Time64(TimeUnit::Nanosecond) => Box::new(NullableTimeAsText::<Time64NanosecondType>::new()), 
-        DataType::Binary => Box::new(VariadicBinary),
-        DataType::FixedSizeBinary(_) => todo!(),
-        DataType::LargeBinary => todo!(),
+        DataType::Binary => Box::new(VariadicBinary::new(1)),
+        DataType::FixedSizeBinary(length) => Box::new(VariadicBinary::new((*length).try_into().unwrap())),
         DataType::Decimal(_, _) => todo!(),
         // Maybe we can support timezones, by converting the timestamps to UTC and change the SQL
         // Data type to timestamp UTC.
         DataType::Timestamp(_, Some(_)) => return Err(WriterError::TimeZonesNotSupported),
         unsupported @ (DataType::Null
+        | DataType::LargeBinary
+        | DataType::LargeUtf8
         // We could support u64 with upstream changes, but best if user supplies the sql data type.
         | DataType::UInt64
         // We could support u32 with upstream changes, but best if user supplies the sql data type.
