@@ -7,8 +7,8 @@ use arrow::{
     datatypes::{
         DataType, Date32Type, Date64Type, Field, Float16Type, Float32Type, Float64Type, Int16Type,
         Int32Type, Int64Type, Int8Type, Schema, Time32MillisecondType, Time32SecondType,
-        Time64MicrosecondType, TimeUnit, TimestampMicrosecondType, TimestampMillisecondType,
-        TimestampNanosecondType, TimestampSecondType, UInt8Type,
+        Time64MicrosecondType, Time64NanosecondType, TimeUnit, TimestampMicrosecondType,
+        TimestampMillisecondType, TimestampNanosecondType, TimestampSecondType, UInt8Type,
     },
     error::ArrowError,
     record_batch::{RecordBatch, RecordBatchReader},
@@ -222,7 +222,7 @@ fn field_to_write_strategy(field: &Field) -> Result<Box<dyn WriteStrategy>, Writ
         DataType::Time32(TimeUnit::Second) => Time32SecondType::map_with(is_nullable, sec_since_midnight_to_time),
         DataType::Time32(TimeUnit::Millisecond) => Box::new(NullableTimeAsText::<Time32MillisecondType>::new()),
         DataType::Time64(TimeUnit::Microsecond) => Box::new(NullableTimeAsText::<Time64MicrosecondType>::new()),
-        DataType::Time64(_) => todo!(),
+        DataType::Time64(TimeUnit::Nanosecond) => Box::new(NullableTimeAsText::<Time64NanosecondType>::new()),
         DataType::Duration(_) => todo!(),
         DataType::Binary => todo!(),
         DataType::FixedSizeBinary(_) => todo!(),
@@ -241,6 +241,8 @@ fn field_to_write_strategy(field: &Field) -> Result<Box<dyn WriteStrategy>, Writ
         // Only Second and millisecond can be represented as a 32Bit integer
         | DataType::Time32(TimeUnit::Microsecond)
         | DataType::Time32(TimeUnit::Nanosecond)
+        | DataType::Time64(TimeUnit::Second)
+        | DataType::Time64(TimeUnit::Millisecond)
         | DataType::Interval(_)
         | DataType::List(_)
         | DataType::LargeList(_)

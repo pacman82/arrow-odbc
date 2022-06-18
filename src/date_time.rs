@@ -2,7 +2,9 @@ use std::{convert::TryInto, io::Write, marker::PhantomData};
 
 use arrow::{
     array::{Array, PrimitiveArray},
-    datatypes::{ArrowPrimitiveType, Time32MillisecondType, Time64MicrosecondType},
+    datatypes::{
+        ArrowPrimitiveType, Time32MillisecondType, Time64MicrosecondType, Time64NanosecondType,
+    },
 };
 use chrono::{Datelike, NaiveDate, NaiveDateTime, Timelike};
 use odbc_api::{
@@ -166,6 +168,31 @@ impl TimePrimitive for Time64MicrosecondType {
         write!(
             to.set_mut(index, Self::STR_LEN),
             "{:02}:{:02}:{:02}.{:06}",
+            hour,
+            minute,
+            second,
+            fraction
+        )
+        .unwrap();
+    }
+}
+
+impl TimePrimitive for Time64NanosecondType {
+    const PRECISION_FACTOR: i64 = 1_000_000_000;
+    // Length of text representation of time. HH:MM::SS.fffffff
+    const STR_LEN: usize = 16;
+
+    fn insert_at(index: usize, from: Self::Native, to: &mut TextColumnSliceMut<u8>) {
+        let unit_min = 60 * Self::PRECISION_FACTOR;
+        let unit_hour = unit_min * 60;
+
+        let hour = from / unit_hour;
+        let minute = (from % unit_hour) / unit_min;
+        let second = (from % unit_min) / Self::PRECISION_FACTOR;
+        let fraction = (from % Self::PRECISION_FACTOR) / 100;
+        write!(
+            to.set_mut(index, Self::STR_LEN),
+            "{:02}:{:02}:{:02}.{:07}",
             hour,
             minute,
             second,
