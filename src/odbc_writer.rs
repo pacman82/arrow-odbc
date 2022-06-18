@@ -7,7 +7,7 @@ use arrow::{
     datatypes::{
         DataType, Date32Type, Date64Type, Field, Float16Type, Float32Type, Float64Type, Int16Type,
         Int32Type, Int64Type, Int8Type, Schema, TimeUnit, TimestampMicrosecondType,
-        TimestampMillisecondType, TimestampNanosecondType, TimestampSecondType, UInt8Type,
+        TimestampMillisecondType, TimestampNanosecondType, TimestampSecondType, UInt8Type, Time32SecondType,
     },
     error::ArrowError,
     record_batch::{RecordBatch, RecordBatchReader},
@@ -15,10 +15,10 @@ use arrow::{
 use odbc_api::{
     buffers::{AnyColumnBuffer, AnyColumnSliceMut, BufferDescription},
     handles::StatementImpl,
-    ColumnarBulkInserter, Connection, Prepared,
+    ColumnarBulkInserter, Connection, Prepared
 };
 
-use crate::date_time::{epoch_to_date, epoch_to_timestamp};
+use crate::date_time::{epoch_to_date, epoch_to_timestamp, seconds_to_time};
 
 use self::{boolean::boolean_to_bit, map_arrow_to_odbc::MapArrowToOdbc, text::Utf8ToNativeText};
 
@@ -216,6 +216,7 @@ fn field_to_write_strategy(field: &Field) -> Result<Box<dyn WriteStrategy>, Writ
         })},
         DataType::Date32 => Date32Type::map_with(is_nullable, epoch_to_date),
         DataType::Date64 => Date64Type::map_with(is_nullable, |days_since_epoch| epoch_to_date(days_since_epoch.try_into().unwrap())),
+        DataType::Time32(TimeUnit::Second) => Time32SecondType::map_with(is_nullable, seconds_to_time),
         DataType::Time32(_) => todo!(),
         DataType::Time64(_) => todo!(),
         DataType::Duration(_) => todo!(),
