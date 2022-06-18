@@ -817,8 +817,6 @@ fn insert_does_not_support_list_type() {
     ))
 }
 
-/// Insert String data into database
-
 #[test]
 fn insert_text() {
     // Given a table and a record batch reader returning a batch with a text column.
@@ -841,7 +839,6 @@ fn insert_text() {
 
 /// This test is most relevant on windows platforms, the UTF-8 is not the default encoding and text
 /// should be encoded as UTF-16
-
 #[test]
 fn insert_non_ascii_text() {
     // Given a table and a record batch reader returning a batch with a text column.
@@ -1354,6 +1351,30 @@ fn insert_time64_ns_array() {
     let actual = table_to_string(&conn, table_name, &["a"]);
     // We currently insert nanoseconds with precision 7
     let expected = "03:05:11.1111111";
+    assert_eq!(expected, actual);
+}
+
+#[test]
+fn insert_binary() {
+    // Given a table and a record batch reader returning a batch with a text column.
+    let table_name = function_name!().rsplit_once(':').unwrap().1;
+    let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
+    setup_empty_table(&conn, table_name, &["VARBINARY(4096)"]).unwrap();
+    let array = BinaryArray::from(vec![
+        Some([1,2,].as_slice()),
+        None,
+        Some([3,4,5,6,7].as_slice()),
+    ]);
+    let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Binary, true)]));
+    let batch = RecordBatch::try_new(schema.clone(), vec![Arc::new(array)]).unwrap();
+    let mut reader = StubBatchReader::new(schema, vec![batch]);
+
+    // When
+    insert_into_table(&conn, &mut reader, table_name, 5).unwrap();
+
+    // Then
+    let actual = table_to_string(&conn, table_name, &["a"]);
+    let expected = "0102\nNULL\n0304050607";
     assert_eq!(expected, actual);
 }
 

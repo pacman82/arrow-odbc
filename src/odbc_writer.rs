@@ -16,15 +16,16 @@ use arrow::{
 use odbc_api::{
     buffers::{AnyColumnBuffer, AnyColumnSliceMut, BufferDescription},
     handles::StatementImpl,
-    ColumnarBulkInserter, Connection, Prepared,
+    ColumnarBulkInserter, Connection, Prepared
 };
 
 use crate::date_time::{
     epoch_to_date, epoch_to_timestamp, sec_since_midnight_to_time, NullableTimeAsText,
 };
 
-use self::{boolean::boolean_to_bit, map_arrow_to_odbc::MapArrowToOdbc, text::Utf8ToNativeText};
+use self::{boolean::boolean_to_bit, map_arrow_to_odbc::MapArrowToOdbc, text::Utf8ToNativeText, binary::VariadicBinary};
 
+mod binary;
 mod boolean;
 mod map_arrow_to_odbc;
 mod text;
@@ -222,9 +223,8 @@ fn field_to_write_strategy(field: &Field) -> Result<Box<dyn WriteStrategy>, Writ
         DataType::Time32(TimeUnit::Second) => Time32SecondType::map_with(is_nullable, sec_since_midnight_to_time),
         DataType::Time32(TimeUnit::Millisecond) => Box::new(NullableTimeAsText::<Time32MillisecondType>::new()),
         DataType::Time64(TimeUnit::Microsecond) => Box::new(NullableTimeAsText::<Time64MicrosecondType>::new()),
-        DataType::Time64(TimeUnit::Nanosecond) => Box::new(NullableTimeAsText::<Time64NanosecondType>::new()),
-        DataType::Duration(_) => todo!(),
-        DataType::Binary => todo!(),
+        DataType::Time64(TimeUnit::Nanosecond) => Box::new(NullableTimeAsText::<Time64NanosecondType>::new()), 
+        DataType::Binary => Box::new(VariadicBinary),
         DataType::FixedSizeBinary(_) => todo!(),
         DataType::LargeBinary => todo!(),
         DataType::Decimal(_, _) => todo!(),
@@ -244,6 +244,7 @@ fn field_to_write_strategy(field: &Field) -> Result<Box<dyn WriteStrategy>, Writ
         | DataType::Time64(TimeUnit::Second)
         | DataType::Time64(TimeUnit::Millisecond)
         | DataType::Interval(_)
+        | DataType::Duration(_)
         | DataType::List(_)
         | DataType::LargeList(_)
         | DataType::FixedSizeList(_, _)
