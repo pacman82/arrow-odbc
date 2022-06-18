@@ -4,8 +4,9 @@ use arrow::{
     array::{
         Array, ArrayRef, BinaryArray, BooleanArray, Date32Array, Date64Array, DecimalArray,
         FixedSizeBinaryArray, Float16Array, Float32Array, Int16Array, Int32Array, Int64Array,
-        Int8Array, StringArray, TimestampMicrosecondArray, TimestampMillisecondArray,
-        TimestampNanosecondArray, TimestampSecondArray, UInt8Array, Time32SecondArray, Time32MillisecondArray,
+        Int8Array, StringArray, Time32MillisecondArray, Time32SecondArray,
+        TimestampMicrosecondArray, TimestampMillisecondArray, TimestampNanosecondArray,
+        TimestampSecondArray, UInt8Array,
     },
     datatypes::{DataType, Field, Schema, SchemaRef, TimeUnit},
     error::ArrowError,
@@ -1261,7 +1262,11 @@ fn insert_time32_second_array() {
     let table_name = function_name!().rsplit_once(':').unwrap().1;
     let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
     setup_empty_table(&conn, table_name, &["TIME(0)"]).unwrap();
-    let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Time32(TimeUnit::Second), false)]));
+    let schema = Arc::new(Schema::new(vec![Field::new(
+        "a",
+        DataType::Time32(TimeUnit::Second),
+        false,
+    )]));
     // Corresponds to single element array with entry 03:05:11
     let array: Time32SecondArray = [Some(11_111)].into_iter().collect();
     let batch = RecordBatch::try_new(schema.clone(), vec![Arc::new(array)]).unwrap();
@@ -1282,7 +1287,11 @@ fn insert_time32_ms_array() {
     let table_name = function_name!().rsplit_once(':').unwrap().1;
     let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
     setup_empty_table(&conn, table_name, &["TIME(3)"]).unwrap();
-    let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Time32(TimeUnit::Millisecond), false)]));
+    let schema = Arc::new(Schema::new(vec![Field::new(
+        "a",
+        DataType::Time32(TimeUnit::Millisecond),
+        false,
+    )]));
     // Corresponds to single element array with entry 03:05:11.111
     let array: Time32MillisecondArray = [Some(11_111_111)].into_iter().collect();
     let batch = RecordBatch::try_new(schema.clone(), vec![Arc::new(array)]).unwrap();

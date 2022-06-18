@@ -1,8 +1,11 @@
-use std::{io::Write, convert::TryInto};
+use std::{convert::TryInto, io::Write};
 
 use arrow::array::{Array, Time32MillisecondArray};
 use chrono::{Datelike, NaiveDate, NaiveDateTime, Timelike};
-use odbc_api::{sys::{Date, Time, Timestamp}, buffers::{BufferDescription, BufferKind, AnyColumnSliceMut}};
+use odbc_api::{
+    buffers::{AnyColumnSliceMut, BufferDescription, BufferKind},
+    sys::{Date, Time, Timestamp},
+};
 
 use crate::{odbc_writer::WriteStrategy, WriterError};
 
