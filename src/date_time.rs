@@ -1,7 +1,10 @@
-use std::convert::TryInto;
+use std::{io::Write, convert::TryInto};
 
+use arrow::array::{Array, Time32MillisecondArray};
 use chrono::{Datelike, NaiveDate, NaiveDateTime, Timelike};
-use odbc_api::sys::{Date, Time, Timestamp};
+use odbc_api::{sys::{Date, Time, Timestamp}, buffers::{BufferDescription, BufferKind, AnyColumnSliceMut}};
+
+use crate::{odbc_writer::WriteStrategy, WriterError};
 
 /// Transform date to days since unix epoch as i32
 pub fn days_since_epoch(date: &Date) -> i32 {
@@ -84,13 +87,63 @@ pub fn epoch_to_date(from: i32) -> Date {
     }
 }
 
-pub fn seconds_to_time(from: i32) -> Time {
-    let hour = from / 3_600;
-    let minute = (from - hour * 3_600) / 60;
-    let second = from - hour * 3_600 - minute * 60;
+pub fn sec_since_midnight_to_time(from: i32) -> Time {
+    let unit_min = 60;
+    let unit_hour = unit_min * 60;
+    let hour = from / unit_hour;
+    let minute = (from % unit_hour) / unit_min;
+    let second = from % unit_min;
     Time {
         hour: hour.try_into().unwrap(),
         minute: minute.try_into().unwrap(),
         second: second.try_into().unwrap(),
+    }
+}
+
+pub struct NullableTime32AsText;
+
+impl WriteStrategy for NullableTime32AsText {
+    fn buffer_description(&self) -> BufferDescription {
+        BufferDescription {
+            nullable: false,
+            kind: BufferKind::Text { max_str_len: 12 },
+        }
+    }
+
+    fn write_rows(
+        &self,
+        param_offset: usize,
+        column_buf: AnyColumnSliceMut<'_>,
+        array: &dyn Array,
+    ) -> Result<(), WriterError> {
+        let from = array
+            .as_any()
+            .downcast_ref::<Time32MillisecondArray>()
+            .unwrap();
+        let mut to = column_buf.as_text_view().unwrap();
+
+        let precision = 1_000;
+        let element_size = 12;
+        let unit_min = 60 * precision;
+        let unit_hour = unit_min * 60;
+
+        for (index, elapsed_since_midnight) in from.iter().enumerate() {
+            if let Some(from) = elapsed_since_midnight {
+                let hour = from / unit_hour;
+                let minute = (from % unit_hour) / unit_min;
+                let second = (from % unit_min) / precision;
+                let fraction = from % precision;
+                write!(
+                    to.set_mut(param_offset + index, element_size as usize),
+                    "{:02}:{:02}:{:02}.{:03}",
+                    hour,
+                    minute,
+                    second,
+                    fraction
+                )
+                .unwrap();
+            }
+        }
+        Ok(())
     }
 }

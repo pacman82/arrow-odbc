@@ -5,7 +5,7 @@ use arrow::{
         Array, ArrayRef, BinaryArray, BooleanArray, Date32Array, Date64Array, DecimalArray,
         FixedSizeBinaryArray, Float16Array, Float32Array, Int16Array, Int32Array, Int64Array,
         Int8Array, StringArray, TimestampMicrosecondArray, TimestampMillisecondArray,
-        TimestampNanosecondArray, TimestampSecondArray, UInt8Array, Time32SecondArray,
+        TimestampNanosecondArray, TimestampSecondArray, UInt8Array, Time32SecondArray, Time32MillisecondArray,
     },
     datatypes::{DataType, Field, Schema, SchemaRef, TimeUnit},
     error::ArrowError,
@@ -1256,14 +1256,14 @@ fn insert_date64_array() {
 }
 
 #[test]
-fn insert_time32_array() {
+fn insert_time32_second_array() {
     // Given a table and a record batch reader returning a batch with a text column.
     let table_name = function_name!().rsplit_once(':').unwrap().1;
     let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
     setup_empty_table(&conn, table_name, &["TIME(0)"]).unwrap();
     let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Time32(TimeUnit::Second), false)]));
     // Corresponds to single element array with entry 03:05:11
-    let array: Time32SecondArray = [Some(11111)].into_iter().collect();
+    let array: Time32SecondArray = [Some(11_111)].into_iter().collect();
     let batch = RecordBatch::try_new(schema.clone(), vec![Arc::new(array)]).unwrap();
     let mut reader = StubBatchReader::new(schema, vec![batch]);
 
@@ -1273,6 +1273,27 @@ fn insert_time32_array() {
     // Then
     let actual = table_to_string(&conn, table_name, &["a"]);
     let expected = "03:05:11";
+    assert_eq!(expected, actual);
+}
+
+#[test]
+fn insert_time32_ms_array() {
+    // Given a table and a record batch reader returning a batch with a text column.
+    let table_name = function_name!().rsplit_once(':').unwrap().1;
+    let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
+    setup_empty_table(&conn, table_name, &["TIME(3)"]).unwrap();
+    let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Time32(TimeUnit::Millisecond), false)]));
+    // Corresponds to single element array with entry 03:05:11.111
+    let array: Time32MillisecondArray = [Some(11_111_111)].into_iter().collect();
+    let batch = RecordBatch::try_new(schema.clone(), vec![Arc::new(array)]).unwrap();
+    let mut reader = StubBatchReader::new(schema, vec![batch]);
+
+    // When
+    insert_into_table(&conn, &mut reader, table_name, 5).unwrap();
+
+    // Then
+    let actual = table_to_string(&conn, table_name, &["a"]);
+    let expected = "03:05:11.111";
     assert_eq!(expected, actual);
 }
 
