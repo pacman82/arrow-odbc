@@ -1,9 +1,12 @@
-use std::{convert::TryInto, io::Write};
+use std::{convert::TryInto, io::Write, marker::PhantomData};
 
-use arrow::array::{Array, Time32MillisecondArray};
+use arrow::{
+    array::{Array, PrimitiveArray},
+    datatypes::{ArrowPrimitiveType, Time32MillisecondType, Time64MicrosecondType},
+};
 use chrono::{Datelike, NaiveDate, NaiveDateTime, Timelike};
 use odbc_api::{
-    buffers::{AnyColumnSliceMut, BufferDescription, BufferKind},
+    buffers::{AnyColumnSliceMut, BufferDescription, BufferKind, TextColumnSliceMut},
     sys::{Date, Time, Timestamp},
 };
 
@@ -103,13 +106,85 @@ pub fn sec_since_midnight_to_time(from: i32) -> Time {
     }
 }
 
-pub struct NullableTime32AsText;
+pub struct NullableTimeAsText<P> {
+    _phantom: PhantomData<P>,
+}
 
-impl WriteStrategy for NullableTime32AsText {
+impl<P> NullableTimeAsText<P> {
+    pub fn new() -> Self {
+        Self {
+            _phantom: PhantomData,
+        }
+    }
+}
+
+pub trait TimePrimitive: ArrowPrimitiveType {
+    const PRECISION_FACTOR: Self::Native;
+    const STR_LEN: usize;
+
+    fn insert_at(index: usize, from: Self::Native, to: &mut TextColumnSliceMut<u8>);
+}
+
+impl TimePrimitive for Time32MillisecondType {
+    const PRECISION_FACTOR: i32 = 1_000;
+    // Length of text representation of time. HH:MM::SS.fff
+    const STR_LEN: usize = 12;
+
+    fn insert_at(index: usize, from: Self::Native, to: &mut TextColumnSliceMut<u8>) {
+        let unit_min = 60 * Self::PRECISION_FACTOR;
+        let unit_hour = unit_min * 60;
+
+        let hour = from / unit_hour;
+        let minute = (from % unit_hour) / unit_min;
+        let second = (from % unit_min) / Self::PRECISION_FACTOR;
+        let fraction = from % Self::PRECISION_FACTOR;
+        write!(
+            to.set_mut(index, Self::STR_LEN),
+            "{:02}:{:02}:{:02}.{:03}",
+            hour,
+            minute,
+            second,
+            fraction
+        )
+        .unwrap();
+    }
+}
+
+impl TimePrimitive for Time64MicrosecondType {
+    const PRECISION_FACTOR: i64 = 1_000_000;
+    // Length of text representation of time. HH:MM::SS.ffffff
+    const STR_LEN: usize = 15;
+
+    fn insert_at(index: usize, from: Self::Native, to: &mut TextColumnSliceMut<u8>) {
+        let unit_min = 60 * Self::PRECISION_FACTOR;
+        let unit_hour = unit_min * 60;
+
+        let hour = from / unit_hour;
+        let minute = (from % unit_hour) / unit_min;
+        let second = (from % unit_min) / Self::PRECISION_FACTOR;
+        let fraction = from % Self::PRECISION_FACTOR;
+        write!(
+            to.set_mut(index, Self::STR_LEN),
+            "{:02}:{:02}:{:02}.{:06}",
+            hour,
+            minute,
+            second,
+            fraction
+        )
+        .unwrap();
+    }
+}
+
+impl<P> WriteStrategy for NullableTimeAsText<P>
+where
+    P: TimePrimitive,
+{
     fn buffer_description(&self) -> BufferDescription {
         BufferDescription {
             nullable: false,
-            kind: BufferKind::Text { max_str_len: 12 },
+            kind: BufferKind::Text {
+                max_str_len: P::STR_LEN,
+            },
         }
     }
 
@@ -119,32 +194,13 @@ impl WriteStrategy for NullableTime32AsText {
         column_buf: AnyColumnSliceMut<'_>,
         array: &dyn Array,
     ) -> Result<(), WriterError> {
-        let from = array
-            .as_any()
-            .downcast_ref::<Time32MillisecondArray>()
-            .unwrap();
+        let from = array.as_any().downcast_ref::<PrimitiveArray<P>>().unwrap();
         let mut to = column_buf.as_text_view().unwrap();
-
-        let precision = 1_000;
-        let element_size = 12;
-        let unit_min = 60 * precision;
-        let unit_hour = unit_min * 60;
-
         for (index, elapsed_since_midnight) in from.iter().enumerate() {
             if let Some(from) = elapsed_since_midnight {
-                let hour = from / unit_hour;
-                let minute = (from % unit_hour) / unit_min;
-                let second = (from % unit_min) / precision;
-                let fraction = from % precision;
-                write!(
-                    to.set_mut(param_offset + index, element_size as usize),
-                    "{:02}:{:02}:{:02}.{:03}",
-                    hour,
-                    minute,
-                    second,
-                    fraction
-                )
-                .unwrap();
+                P::insert_at(index + param_offset, from, &mut to)
+            } else {
+                to.set_cell(index + param_offset, None)
             }
         }
         Ok(())

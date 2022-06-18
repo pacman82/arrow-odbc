@@ -6,9 +6,9 @@ use arrow::{
     array::Array,
     datatypes::{
         DataType, Date32Type, Date64Type, Field, Float16Type, Float32Type, Float64Type, Int16Type,
-        Int32Type, Int64Type, Int8Type, Schema, Time32SecondType, TimeUnit,
-        TimestampMicrosecondType, TimestampMillisecondType, TimestampNanosecondType,
-        TimestampSecondType, UInt8Type,
+        Int32Type, Int64Type, Int8Type, Schema, Time32MillisecondType, Time32SecondType,
+        Time64MicrosecondType, TimeUnit, TimestampMicrosecondType, TimestampMillisecondType,
+        TimestampNanosecondType, TimestampSecondType, UInt8Type,
     },
     error::ArrowError,
     record_batch::{RecordBatch, RecordBatchReader},
@@ -20,7 +20,7 @@ use odbc_api::{
 };
 
 use crate::date_time::{
-    epoch_to_date, epoch_to_timestamp, sec_since_midnight_to_time, NullableTime32AsText,
+    epoch_to_date, epoch_to_timestamp, sec_since_midnight_to_time, NullableTimeAsText,
 };
 
 use self::{boolean::boolean_to_bit, map_arrow_to_odbc::MapArrowToOdbc, text::Utf8ToNativeText};
@@ -220,8 +220,8 @@ fn field_to_write_strategy(field: &Field) -> Result<Box<dyn WriteStrategy>, Writ
         DataType::Date32 => Date32Type::map_with(is_nullable, epoch_to_date),
         DataType::Date64 => Date64Type::map_with(is_nullable, |days_since_epoch| epoch_to_date(days_since_epoch.try_into().unwrap())),
         DataType::Time32(TimeUnit::Second) => Time32SecondType::map_with(is_nullable, sec_since_midnight_to_time),
-        DataType::Time32(TimeUnit::Millisecond) => Box::new(NullableTime32AsText),
-        DataType::Time32(_) => todo!(),
+        DataType::Time32(TimeUnit::Millisecond) => Box::new(NullableTimeAsText::<Time32MillisecondType>::new()),
+        DataType::Time64(TimeUnit::Microsecond) => Box::new(NullableTimeAsText::<Time64MicrosecondType>::new()),
         DataType::Time64(_) => todo!(),
         DataType::Duration(_) => todo!(),
         DataType::Binary => todo!(),
@@ -238,6 +238,9 @@ fn field_to_write_strategy(field: &Field) -> Result<Box<dyn WriteStrategy>, Writ
         | DataType::UInt32
         // We could support u16 with upstream changes, but best if user supplies the sql data type.
         | DataType::UInt16
+        // Only Second and millisecond can be represented as a 32Bit integer
+        | DataType::Time32(TimeUnit::Microsecond)
+        | DataType::Time32(TimeUnit::Nanosecond)
         | DataType::Interval(_)
         | DataType::List(_)
         | DataType::LargeList(_)
