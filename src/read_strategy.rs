@@ -264,6 +264,7 @@ pub fn choose_column_strategy(
     Ok(strat)
 }
 
+/// Read error related to a specific column
 #[derive(Error, Debug)]
 pub enum ColumnFailure {
     /// We are getting a display or column size from ODBC but it is not larger than 0.

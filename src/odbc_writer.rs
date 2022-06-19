@@ -36,7 +36,9 @@ mod boolean;
 mod map_arrow_to_odbc;
 mod text;
 
-/// Consumes the batches in the reader and inserts it into a table on a database.
+/// Fastest and most convinient way to stream the contents of arrow record batches into a database
+/// table. For usecase there you want to insert repeatedly into the same table from different
+/// streams it is more efficient to create an instance of [`self::OdbcWriter`] and reuse it.
 pub fn insert_into_table(
     connection: &Connection,
     batches: &mut impl RecordBatchReader,
@@ -86,7 +88,7 @@ pub enum WriterError {
     TimeZonesNotSupported,
 }
 
-/// Inserts batches from an [`crate::arrow::RecordBatchReader`] into a database.
+/// Inserts batches from an [`arrow::record_batch::RecordBatchReader`] into a database.
 pub struct OdbcWriter<S> {
     /// Prepared statement with bound array parameter buffers. Data is copied into these buffers
     /// until they are full. Then we execute the statement. This is repeated until we run out of
@@ -140,6 +142,8 @@ impl<'o> OdbcWriter<StatementImpl<'o>> {
         })
     }
 
+    /// A writer which borrows the connection and inserts the given schema into a table with
+    /// matching column names.
     pub fn with_connection(
         connection: &'o Connection<'o>,
         schema: &Schema,
@@ -158,6 +162,8 @@ impl<'o> OdbcWriter<StatementImpl<'o>> {
         Self::new(row_capacity, schema, statement)
     }
 
+    /// Consumes all the batches in the record batch reader and sends them chunk by chunk to the
+    /// database.
     pub fn write_all(
         &mut self,
         reader: impl Iterator<Item = Result<RecordBatch, ArrowError>>,
@@ -170,6 +176,8 @@ impl<'o> OdbcWriter<StatementImpl<'o>> {
         Ok(())
     }
 
+    /// Consumes a single batch and sends it chunk by chunk to the database. The last batch may not
+    /// be consumed until [`Self::flush`] is called.
     pub fn write_batch(&mut self, record_batch: &RecordBatch) -> Result<(), WriterError> {
         let capacity = self.inserter.capacity();
         let mut remanining_rows = record_batch.num_rows();
@@ -201,6 +209,11 @@ impl<'o> OdbcWriter<StatementImpl<'o>> {
         Ok(())
     }
 
+    /// The number of row in an individual record batch must not necessarily match the capacity of
+    /// the buffers owned by this writer. Therfore sometimes records are not send to the database
+    /// immediatly but rather we wait for the buffers to be filled then reading the next batch. Once
+    /// we reach the last batch however, there is no "next batch" anymore. In that case we call this
+    /// method in order to send the remainder of the records to the database as well.
     pub fn flush(&mut self) -> Result<(), WriterError> {
         self.inserter
             .execute()
