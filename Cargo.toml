@@ -1,6 +1,6 @@
 [package]
 name = "arrow-odbc"
-version = "0.15.0"
+version = "0.16.0"
 authors = ["Markus Klein"]
 edition = "2021"
 license = "MIT"
@@ -9,7 +9,7 @@ documentation = "https://docs.rs/arrow-odbc/"
 
 # A short blurb about the package. This is not rendered in any format when
 # uploaded to crates.io (aka this is not markdown).
-description = "Fill Apache Arrow arrays from ODBC data sources"
+description = "Read/Write Apache Arrow arrays from/to ODBC data sources."
 
 # This is a list of up to five keywords that describe this crate. Keywords
 # are searchable on crates.io, and you may choose any words that would
