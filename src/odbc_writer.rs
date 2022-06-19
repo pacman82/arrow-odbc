@@ -49,6 +49,9 @@ pub fn insert_into_table(
     inserter.write_all(batches)
 }
 
+/// Generates an insert statement using the table and column names.
+/// 
+/// `INSERT INTO <table> (<column_names 0>, <column_names 1>, ...) VALUES (?, ?, ...)`
 fn insert_statement_text(table: &str, column_names: &[&'_ str]) -> String {
     // Generate statement text from table name and headline
     let columns = column_names.join(", ");
@@ -60,6 +63,7 @@ fn insert_statement_text(table: &str, column_names: &[&'_ str]) -> String {
     format!("INSERT INTO {} ({}) VALUES ({});", table, columns, values)
 }
 
+/// Emitted writing values from arror arrays into a table on the database
 #[derive(Debug, Error)]
 pub enum WriterError {
     #[error("Failure to bind the array parameter buffers to the statement.")]
@@ -95,7 +99,26 @@ pub struct OdbcWriter<'o> {
 }
 
 impl<'o> OdbcWriter<'o> {
-    /// Construct a new ODBC writer using an alredy existing prepared statement.
+    /// Construct a new ODBC writer using an alredy existing prepared statement. Usually you want to
+    /// call a higher level constructor like [`Self::with_connection`]. Yet, this constructor is
+    /// useful in two scenarios.
+    /// 
+    /// 1. The prepared statement is already constructed and you do not want to spend the time to
+    ///    prepare it again.
+    /// 2. You want to use the arrow arrays as arrar parameters for a statement, but that statement
+    ///    is not necessarily an INSERT statement with a simple 1to1 mapping of columns between
+    ///    table and arrow schema.
+    /// 
+    /// # Parameters
+    /// 
+    /// * `row_capacity`: The amount of rows send to the database in each chunk. With the exception
+    ///   of the last chunk, which may be smaller.
+    /// * `schema`: Schema needs to have one column for each positional parameter of the statement
+    ///   and match the data which will be supplied to the instance later. Otherwise your code will
+    ///   panic.
+    /// * `statement`: A prepared statement whose SQL text representation contains one placeholder
+    ///   for each column. The order of the placeholers must correspond to the orders of the columns
+    ///   in the `schema`.
     pub fn new(
         row_capacity: usize,
         schema: &Schema,
