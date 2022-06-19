@@ -45,6 +45,7 @@
 //!
 //! ```
 mod date_time;
+mod decimal;
 mod error;
 mod odbc_reader;
 

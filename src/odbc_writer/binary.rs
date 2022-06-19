@@ -4,7 +4,7 @@ use odbc_api::buffers::{AnyColumnSliceMut, BufferDescription, BufferKind};
 use super::{WriteStrategy, WriterError};
 
 pub struct VariadicBinary {
-    buffer_start_size: usize
+    buffer_start_size: usize,
 }
 
 impl VariadicBinary {
@@ -17,7 +17,9 @@ impl WriteStrategy for VariadicBinary {
     fn buffer_description(&self) -> BufferDescription {
         BufferDescription {
             nullable: true,
-            kind: BufferKind::Binary { length: self.buffer_start_size },
+            kind: BufferKind::Binary {
+                length: self.buffer_start_size,
+            },
         }
     }
 
