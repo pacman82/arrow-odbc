@@ -3,6 +3,7 @@
 ## 0.17.0
 
 * Update odbc-api  `>= 0.44.3, < 0.45` -> `>= 0.45.0, < 0.46.0`
+* Allow for creating an `OdbcWriter` which takes ownership of the connection using `OdbcWriter::from_connection`.
 
 ## 0.16.0
 

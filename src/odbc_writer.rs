@@ -15,8 +15,8 @@ use arrow::{
 };
 use odbc_api::{
     buffers::{AnyColumnBuffer, AnyColumnSliceMut, BufferDescription},
-    handles::StatementImpl,
-    ColumnarBulkInserter, Connection, Prepared,
+    handles::{AsStatementRef, StatementImpl},
+    ColumnarBulkInserter, Connection, Prepared, StatementConnection,
 };
 
 use crate::{
@@ -39,6 +39,11 @@ mod text;
 /// Fastest and most convinient way to stream the contents of arrow record batches into a database
 /// table. For usecase there you want to insert repeatedly into the same table from different
 /// streams it is more efficient to create an instance of [`self::OdbcWriter`] and reuse it.
+///
+/// **Note:**
+///
+/// If table or column names are derived from user input, be sure to sanatize the input in order to
+/// prevent SQL injection attacks.
 pub fn insert_into_table(
     connection: &Connection,
     batches: &mut impl RecordBatchReader,
@@ -52,7 +57,7 @@ pub fn insert_into_table(
 }
 
 /// Generates an insert statement using the table and column names.
-/// 
+///
 /// `INSERT INTO <table> (<column_names 0>, <column_names 1>, ...) VALUES (?, ?, ...)`
 fn insert_statement_text(table: &str, column_names: &[&'_ str]) -> String {
     // Generate statement text from table name and headline
@@ -63,6 +68,42 @@ fn insert_statement_text(table: &str, column_names: &[&'_ str]) -> String {
         .collect::<Vec<_>>()
         .join(", ");
     format!("INSERT INTO {} ({}) VALUES ({});", table, columns, values)
+}
+
+/// Creates an SQL insert statement from an arrow schema. The resulting statement will have one
+/// placeholer (`?`) for each column in the statement.
+///
+/// **Note:**
+///
+/// If table or column names are derived from user input, be sure to sanatize the input in order to
+/// prevent SQL injection attacks.
+///
+/// # Example
+///
+/// ```
+/// use arrow_odbc::{
+///     insert_statement_from_schema,
+///     arrow::datatypes::{Field, DataType, Schema},
+/// };
+///
+/// let field_a = Field::new("a", DataType::Int64, false);
+/// let field_b = Field::new("b", DataType::Boolean, false);
+///
+/// let schema = Schema::new(vec![field_a, field_b]);
+/// let sql = insert_statement_from_schema(&schema, "MyTable");
+///
+/// assert_eq!("INSERT INTO MyTable (a, b) VALUES (?, ?);", sql)
+/// ```
+///
+/// This function is automatically invoked by [`crate::OdbcWriter::with_connection`].
+/// ```
+pub fn insert_statement_from_schema(schema: &Schema, table_name: &str) -> String {
+    let fields = schema.fields();
+    let num_columns = fields.len();
+    let column_names: Vec<_> = (0..num_columns)
+        .map(|i| fields[i].name().as_str())
+        .collect();
+    insert_statement_text(table_name, &column_names)
 }
 
 /// Emitted writing values from arror arrays into a table on the database
@@ -100,19 +141,22 @@ pub struct OdbcWriter<S> {
     strategies: Vec<Box<dyn WriteStrategy>>,
 }
 
-impl<'o> OdbcWriter<StatementImpl<'o>> {
+impl<S> OdbcWriter<S>
+where
+    S: AsStatementRef,
+{
     /// Construct a new ODBC writer using an alredy existing prepared statement. Usually you want to
     /// call a higher level constructor like [`Self::with_connection`]. Yet, this constructor is
     /// useful in two scenarios.
-    /// 
+    ///
     /// 1. The prepared statement is already constructed and you do not want to spend the time to
     ///    prepare it again.
     /// 2. You want to use the arrow arrays as arrar parameters for a statement, but that statement
     ///    is not necessarily an INSERT statement with a simple 1to1 mapping of columns between
     ///    table and arrow schema.
-    /// 
+    ///
     /// # Parameters
-    /// 
+    ///
     /// * `row_capacity`: The amount of rows send to the database in each chunk. With the exception
     ///   of the last chunk, which may be smaller.
     /// * `schema`: Schema needs to have one column for each positional parameter of the statement
@@ -124,7 +168,7 @@ impl<'o> OdbcWriter<StatementImpl<'o>> {
     pub fn new(
         row_capacity: usize,
         schema: &Schema,
-        statement: Prepared<StatementImpl<'o>>,
+        statement: Prepared<S>,
     ) -> Result<Self, WriterError> {
         let strategies: Vec<_> = schema
             .fields()
@@ -140,26 +184,6 @@ impl<'o> OdbcWriter<StatementImpl<'o>> {
             inserter,
             strategies,
         })
-    }
-
-    /// A writer which borrows the connection and inserts the given schema into a table with
-    /// matching column names.
-    pub fn with_connection(
-        connection: &'o Connection<'o>,
-        schema: &Schema,
-        table_name: &str,
-        row_capacity: usize,
-    ) -> Result<Self, WriterError> {
-        let fields = schema.fields();
-        let num_columns = fields.len();
-        let column_names: Vec<_> = (0..num_columns)
-            .map(|i| fields[i].name().as_str())
-            .collect();
-        let sql = insert_statement_text(table_name, &column_names);
-        let statement = connection
-            .prepare(&sql)
-            .map_err(|source| WriterError::PreparingInsertStatement { source, sql })?;
-        Self::new(row_capacity, schema, statement)
     }
 
     /// Consumes all the batches in the record batch reader and sends them chunk by chunk to the
@@ -223,7 +247,52 @@ impl<'o> OdbcWriter<StatementImpl<'o>> {
     }
 }
 
+impl<'env> OdbcWriter<StatementConnection<'env>> {
+    /// A writer which takes ownership of the connection and inserts the given schema into a table
+    /// with matching column names.
+    ///
+    /// **Note:**
+    ///
+    /// If table or column names are derived from user input, be sure to sanatize the input in order
+    /// to prevent SQL injection attacks.
+    pub fn from_connection(
+        connection: Connection<'env>,
+        schema: &Schema,
+        table_name: &str,
+        row_capacity: usize,
+    ) -> Result<Self, WriterError> {
+        let sql = insert_statement_from_schema(schema, table_name);
+        let statement = connection
+            .into_prepared(&sql)
+            .map_err(|source| WriterError::PreparingInsertStatement { source, sql })?;
+        Self::new(row_capacity, schema, statement)
+    }
+}
+
+impl<'o> OdbcWriter<StatementImpl<'o>> {
+    /// A writer which borrows the connection and inserts the given schema into a table with
+    /// matching column names.
+    ///
+    /// **Note:**
+    ///
+    /// If table or column names are derived from user input, be sure to sanatize the input in order
+    /// to prevent SQL injection attacks.
+    pub fn with_connection(
+        connection: &'o Connection<'o>,
+        schema: &Schema,
+        table_name: &str,
+        row_capacity: usize,
+    ) -> Result<Self, WriterError> {
+        let sql = insert_statement_from_schema(schema, table_name);
+        let statement = connection
+            .prepare(&sql)
+            .map_err(|source| WriterError::PreparingInsertStatement { source, sql })?;
+        Self::new(row_capacity, schema, statement)
+    }
+}
+
 pub trait WriteStrategy {
+    /// Describe the buffer used to hold the array parameters for the column
     fn buffer_description(&self) -> BufferDescription;
 
     /// # Parameters

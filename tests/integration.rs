@@ -1429,6 +1429,31 @@ fn insert_decimal() {
     assert_eq!(expected, actual);
 }
 
+#[test]
+fn insert_taking_ownership_of_connection() {
+    // Given a table and a record batch reader returning a batch with a text column.
+    let table_name = function_name!().rsplit_once(':').unwrap().1;
+    let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
+    setup_empty_table(&conn, table_name, &["VARCHAR(4096)"]).unwrap();
+    let array = StringArray::from(vec![Some("Hello"), None, Some("World")]);
+    let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Utf8, true)]));
+    let batch = RecordBatch::try_new(schema.clone(), vec![Arc::new(array)]).unwrap();
+    let reader = StubBatchReader::new(schema.clone(), vec![batch]);
+
+    // When
+    let mut inserter = {
+        let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
+        let row_capacity = 50;
+        OdbcWriter::from_connection(conn, &schema, table_name, row_capacity).unwrap()
+    };
+    inserter.write_all(reader).unwrap();
+
+    // Then
+    let actual = table_to_string(&conn, table_name, &["a"]);
+    let expected = "Hello\nNULL\nWorld";
+    assert_eq!(expected, actual);
+}
+
 /// Creates the table and assures it is empty. Columns are named a,b,c, etc.
 fn setup_empty_table(
     conn: &Connection,
