@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.17.0
+
+* Update odbc-api  `>= 0.44.3, < 0.45` -> `>= 0.45.0, < 0.46.0`
+
 ## 0.16.0
 
 * Support for inserting `RecordBatch`es into a database table.

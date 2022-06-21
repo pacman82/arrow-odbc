@@ -124,7 +124,7 @@ impl<'o> OdbcWriter<StatementImpl<'o>> {
     pub fn new(
         row_capacity: usize,
         schema: &Schema,
-        statement: Prepared<'o>,
+        statement: Prepared<StatementImpl<'o>>,
     ) -> Result<Self, WriterError> {
         let strategies: Vec<_> = schema
             .fields()
