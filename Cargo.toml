@@ -42,6 +42,6 @@ lazy_static = "1.4.0"
 # Function name macro is used to ensure unique table names in test
 stdext = "0.3.1"
 float_eq = "1.0.0"
-half = "1.8.2"
+half = "2.0.0"
 
 [features]
