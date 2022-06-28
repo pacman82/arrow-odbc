@@ -8,14 +8,17 @@ use arrow::{
         Time64NanosecondArray, TimestampMicrosecondArray, TimestampMillisecondArray,
         TimestampNanosecondArray, TimestampSecondArray, UInt8Array,
     },
-    datatypes::{DataType, Field, Schema, SchemaRef, TimeUnit},
+    datatypes::{ArrowPrimitiveType, DataType, Field, Float16Type, Schema, SchemaRef, TimeUnit},
     error::ArrowError,
     record_batch::{RecordBatch, RecordBatchReader},
 };
 use chrono::NaiveDate;
 use float_eq::assert_float_eq;
-use half::f16;
 use lazy_static::lazy_static;
+
+/// This declaration is equivalent to `use half::f16`, yet it does have the benefit, that we do not
+/// need to directly depend on the `half` crate and worry about version mismatches.
+type F16 = <Float16Type as ArrowPrimitiveType>::Native;
 
 use arrow_odbc::{
     arrow::array::Float64Array,
@@ -1070,7 +1073,7 @@ fn insert_nullable_f16() {
     let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
     setup_empty_table(&conn, table_name, &["REAL"]).unwrap();
     let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Float16, true)]));
-    let array1: Float16Array = [Some(f16::from_f32(1.0)), None, Some(f16::from_f32(3.0))]
+    let array1: Float16Array = [Some(F16::from_f32(1.0)), None, Some(F16::from_f32(3.0))]
         .into_iter()
         .collect();
     let batch1 = RecordBatch::try_new(schema.clone(), vec![Arc::new(array1)]).unwrap();
@@ -1093,9 +1096,9 @@ fn insert_non_nullable_f16() {
     setup_empty_table(&conn, table_name, &["REAL"]).unwrap();
     let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Float16, false)]));
     let array1: Float16Array = [
-        Some(f16::from_f32(1.0)),
-        Some(f16::from_f32(2.0)),
-        Some(f16::from_f32(3.0)),
+        Some(F16::from_f32(1.0)),
+        Some(F16::from_f32(2.0)),
+        Some(F16::from_f32(3.0)),
     ]
     .into_iter()
     .collect();
