@@ -96,7 +96,6 @@ fn insert_statement_text(table: &str, column_names: &[&'_ str]) -> String {
 /// ```
 ///
 /// This function is automatically invoked by [`crate::OdbcWriter::with_connection`].
-/// ```
 pub fn insert_statement_from_schema(schema: &Schema, table_name: &str) -> String {
     let fields = schema.fields();
     let num_columns = fields.len();
