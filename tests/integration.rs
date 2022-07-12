@@ -2,11 +2,11 @@ use std::sync::Arc;
 
 use arrow::{
     array::{
-        Array, ArrayRef, BinaryArray, BooleanArray, Date32Array, Date64Array, DecimalArray,
-        FixedSizeBinaryArray, Float16Array, Float32Array, Int16Array, Int32Array, Int64Array,
-        Int8Array, StringArray, Time32MillisecondArray, Time32SecondArray, Time64MicrosecondArray,
-        Time64NanosecondArray, TimestampMicrosecondArray, TimestampMillisecondArray,
-        TimestampNanosecondArray, TimestampSecondArray, UInt8Array,
+        Array, ArrayRef, BasicDecimalArray, BinaryArray, BooleanArray, Date32Array, Date64Array,
+        DecimalArray, FixedSizeBinaryArray, Float16Array, Float32Array, Int16Array, Int32Array,
+        Int64Array, Int8Array, StringArray, Time32MillisecondArray, Time32SecondArray,
+        Time64MicrosecondArray, Time64NanosecondArray, TimestampMicrosecondArray,
+        TimestampMillisecondArray, TimestampNanosecondArray, TimestampSecondArray, UInt8Array,
     },
     datatypes::{ArrowPrimitiveType, DataType, Field, Float16Type, Schema, SchemaRef, TimeUnit},
     error::ArrowError,
