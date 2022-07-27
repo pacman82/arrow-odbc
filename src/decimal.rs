@@ -1,4 +1,4 @@
-use arrow::array::{Array, DecimalArray};
+use arrow::array::{Array, Decimal128Array};
 use odbc_api::buffers::{AnyColumnSliceMut, BufferDescription, BufferKind};
 
 use crate::{odbc_writer::WriteStrategy, WriterError};
@@ -38,7 +38,7 @@ impl WriteStrategy for NullableDecimalAsText {
     ) -> Result<(), WriterError> {
         let length = self.len_text();
 
-        let from = array.as_any().downcast_ref::<DecimalArray>().unwrap();
+        let from = array.as_any().downcast_ref::<Decimal128Array>().unwrap();
         let mut to = column_buf.as_text_view().unwrap();
 
         for (index, elapsed_since_midnight) in from.iter().enumerate() {

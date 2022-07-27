@@ -3,7 +3,7 @@ use std::sync::Arc;
 use arrow::{
     array::{
         Array, ArrayRef, BasicDecimalArray, BinaryArray, BooleanArray, Date32Array, Date64Array,
-        DecimalArray, FixedSizeBinaryArray, Float16Array, Float32Array, Int16Array, Int32Array,
+        Decimal128Array, FixedSizeBinaryArray, Float16Array, Float32Array, Int16Array, Int32Array,
         Int64Array, Int8Array, StringArray, Time32MillisecondArray, Time32SecondArray,
         Time64MicrosecondArray, Time64NanosecondArray, TimestampMicrosecondArray,
         TimestampMillisecondArray, TimestampNanosecondArray, TimestampSecondArray, UInt8Array,
@@ -441,7 +441,10 @@ fn fetch_decimals() {
     let array_any =
         fetch_arrow_data(table_name, "DECIMAL(5,2) NOT NULL", "(123.45),(678.90)").unwrap();
 
-    let array_vals = array_any.as_any().downcast_ref::<DecimalArray>().unwrap();
+    let array_vals = array_any
+        .as_any()
+        .downcast_ref::<Decimal128Array>()
+        .unwrap();
 
     // Assert that the correct values are found within the arrow batch
     assert_eq!("123.45", array_vals.value_as_string(0));
@@ -1411,7 +1414,7 @@ fn insert_decimal() {
     let table_name = function_name!().rsplit_once(':').unwrap().1;
     let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
     setup_empty_table(&conn, table_name, &["NUMERIC(5,3)"]).unwrap();
-    let array: DecimalArray = [Some(12345), None, Some(67891), Some(1), Some(1000)]
+    let array: Decimal128Array = [Some(12345), None, Some(67891), Some(1), Some(1000)]
         .into_iter()
         .collect();
     let array = array.with_precision_and_scale(5, 3).unwrap();

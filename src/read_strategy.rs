@@ -1,7 +1,7 @@
 use std::{convert::TryInto, sync::Arc};
 
 use arrow::{
-    array::{ArrayRef, BooleanBuilder, DecimalBuilder},
+    array::{ArrayRef, BooleanBuilder, Decimal128Builder},
     datatypes::{
         DataType as ArrowDataType, Date32Type, Field, Float32Type, Float64Type, Int16Type,
         Int32Type, Int64Type, Int8Type, TimeUnit, TimestampMicrosecondType,
@@ -54,7 +54,7 @@ impl ReadStrategy for NonNullableBoolean {
         let values = Bit::as_slice(column_view).unwrap();
         let mut builder = BooleanBuilder::new(values.len());
         for bit in values {
-            builder.append_value(bit.as_bool()).unwrap();
+            builder.append_value(bit.as_bool());
         }
         Arc::new(builder.finish())
     }
@@ -74,9 +74,7 @@ impl ReadStrategy for NullableBoolean {
         let values = Bit::as_nullable_slice(column_view).unwrap();
         let mut builder = BooleanBuilder::new(values.len());
         for bit in values {
-            builder
-                .append_option(bit.copied().map(Bit::as_bool))
-                .unwrap()
+            builder.append_option(bit.copied().map(Bit::as_bool))
         }
         Arc::new(builder.finish())
     }
@@ -112,7 +110,7 @@ impl ReadStrategy for Decimal {
     fn fill_arrow_array(&self, column_view: AnyColumnView) -> ArrayRef {
         let view = column_view.as_text_view().unwrap();
         let capacity = view.len();
-        let mut builder = DecimalBuilder::new(capacity, self.precision, self.scale);
+        let mut builder = Decimal128Builder::new(capacity, self.precision, self.scale);
 
         let mut buf_digits = Vec::new();
 
@@ -125,7 +123,7 @@ impl ReadStrategy for Decimal {
 
                 builder.append_value(num).unwrap();
             } else {
-                builder.append_null().unwrap();
+                builder.append_null();
             }
         }
 
@@ -204,6 +202,7 @@ pub fn choose_column_strategy(
         ArrowDataType::Decimal(precision, scale) => {
             Box::new(Decimal::new(field.is_nullable(), *precision, *scale))
         }
+        ArrowDataType::Decimal256(precision, scale) => todo!(),
         ArrowDataType::Binary => {
             let sql_type = query_metadata
                 .col_data_type(col_index)

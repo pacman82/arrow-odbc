@@ -112,7 +112,7 @@ impl ReadStrategy for WideText {
             } else {
                 None
             };
-            builder.append_option(opt).unwrap();
+            builder.append_option(opt);
         }
         Arc::new(builder.finish())
     }
@@ -147,12 +147,10 @@ impl ReadStrategy for NarrowText {
         let view = column_view.as_text_view().unwrap();
         let mut builder = StringBuilder::new(view.len());
         for value in view.iter() {
-            builder
-                .append_option(value.map(|bytes| {
-                    std::str::from_utf8(bytes)
-                        .expect("ODBC column had been expected to return valid utf8, but did not.")
-                }))
-                .unwrap();
+            builder.append_option(value.map(|bytes| {
+                std::str::from_utf8(bytes)
+                    .expect("ODBC column had been expected to return valid utf8, but did not.")
+            }));
         }
         Arc::new(builder.finish())
     }
