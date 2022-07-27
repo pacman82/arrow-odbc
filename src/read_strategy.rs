@@ -202,7 +202,6 @@ pub fn choose_column_strategy(
         ArrowDataType::Decimal(precision, scale) => {
             Box::new(Decimal::new(field.is_nullable(), *precision, *scale))
         }
-        ArrowDataType::Decimal256(precision, scale) => todo!(),
         ArrowDataType::Binary => {
             let sql_type = query_metadata
                 .col_data_type(col_index)
@@ -239,6 +238,7 @@ pub fn choose_column_strategy(
             (*length).try_into().unwrap(),
         )),
         arrow_type @ (ArrowDataType::Null
+        | ArrowDataType::Decimal256(..)
         | ArrowDataType::Date64
         | ArrowDataType::Time32(..)
         | ArrowDataType::Time64(..)

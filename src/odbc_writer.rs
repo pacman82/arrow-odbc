@@ -337,11 +337,11 @@ fn field_to_write_strategy(field: &Field) -> Result<Box<dyn WriteStrategy>, Writ
         DataType::Binary => Box::new(VariadicBinary::new(1)),
         DataType::FixedSizeBinary(length) => Box::new(VariadicBinary::new((*length).try_into().unwrap())),
         DataType::Decimal(precision, scale) => Box::new(NullableDecimalAsText::new(*precision, *scale)),
-        DataType::Decimal256(precision, scale) => todo!(),
         // Maybe we can support timezones, by converting the timestamps to UTC and change the SQL
         // Data type to timestamp UTC.
         DataType::Timestamp(_, Some(_)) => return Err(WriterError::TimeZonesNotSupported),
         unsupported @ (DataType::Null
+        | DataType::Decimal256(..)
         | DataType::LargeBinary
         | DataType::LargeUtf8
         // We could support u64 with upstream changes, but best if user supplies the sql data type.
