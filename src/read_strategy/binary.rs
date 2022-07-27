@@ -32,9 +32,9 @@ impl ReadStrategy for Binary {
         let mut builder = BinaryBuilder::new(view.len());
         for value in view.iter() {
             if let Some(bytes) = value {
-                builder.append_value(bytes).unwrap();
+                builder.append_value(bytes);
             } else {
-                builder.append_null().unwrap();
+                builder.append_null();
             }
         }
         Arc::new(builder.finish())
@@ -68,7 +68,7 @@ impl ReadStrategy for FixedSizedBinary {
             if let Some(bytes) = value {
                 builder.append_value(bytes).unwrap();
             } else {
-                builder.append_null().unwrap();
+                builder.append_null();
             }
         }
         Arc::new(builder.finish())
