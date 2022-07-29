@@ -3,12 +3,12 @@ use odbc_api::buffers::{AnyColumnSliceMut, BufferDescription, BufferKind};
 
 use crate::{odbc_writer::WriteStrategy, WriterError};
 
-pub struct NullableDecimalAsText {
+pub struct NullableDecimal128AsText {
     precision: usize,
     scale: usize,
 }
 
-impl NullableDecimalAsText {
+impl NullableDecimal128AsText {
     fn len_text(&self) -> usize {
         let radix_character_length = if self.scale == 0 { 0 } else { 1 };
         // Precision digits + optional point + sign
@@ -20,7 +20,7 @@ impl NullableDecimalAsText {
     }
 }
 
-impl WriteStrategy for NullableDecimalAsText {
+impl WriteStrategy for NullableDecimal128AsText {
     fn buffer_description(&self) -> BufferDescription {
         BufferDescription {
             nullable: false,

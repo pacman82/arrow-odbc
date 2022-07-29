@@ -59,8 +59,8 @@ fn main() -> Result<(), anyhow::Error> {
 
 | ODBC               | Arrow                |
 | ------------------ | -------------------- |
-| Numeric(p <= 38)   | Decimal              |
-| Decimal(p <= 38)   | Decimal              |
+| Numeric(p <= 38)   | Decimal128           |
+| Decimal(p <= 38)   | Decimal128           |
 | Integer            | Int32                |
 | SmallInt           | Int16                |
 | Real               | Float32              |
@@ -82,31 +82,31 @@ fn main() -> Result<(), anyhow::Error> {
 
 ## Matching of Arrow to ODBC types then inserting
 
-| Arrow              | ODBC           |
-| ------------------ | -------------- |
-| Utf8               | VarChar        |
-| Decimal(p, s = 0)  | VarChar(p + 1) |
-| Decimal(p, s != 0) | VarChar(p + 2) |
-| Int8               | TinyInt        |
-| Int16              | SmallInt       |
-| Int32              | Integer        |
-| Int64              | BigInt         |
-| Float16            | Real           |
-| Float32            | Real           |
-| Float64            | Double         |
-| Timestamp s        | Timestamp(7)   |
-| Timestamp ms       | Timestamp(7)   |
-| Timestamp us       | Timestamp(7)   |
-| Timestamp ns       | Timestamp(7)   |
-| Date32             | Date           |
-| Date64             | Date           |
-| Time32 s           | Time           |
-| Time32 ms          | VarChar(12)    |
-| Time64 us          | VarChar(15)    |
-| Time64 ns          | VarChar(16)    |
-| Binary             | Varbinary      |
-| FixedBinary(l)     | Varbinary(l)   |
-| All others         | Unsupported    |
+| Arrow                 | ODBC           |
+| --------------------- | -------------- |
+| Utf8                  | VarChar        |
+| Decimal128(p, s = 0)  | VarChar(p + 1) |
+| Decimal128(p, s != 0) | VarChar(p + 2) |
+| Int8                  | TinyInt        |
+| Int16                 | SmallInt       |
+| Int32                 | Integer        |
+| Int64                 | BigInt         |
+| Float16               | Real           |
+| Float32               | Real           |
+| Float64               | Double         |
+| Timestamp s           | Timestamp(7)   |
+| Timestamp ms          | Timestamp(7)   |
+| Timestamp us          | Timestamp(7)   |
+| Timestamp ns          | Timestamp(7)   |
+| Date32                | Date           |
+| Date64                | Date           |
+| Time32 s              | Time           |
+| Time32 ms             | VarChar(12)    |
+| Time64 us             | VarChar(15)    |
+| Time64 ns             | VarChar(16)    |
+| Binary                | Varbinary      |
+| FixedBinary(l)        | Varbinary(l)   |
+| All others            | Unsupported    |
 
 The mapping for insertion is not the optimal yet, but before spending a lot of work on improving it I was curious that usecase would pop up for users. So if something does not work, but maybe could provided a better mapping of Arrow to ODBC types, feel free to open an issue. If you do so please give a lot of context of what you are trying to do.
 

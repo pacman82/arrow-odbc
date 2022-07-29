@@ -1409,7 +1409,7 @@ fn insert_fixed_binary() {
 }
 
 #[test]
-fn insert_decimal() {
+fn insert_decimal_128() {
     // Given a table and a record batch reader returning a batch with a text column.
     let table_name = function_name!().rsplit_once(':').unwrap().1;
     let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
