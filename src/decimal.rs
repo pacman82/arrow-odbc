@@ -9,15 +9,16 @@ pub struct NullableDecimal128AsText {
 }
 
 impl NullableDecimal128AsText {
-    fn len_text(&self) -> usize {
-        let radix_character_length = if self.scale == 0 { 0 } else { 1 };
-        // Precision digits + optional point + sign
-        self.precision + radix_character_length + 1
-    }
-
     pub fn new(precision: usize, scale: usize) -> Self {
         Self { precision, scale }
     }
+}
+
+/// Length of a text representation of a decimal
+fn len_text(scale: usize, precision: usize) -> usize {
+    let radix_character_length = if scale == 0 { 0 } else { 1 };
+    // Precision digits + optional point + sign
+    precision + radix_character_length + 1
 }
 
 impl WriteStrategy for NullableDecimal128AsText {
@@ -25,7 +26,7 @@ impl WriteStrategy for NullableDecimal128AsText {
         BufferDescription {
             nullable: false,
             kind: BufferKind::Text {
-                max_str_len: self.len_text(),
+                max_str_len: len_text(self.scale, self.precision),
             },
         }
     }
@@ -36,7 +37,7 @@ impl WriteStrategy for NullableDecimal128AsText {
         column_buf: AnyColumnSliceMut<'_>,
         array: &dyn Array,
     ) -> Result<(), WriterError> {
-        let length = self.len_text();
+        let length = len_text(self.scale, self.precision);
 
         let from = array.as_any().downcast_ref::<Decimal128Array>().unwrap();
         let mut to = column_buf.as_text_view().unwrap();
