@@ -1,4 +1,7 @@
-use arrow::array::{Array, Decimal128Array};
+use arrow::{
+    array::{Array, BasicDecimalArray, Decimal128Array, Decimal256Array},
+    util::decimal::BasicDecimal,
+};
 use odbc_api::buffers::{AnyColumnSliceMut, BufferDescription, BufferKind};
 
 use crate::{odbc_writer::WriteStrategy, WriterError};
@@ -9,6 +12,17 @@ pub struct NullableDecimal128AsText {
 }
 
 impl NullableDecimal128AsText {
+    pub fn new(precision: usize, scale: usize) -> Self {
+        Self { precision, scale }
+    }
+}
+
+pub struct NullableDecimal256AsText {
+    precision: usize,
+    scale: usize,
+}
+
+impl NullableDecimal256AsText {
     pub fn new(precision: usize, scale: usize) -> Self {
         Self { precision, scale }
     }
@@ -42,12 +56,44 @@ impl WriteStrategy for NullableDecimal128AsText {
         let from = array.as_any().downcast_ref::<Decimal128Array>().unwrap();
         let mut to = column_buf.as_text_view().unwrap();
 
-        for (index, elapsed_since_midnight) in from.iter().enumerate() {
-            if let Some(from) = elapsed_since_midnight {
-                let buf = to.set_mut(index, length);
-                write_integer_as_decimal(from, self.precision, self.scale, buf)
+        for (index, cell) in from.iter().enumerate() {
+            if let Some(value) = cell {
+                let buf = to.set_mut(index + param_offset, length);
+                write_integer_as_decimal(value, self.precision, self.scale, buf)
             } else {
                 to.set_cell(index + param_offset, None)
+            }
+        }
+        Ok(())
+    }
+}
+
+impl WriteStrategy for NullableDecimal256AsText {
+    fn buffer_description(&self) -> BufferDescription {
+        BufferDescription {
+            nullable: false,
+            kind: BufferKind::Text {
+                max_str_len: len_text(self.scale, self.precision),
+            },
+        }
+    }
+
+    fn write_rows(
+        &self,
+        param_offset: usize,
+        column_buf: AnyColumnSliceMut<'_>,
+        array: &dyn Array,
+    ) -> Result<(), WriterError> {
+        let from = array.as_any().downcast_ref::<Decimal256Array>().unwrap();
+        let mut to = column_buf.as_text_view().unwrap();
+
+        for index in 0..from.len() {
+            if from.is_null(index) {
+                to.set_cell(index + param_offset, None)
+            } else {
+                let value = from.value(index);
+                let text = value.to_string();
+                to.set_cell(index + param_offset, Some(text.as_bytes()))
             }
         }
         Ok(())

@@ -23,7 +23,7 @@ use crate::{
     date_time::{
         epoch_to_date, epoch_to_timestamp, sec_since_midnight_to_time, NullableTimeAsText,
     },
-    decimal::NullableDecimal128AsText,
+    decimal::{NullableDecimal128AsText, NullableDecimal256AsText},
 };
 
 use self::{
@@ -337,11 +337,11 @@ fn field_to_write_strategy(field: &Field) -> Result<Box<dyn WriteStrategy>, Writ
         DataType::Binary => Box::new(VariadicBinary::new(1)),
         DataType::FixedSizeBinary(length) => Box::new(VariadicBinary::new((*length).try_into().unwrap())),
         DataType::Decimal(precision, scale) => Box::new(NullableDecimal128AsText::new(*precision, *scale)),
+        DataType::Decimal256(precision, scale) => Box::new(NullableDecimal256AsText::new(*precision, *scale)),
         // Maybe we can support timezones, by converting the timestamps to UTC and change the SQL
         // Data type to timestamp UTC.
         DataType::Timestamp(_, Some(_)) => return Err(WriterError::TimeZonesNotSupported),
         unsupported @ (DataType::Null
-        | DataType::Decimal256(..)
         | DataType::LargeBinary
         | DataType::LargeUtf8
         // We could support u64 with upstream changes, but best if user supplies the sql data type.

@@ -3,14 +3,16 @@ use std::sync::Arc;
 use arrow::{
     array::{
         Array, ArrayRef, BasicDecimalArray, BinaryArray, BooleanArray, Date32Array, Date64Array,
-        Decimal128Array, FixedSizeBinaryArray, Float16Array, Float32Array, Int16Array, Int32Array,
-        Int64Array, Int8Array, StringArray, Time32MillisecondArray, Time32SecondArray,
-        Time64MicrosecondArray, Time64NanosecondArray, TimestampMicrosecondArray,
-        TimestampMillisecondArray, TimestampNanosecondArray, TimestampSecondArray, UInt8Array,
+        Decimal128Array, Decimal256Builder, FixedSizeBinaryArray, Float16Array, Float32Array,
+        Int16Array, Int32Array, Int64Array, Int8Array, StringArray, Time32MillisecondArray,
+        Time32SecondArray, Time64MicrosecondArray, Time64NanosecondArray,
+        TimestampMicrosecondArray, TimestampMillisecondArray, TimestampNanosecondArray,
+        TimestampSecondArray, UInt8Array,
     },
     datatypes::{ArrowPrimitiveType, DataType, Field, Float16Type, Schema, SchemaRef, TimeUnit},
     error::ArrowError,
     record_batch::{RecordBatch, RecordBatchReader},
+    util::decimal::{BasicDecimal, Decimal256},
 };
 use chrono::NaiveDate;
 use float_eq::assert_float_eq;
@@ -1427,11 +1429,42 @@ fn insert_decimal_128() {
     let mut reader = StubBatchReader::new(schema, vec![batch]);
 
     // When
-    insert_into_table(&conn, &mut reader, table_name, 5).unwrap();
+    insert_into_table(&conn, &mut reader, table_name, 2).unwrap();
 
     // Then
     let actual = table_to_string(&conn, table_name, &["a"]);
     let expected = "12.345\nNULL\n67.891\n.001\n1.000";
+    assert_eq!(expected, actual);
+}
+
+#[test]
+fn insert_decimal_256() {
+    // Given a table and a record batch reader returning a batch with a text column.
+    let table_name = function_name!().rsplit_once(':').unwrap().1;
+    let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
+    setup_empty_table(&conn, table_name, &["NUMERIC(5,3)"]).unwrap();
+    let mut builder = Decimal256Builder::new(2 * 256 / 8, 5, 3);
+    let mut bytes = [0u8; 32];
+    bytes[0..4].copy_from_slice(12345i32.to_le_bytes().as_slice());
+    builder
+        .append_value(&Decimal256::new(5, 3, &bytes))
+        .unwrap();
+    builder.append_null();
+    let array = builder.finish();
+    let schema = Arc::new(Schema::new(vec![Field::new(
+        "a",
+        DataType::Decimal256(5, 3),
+        true,
+    )]));
+    let batch = RecordBatch::try_new(schema.clone(), vec![Arc::new(array)]).unwrap();
+    let mut reader = StubBatchReader::new(schema, vec![batch]);
+
+    // When
+    insert_into_table(&conn, &mut reader, table_name, 5).unwrap();
+
+    // Then
+    let actual = table_to_string(&conn, table_name, &["a"]);
+    let expected = "12.345\nNULL";
     assert_eq!(expected, actual);
 }
 
