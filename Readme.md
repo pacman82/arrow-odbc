@@ -87,6 +87,8 @@ fn main() -> Result<(), anyhow::Error> {
 | Utf8                  | VarChar        |
 | Decimal128(p, s = 0)  | VarChar(p + 1) |
 | Decimal128(p, s != 0) | VarChar(p + 2) |
+| Decimal256(p, s = 0)  | VarChar(p + 1) |
+| Decimal256(p, s != 0) | VarChar(p + 2) |
 | Int8                  | TinyInt        |
 | Int16                 | SmallInt       |
 | Int32                 | Integer        |
