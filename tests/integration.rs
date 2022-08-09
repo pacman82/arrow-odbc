@@ -1422,7 +1422,7 @@ fn insert_decimal_128() {
     let array = array.with_precision_and_scale(5, 3).unwrap();
     let schema = Arc::new(Schema::new(vec![Field::new(
         "a",
-        DataType::Decimal(5, 3),
+        DataType::Decimal128(5, 3),
         true,
     )]));
     let batch = RecordBatch::try_new(schema.clone(), vec![Arc::new(array)]).unwrap();

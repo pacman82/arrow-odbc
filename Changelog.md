@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.19.0
+
+* Update arrow `>= 19, < 20` -> `>= 20, < 21`
+
 ## 0.18.1
 
 * Support for inserting `Decimal256`.

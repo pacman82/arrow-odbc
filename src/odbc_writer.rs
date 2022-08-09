@@ -336,7 +336,7 @@ fn field_to_write_strategy(field: &Field) -> Result<Box<dyn WriteStrategy>, Writ
         DataType::Time64(TimeUnit::Nanosecond) => Box::new(NullableTimeAsText::<Time64NanosecondType>::new()),
         DataType::Binary => Box::new(VariadicBinary::new(1)),
         DataType::FixedSizeBinary(length) => Box::new(VariadicBinary::new((*length).try_into().unwrap())),
-        DataType::Decimal(precision, scale) => Box::new(NullableDecimal128AsText::new(*precision, *scale)),
+        DataType::Decimal128(precision, scale) => Box::new(NullableDecimal128AsText::new(*precision, *scale)),
         DataType::Decimal256(precision, scale) => Box::new(NullableDecimal256AsText::new(*precision, *scale)),
         // Maybe we can support timezones, by converting the timestamps to UTC and change the SQL
         // Data type to timestamp UTC.

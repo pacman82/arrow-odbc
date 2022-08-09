@@ -58,7 +58,7 @@ pub fn arrow_schema_from(resut_set_metadata: &mut impl ResultSetMetadata) -> Res
                 | OdbcDataType::Decimal {
                     precision: p @ 0..=38,
                     scale,
-                } => ArrowDataType::Decimal(p, scale.try_into().unwrap()),
+                } => ArrowDataType::Decimal128(p, scale.try_into().unwrap()),
                 OdbcDataType::Integer => ArrowDataType::Int32,
                 OdbcDataType::SmallInt => ArrowDataType::Int16,
                 OdbcDataType::Real | OdbcDataType::Float { precision: 0..=24 } => {

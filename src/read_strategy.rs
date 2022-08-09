@@ -199,7 +199,7 @@ pub fn choose_column_strategy(
                 buffer_allocation_options.max_text_size,
             )?
         }
-        ArrowDataType::Decimal(precision, scale) => {
+        ArrowDataType::Decimal128(precision, scale) => {
             Box::new(Decimal::new(field.is_nullable(), *precision, *scale))
         }
         ArrowDataType::Binary => {
