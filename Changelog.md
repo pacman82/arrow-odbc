@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.20.0
+
+* Use `narrow` text on non-windows platforms by default. Connection strings, queries and error messages are assumed to be UTF-8 and not transcoded to and from UTF-16.
+
 ## 0.19.3
 
 * Update odbc-api  `>= 0.45.0, < 0.48.0` -> `>= 0.45.0, < 0.49.0`
