@@ -37,8 +37,10 @@ use odbc_api::{buffers::TextRowSet, Cursor, IntoParameter};
 use stdext::function_name;
 
 /// Connection string to our Microsoft SQL Database. Boot it up with docker-compose up
-const MSSQL: &str =
-    "Driver={ODBC Driver 17 for SQL Server};Server=localhost;UID=SA;PWD=My@Test@Password1;";
+const MSSQL: &str = "Driver={ODBC Driver 17 for SQL Server};\
+    Server=localhost;\
+    UID=SA;\
+    PWD=My@Test@Password1;";
 
 // Rust by default executes tests in parallel. Yet only one environment is allowed at a time.
 lazy_static! {
@@ -632,12 +634,17 @@ fn fetch_schema_for_table() {
 #[test]
 fn should_allocate_enough_memory_for_wchar_column_bound_to_u8() {
     let table_name = function_name!().rsplit_once(':').unwrap().1;
+    let cursor = query_single_value(table_name, "NCHAR(1) NOT NULL", "™");
 
-    let array_any = fetch_arrow_data(table_name, "NCHAR(1) NOT NULL", "('™')").unwrap();
+    // Now that we have a cursor, we want to iterate over its rows and fill an arrow batch with it.
+    let max_batch_size = 1;
+    let mut reader = OdbcReader::new(cursor, max_batch_size).unwrap();
+    // Batch for batch copy values from ODBC buffer into arrow batches
+    let record_batch = reader.next().unwrap().unwrap();
+    let array_any = record_batch.column(0).clone();
 
     // Assert that the correct values are found within the arrow batch
     let array_vals = array_any.as_any().downcast_ref::<StringArray>().unwrap();
-
     assert_eq!("™", array_vals.value(0));
 }
 
@@ -650,12 +657,17 @@ fn should_allocate_enough_memory_for_wchar_column_bound_to_u8() {
 #[test]
 fn should_allocate_enough_memory_for_varchar_column_bound_to_u16() {
     let table_name = function_name!().rsplit_once(':').unwrap().1;
+    let cursor = query_single_value(table_name, "CHAR(1) NOT NULL", "Ü");
 
-    let array_any = fetch_arrow_data(table_name, "CHAR(1) NOT NULL", "('Ü')").unwrap();
+    // Now that we have a cursor, we want to iterate over its rows and fill an arrow batch with it.
+    let max_batch_size = 1;
+    let mut reader = OdbcReader::new(cursor, max_batch_size).unwrap();
+    // Batch for batch copy values from ODBC buffer into arrow batches
+    let record_batch = reader.next().unwrap().unwrap();
+    let array_any = record_batch.column(0).clone();
 
     // Assert that the correct values are found within the arrow batch
     let array_vals = array_any.as_any().downcast_ref::<StringArray>().unwrap();
-
     assert_eq!("Ü", array_vals.value(0));
 }
 
@@ -711,36 +723,6 @@ fn should_error_for_truncation() {
 
     // Then we get an error, rather than the truncation only occurring as a warning.
     assert!(result.is_err())
-}
-
-/// Inserts the values in the literal into the database and returns them as an Arrow array.
-fn fetch_arrow_data(
-    table_name: &str,
-    column_type: &str,
-    literal: &str,
-) -> Result<ArrayRef, anyhow::Error> {
-    // Setup a table on the database
-    let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
-    setup_empty_table(&conn, table_name, &[column_type]).unwrap();
-    // Insert values using literals
-    let sql = format!("INSERT INTO {table_name} (a) VALUES {literal}");
-    conn.execute(&sql, ()).unwrap();
-
-    // Query column with values to get a cursor
-    let sql = format!("SELECT a FROM {table_name}");
-    let cursor = conn.execute(&sql, ()).unwrap().unwrap();
-
-    // Now that we have a cursor, we want to iterate over its rows and fill an arrow batch with it.
-
-    // Batches will contain at most 100 entries.
-    let max_batch_size = 100;
-
-    let mut reader = OdbcReader::new(cursor, max_batch_size)?;
-
-    // Batch for batch copy values from ODBC buffer into arrow batches
-    let record_batch = reader.next().unwrap()?;
-
-    Ok(record_batch.column(0).clone())
 }
 
 #[test]
@@ -1553,6 +1535,52 @@ pub fn cursor_to_string(mut cursor: impl Cursor) -> String {
     }
 
     text
+}
+
+/// Inserts the values in the literal into the database and returns them as an Arrow array.
+fn fetch_arrow_data(
+    table_name: &str,
+    column_type: &str,
+    literal: &str,
+) -> Result<ArrayRef, anyhow::Error> {
+    // Setup a table on the database
+    let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
+    setup_empty_table(&conn, table_name, &[column_type]).unwrap();
+    // Insert values using literals
+    let sql = format!("INSERT INTO {table_name} (a) VALUES {literal}");
+    conn.execute(&sql, ()).unwrap();
+
+    // Query column with values to get a cursor
+    let sql = format!("SELECT a FROM {table_name}");
+    let cursor = conn.execute(&sql, ()).unwrap().unwrap();
+
+    // Now that we have a cursor, we want to iterate over its rows and fill an arrow batch with it.
+
+    // Batches will contain at most 100 entries.
+    let max_batch_size = 100;
+
+    let mut reader = OdbcReader::new(cursor, max_batch_size)?;
+
+    // Batch for batch copy values from ODBC buffer into arrow batches
+    let record_batch = reader.next().unwrap()?;
+
+    Ok(record_batch.column(0).clone())
+}
+
+fn query_single_value(
+    table_name: &str,
+    column_type: &str,
+    value: impl IntoParameter,
+) -> impl Cursor {
+    // Setup a table on the database
+    let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
+    setup_empty_table(&conn, table_name, &[column_type]).unwrap();
+    // Insert values using literals
+    let sql = format!("INSERT INTO {table_name} (a) VALUES (?)");
+    conn.execute(&sql, &value.into_parameter()).unwrap();
+    // Query column with values to get a cursor
+    let sql = format!("SELECT a FROM {table_name}");
+    conn.into_cursor(&sql, ()).unwrap().unwrap()
 }
 
 /// An arrow batch reader emitting predefined batches. Used to test insertion.
