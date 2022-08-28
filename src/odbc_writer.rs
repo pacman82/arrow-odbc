@@ -133,7 +133,7 @@ pub struct OdbcWriter<S> {
     /// Prepared statement with bound array parameter buffers. Data is copied into these buffers
     /// until they are full. Then we execute the statement. This is repeated until we run out of
     /// data.
-    pub inserter: ColumnarBulkInserter<S, AnyColumnBuffer>,
+    inserter: ColumnarBulkInserter<S, AnyColumnBuffer>,
     /// For each field in the arrow schema we decide on which buffer to use to send the parameters
     /// to the database, and need to remember how to copy the data from an arrow array to an odbc
     /// mutable buffer slice for any column.

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.21.0
+
+* Fix: `OdbcWriter::inserter` had only been public by accident.
+
 ## 0.20.0
 
 * Use `narrow` text on non-windows platforms by default. Connection strings, queries and error messages are assumed to be UTF-8 and not transcoded to and from UTF-16.
