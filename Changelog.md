@@ -1,11 +1,8 @@
 # Changelog
 
-## 0.22.0
-
-* Update arrow `>= 20, < 21` -> `>= 21, < 22`
-
 ## 0.21.0
 
+* Update arrow `>= 20, < 21` -> `>= 21, < 22`
 * Fix: `OdbcWriter::inserter` had only been public by accident.
 
 ## 0.20.0
