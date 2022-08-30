@@ -1,7 +1,4 @@
-use arrow::{
-    array::{Array, BasicDecimalArray, Decimal128Array, Decimal256Array},
-    util::decimal::BasicDecimal,
-};
+use arrow::array::{Array, Decimal128Array, Decimal256Array};
 use odbc_api::buffers::{AnyColumnSliceMut, BufferDescription, BufferKind};
 
 use crate::{odbc_writer::WriteStrategy, WriterError};
