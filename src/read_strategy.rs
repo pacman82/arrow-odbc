@@ -52,7 +52,7 @@ impl ReadStrategy for NonNullableBoolean {
 
     fn fill_arrow_array(&self, column_view: AnyColumnView) -> ArrayRef {
         let values = Bit::as_slice(column_view).unwrap();
-        let mut builder = BooleanBuilder::new(values.len());
+        let mut builder = BooleanBuilder::new();
         for bit in values {
             builder.append_value(bit.as_bool());
         }
@@ -72,7 +72,7 @@ impl ReadStrategy for NullableBoolean {
 
     fn fill_arrow_array(&self, column_view: AnyColumnView) -> ArrayRef {
         let values = Bit::as_nullable_slice(column_view).unwrap();
-        let mut builder = BooleanBuilder::new(values.len());
+        let mut builder = BooleanBuilder::new();
         for bit in values {
             builder.append_option(bit.copied().map(Bit::as_bool))
         }
@@ -82,12 +82,12 @@ impl ReadStrategy for NullableBoolean {
 
 pub struct Decimal {
     nullable: bool,
-    precision: usize,
-    scale: usize,
+    precision: u8,
+    scale: u8,
 }
 
 impl Decimal {
-    pub fn new(nullable: bool, precision: usize, scale: usize) -> Self {
+    pub fn new(nullable: bool, precision: u8, scale: u8) -> Self {
         Self {
             nullable,
             precision,
@@ -102,15 +102,14 @@ impl ReadStrategy for Decimal {
             nullable: self.nullable,
             // Must be able to hold num precision digits a sign and a decimal point
             kind: BufferKind::Text {
-                max_str_len: self.precision + 2,
+                max_str_len: self.precision as usize + 2,
             },
         }
     }
 
     fn fill_arrow_array(&self, column_view: AnyColumnView) -> ArrayRef {
         let view = column_view.as_text_view().unwrap();
-        let capacity = view.len();
-        let mut builder = Decimal128Builder::new(capacity, self.precision, self.scale);
+        let mut builder = Decimal128Builder::new(self.precision, self.scale);
 
         let mut buf_digits = Vec::new();
 

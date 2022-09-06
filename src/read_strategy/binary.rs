@@ -29,7 +29,7 @@ impl ReadStrategy for Binary {
 
     fn fill_arrow_array(&self, column_view: AnyColumnView) -> ArrayRef {
         let view = column_view.as_bin_view().unwrap();
-        let mut builder = BinaryBuilder::new(view.len());
+        let mut builder = BinaryBuilder::new();
         for value in view.iter() {
             if let Some(bytes) = value {
                 builder.append_value(bytes);
@@ -43,12 +43,12 @@ impl ReadStrategy for Binary {
 
 pub struct FixedSizedBinary {
     /// Length in bytes of elements
-    len: usize,
+    len: u32,
     nullable: bool,
 }
 
 impl FixedSizedBinary {
-    pub fn new(nullable: bool, len: usize) -> Self {
+    pub fn new(nullable: bool, len: u32) -> Self {
         Self { len, nullable }
     }
 }
@@ -57,13 +57,15 @@ impl ReadStrategy for FixedSizedBinary {
     fn buffer_description(&self) -> BufferDescription {
         BufferDescription {
             nullable: self.nullable,
-            kind: BufferKind::Binary { length: self.len },
+            kind: BufferKind::Binary {
+                length: self.len as usize,
+            },
         }
     }
 
     fn fill_arrow_array(&self, column_view: AnyColumnView) -> ArrayRef {
         let view = column_view.as_bin_view().unwrap();
-        let mut builder = FixedSizeBinaryBuilder::new(view.len(), self.len.try_into().unwrap());
+        let mut builder = FixedSizeBinaryBuilder::new(self.len.try_into().unwrap());
         for value in view.iter() {
             if let Some(bytes) = value {
                 builder.append_value(bytes).unwrap();

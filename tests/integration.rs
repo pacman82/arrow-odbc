@@ -1424,7 +1424,7 @@ fn insert_decimal_256() {
     let table_name = function_name!().rsplit_once(':').unwrap().1;
     let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
     setup_empty_table(&conn, table_name, &["NUMERIC(5,3)"]).unwrap();
-    let mut builder = Decimal256Builder::new(2 * 256 / 8, 5, 3);
+    let mut builder = Decimal256Builder::new(5, 3);
     let mut bytes = [0u8; 32];
     bytes[0..4].copy_from_slice(12345i32.to_le_bytes().as_slice());
     builder

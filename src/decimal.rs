@@ -4,32 +4,32 @@ use odbc_api::buffers::{AnyColumnSliceMut, BufferDescription, BufferKind};
 use crate::{odbc_writer::WriteStrategy, WriterError};
 
 pub struct NullableDecimal128AsText {
-    precision: usize,
-    scale: usize,
+    precision: u8,
+    scale: u8,
 }
 
 impl NullableDecimal128AsText {
-    pub fn new(precision: usize, scale: usize) -> Self {
+    pub fn new(precision: u8, scale: u8) -> Self {
         Self { precision, scale }
     }
 }
 
 pub struct NullableDecimal256AsText {
-    precision: usize,
-    scale: usize,
+    precision: u8,
+    scale: u8,
 }
 
 impl NullableDecimal256AsText {
-    pub fn new(precision: usize, scale: usize) -> Self {
+    pub fn new(precision: u8, scale: u8) -> Self {
         Self { precision, scale }
     }
 }
 
 /// Length of a text representation of a decimal
-fn len_text(scale: usize, precision: usize) -> usize {
+fn len_text(scale: u8, precision: u8) -> usize {
     let radix_character_length = if scale == 0 { 0 } else { 1 };
     // Precision digits + optional point + sign
-    precision + radix_character_length + 1
+    precision as usize + radix_character_length + 1
 }
 
 impl WriteStrategy for NullableDecimal128AsText {
@@ -97,7 +97,7 @@ impl WriteStrategy for NullableDecimal256AsText {
     }
 }
 
-fn write_integer_as_decimal(mut n: i128, precision: usize, scale: usize, text: &mut [u8]) {
+fn write_integer_as_decimal(mut n: i128, precision: u8, scale: u8, text: &mut [u8]) {
     if n.is_negative() {
         n *= n.signum();
         text[0] = b'-';
@@ -120,6 +120,6 @@ fn write_integer_as_decimal(mut n: i128, precision: usize, scale: usize, text: &
             b'0' + digit
         };
         // +1 offset to make space for sign character
-        text[index + 1] = char;
+        text[index as usize + 1] = char;
     }
 }
