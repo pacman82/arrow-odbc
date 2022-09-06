@@ -81,7 +81,7 @@ where
 
     fn fill_arrow_array(&self, column_view: AnyColumnView) -> ArrayRef {
         let slice = T::Native::as_slice(column_view).unwrap();
-        let mut builder = PrimitiveBuilder::<T>::new();
+        let mut builder = PrimitiveBuilder::<T>::with_capacity(slice.len());
         builder.append_slice(slice);
         Arc::new(builder.finish())
     }
@@ -113,7 +113,7 @@ where
 
     fn fill_arrow_array(&self, column_view: AnyColumnView) -> ArrayRef {
         let values = T::Native::as_nullable_slice(column_view).unwrap();
-        let mut builder = PrimitiveBuilder::<T>::new();
+        let mut builder = PrimitiveBuilder::<T>::with_capacity(values.len());
         for value in values {
             builder.append_option(value.copied());
         }
@@ -152,7 +152,7 @@ where
 
     fn fill_arrow_array(&self, column_view: AnyColumnView) -> ArrayRef {
         let slice = column_view.as_slice::<O>().unwrap();
-        let mut builder = PrimitiveBuilder::<P>::new();
+        let mut builder = PrimitiveBuilder::<P>::with_capacity(slice.len());
         for odbc_value in slice {
             builder.append_value((self.odbc_to_arrow)(odbc_value));
         }
@@ -191,7 +191,7 @@ where
 
     fn fill_arrow_array(&self, column_view: AnyColumnView) -> ArrayRef {
         let opts = column_view.as_nullable_slice::<O>().unwrap();
-        let mut builder = PrimitiveBuilder::<P>::new();
+        let mut builder = PrimitiveBuilder::<P>::with_capacity(opts.len());
         for odbc_opt in opts {
             builder.append_option(odbc_opt.map(&self.odbc_to_arrow));
         }

@@ -99,7 +99,12 @@ impl ReadStrategy for WideText {
 
     fn fill_arrow_array(&self, column_view: AnyColumnView) -> ArrayRef {
         let view = column_view.as_w_text_view().unwrap();
-        let mut builder = StringBuilder::new();
+        let item_capacity = view.len();
+        // Any utf-16 character could take up to 4 Bytes if represented as utf-8, but since mostly
+        // this is 1 to one, and also not every string is likeyl to use its maximum capacity, we
+        // rather accept the reallocation in these scenarios.
+        let data_capacity = self.max_str_len * item_capacity;
+        let mut builder = StringBuilder::with_capacity(item_capacity, data_capacity);
         // Buffer used to convert individual values from utf16 to utf8.
         let mut buf_utf8 = String::new();
         for value in view.iter() {
@@ -145,7 +150,7 @@ impl ReadStrategy for NarrowText {
 
     fn fill_arrow_array(&self, column_view: AnyColumnView) -> ArrayRef {
         let view = column_view.as_text_view().unwrap();
-        let mut builder = StringBuilder::new();
+        let mut builder = StringBuilder::with_capacity(view.len(), self.max_str_len * view.len());
         for value in view.iter() {
             builder.append_option(value.map(|bytes| {
                 std::str::from_utf8(bytes)
