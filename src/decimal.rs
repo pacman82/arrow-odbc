@@ -1,5 +1,5 @@
 use arrow::array::{Array, Decimal128Array, Decimal256Array};
-use odbc_api::buffers::{BufferDescription, BufferKind, AnySliceMut};
+use odbc_api::buffers::{AnySliceMut, BufferDescription, BufferKind};
 
 use crate::{odbc_writer::WriteStrategy, WriterError};
 

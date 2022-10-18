@@ -4,7 +4,7 @@ use arrow::{
     array::{Array, PrimitiveArray},
     datatypes::ArrowPrimitiveType,
 };
-use odbc_api::buffers::{BufferDescription, Item, AnySliceMut};
+use odbc_api::buffers::{AnySliceMut, BufferDescription, Item};
 
 use crate::WriterError;
 

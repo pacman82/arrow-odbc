@@ -14,7 +14,7 @@ use arrow::{
     record_batch::{RecordBatch, RecordBatchReader},
 };
 use odbc_api::{
-    buffers::{BufferDescription, AnyBuffer, AnySliceMut},
+    buffers::{AnyBuffer, AnySliceMut, BufferDescription},
     handles::{AsStatementRef, StatementImpl},
     ColumnarBulkInserter, Connection, Prepared, StatementConnection,
 };

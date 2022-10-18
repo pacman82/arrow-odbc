@@ -1,6 +1,6 @@
 use arrow::array::{Array, BooleanArray};
 use odbc_api::{
-    buffers::{BufferDescription, BufferKind, AnySliceMut},
+    buffers::{AnySliceMut, BufferDescription, BufferKind},
     Bit,
 };
 

@@ -11,7 +11,7 @@ use arrow::{
 
 use atoi::FromRadix10Signed;
 use odbc_api::{
-    buffers::{BufferDescription, BufferKind, Item, AnySlice},
+    buffers::{AnySlice, BufferDescription, BufferKind, Item},
     Bit, DataType as OdbcDataType, ResultSetMetadata,
 };
 use thiserror::Error;

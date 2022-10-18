@@ -1,7 +1,7 @@
 use std::{convert::TryInto, sync::Arc};
 
 use arrow::array::{ArrayRef, BinaryBuilder, FixedSizeBinaryBuilder};
-use odbc_api::buffers::{BufferDescription, BufferKind, AnySlice};
+use odbc_api::buffers::{AnySlice, BufferDescription, BufferKind};
 
 use super::ReadStrategy;
 

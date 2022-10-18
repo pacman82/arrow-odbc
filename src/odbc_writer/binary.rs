@@ -1,5 +1,5 @@
 use arrow::array::{Array, BinaryArray};
-use odbc_api::buffers::{BufferDescription, BufferKind, AnySliceMut};
+use odbc_api::buffers::{AnySliceMut, BufferDescription, BufferKind};
 
 use super::{WriteStrategy, WriterError};
 
