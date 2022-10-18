@@ -1,6 +1,6 @@
 use arrow::array::{Array, BooleanArray};
 use odbc_api::{
-    buffers::{AnyColumnSliceMut, BufferDescription, BufferKind},
+    buffers::{BufferDescription, BufferKind, AnySliceMut},
     Bit,
 };
 
@@ -29,7 +29,7 @@ impl WriteStrategy for Nullable {
     fn write_rows(
         &self,
         param_offset: usize,
-        column_buf: AnyColumnSliceMut<'_>,
+        column_buf: AnySliceMut<'_>,
         array: &dyn Array,
     ) -> Result<(), WriterError> {
         let from = array.as_any().downcast_ref::<BooleanArray>().unwrap();
@@ -54,7 +54,7 @@ impl WriteStrategy for NonNullable {
     fn write_rows(
         &self,
         param_offset: usize,
-        column_buf: AnyColumnSliceMut<'_>,
+        column_buf: AnySliceMut<'_>,
         array: &dyn Array,
     ) -> Result<(), WriterError> {
         let from = array.as_any().downcast_ref::<BooleanArray>().unwrap();

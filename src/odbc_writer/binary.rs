@@ -1,5 +1,5 @@
 use arrow::array::{Array, BinaryArray};
-use odbc_api::buffers::{AnyColumnSliceMut, BufferDescription, BufferKind};
+use odbc_api::buffers::{BufferDescription, BufferKind, AnySliceMut};
 
 use super::{WriteStrategy, WriterError};
 
@@ -26,7 +26,7 @@ impl WriteStrategy for VariadicBinary {
     fn write_rows(
         &self,
         param_offset: usize,
-        to: AnyColumnSliceMut<'_>,
+        to: AnySliceMut<'_>,
         from: &dyn Array,
     ) -> Result<(), WriterError> {
         let from = from.as_any().downcast_ref::<BinaryArray>().unwrap();

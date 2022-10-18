@@ -11,7 +11,7 @@ use arrow::{
 
 use atoi::FromRadix10Signed;
 use odbc_api::{
-    buffers::{AnyColumnView, BufferDescription, BufferKind, Item},
+    buffers::{BufferDescription, BufferKind, Item, AnySlice},
     Bit, DataType as OdbcDataType, ResultSetMetadata,
 };
 use thiserror::Error;
@@ -37,7 +37,7 @@ pub trait ReadStrategy {
     fn buffer_description(&self) -> BufferDescription;
 
     /// Create an arrow array from an ODBC buffer described in [`Self::buffer_description`].
-    fn fill_arrow_array(&self, column_view: AnyColumnView) -> ArrayRef;
+    fn fill_arrow_array(&self, column_view: AnySlice) -> ArrayRef;
 }
 
 pub struct NonNullableBoolean;
@@ -50,7 +50,7 @@ impl ReadStrategy for NonNullableBoolean {
         }
     }
 
-    fn fill_arrow_array(&self, column_view: AnyColumnView) -> ArrayRef {
+    fn fill_arrow_array(&self, column_view: AnySlice) -> ArrayRef {
         let values = Bit::as_slice(column_view).unwrap();
         let mut builder = BooleanBuilder::new();
         for bit in values {
@@ -70,7 +70,7 @@ impl ReadStrategy for NullableBoolean {
         }
     }
 
-    fn fill_arrow_array(&self, column_view: AnyColumnView) -> ArrayRef {
+    fn fill_arrow_array(&self, column_view: AnySlice) -> ArrayRef {
         let values = Bit::as_nullable_slice(column_view).unwrap();
         let mut builder = BooleanBuilder::new();
         for bit in values {
@@ -107,7 +107,7 @@ impl ReadStrategy for Decimal {
         }
     }
 
-    fn fill_arrow_array(&self, column_view: AnyColumnView) -> ArrayRef {
+    fn fill_arrow_array(&self, column_view: AnySlice) -> ArrayRef {
         let view = column_view.as_text_view().unwrap();
         let mut builder = Decimal128Builder::new(self.precision, self.scale);
 

@@ -1,7 +1,7 @@
 use std::{convert::TryInto, sync::Arc};
 
 use arrow::array::{ArrayRef, BinaryBuilder, FixedSizeBinaryBuilder};
-use odbc_api::buffers::{AnyColumnView, BufferDescription, BufferKind};
+use odbc_api::buffers::{BufferDescription, BufferKind, AnySlice};
 
 use super::ReadStrategy;
 
@@ -27,7 +27,7 @@ impl ReadStrategy for Binary {
         }
     }
 
-    fn fill_arrow_array(&self, column_view: AnyColumnView) -> ArrayRef {
+    fn fill_arrow_array(&self, column_view: AnySlice) -> ArrayRef {
         let view = column_view.as_bin_view().unwrap();
         let mut builder = BinaryBuilder::new();
         for value in view.iter() {
@@ -63,7 +63,7 @@ impl ReadStrategy for FixedSizedBinary {
         }
     }
 
-    fn fill_arrow_array(&self, column_view: AnyColumnView) -> ArrayRef {
+    fn fill_arrow_array(&self, column_view: AnySlice) -> ArrayRef {
         let view = column_view.as_bin_view().unwrap();
         let mut builder = FixedSizeBinaryBuilder::new(self.len.try_into().unwrap());
         for value in view.iter() {

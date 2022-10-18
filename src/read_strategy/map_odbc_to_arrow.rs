@@ -4,7 +4,7 @@ use arrow::{
     array::{ArrayRef, PrimitiveBuilder},
     datatypes::ArrowPrimitiveType,
 };
-use odbc_api::buffers::{AnyColumnView, BufferDescription, Item};
+use odbc_api::buffers::{AnySlice, BufferDescription, Item};
 
 use super::ReadStrategy;
 
@@ -79,7 +79,7 @@ where
         }
     }
 
-    fn fill_arrow_array(&self, column_view: AnyColumnView) -> ArrayRef {
+    fn fill_arrow_array(&self, column_view: AnySlice) -> ArrayRef {
         let slice = T::Native::as_slice(column_view).unwrap();
         let mut builder = PrimitiveBuilder::<T>::with_capacity(slice.len());
         builder.append_slice(slice);
@@ -111,7 +111,7 @@ where
         }
     }
 
-    fn fill_arrow_array(&self, column_view: AnyColumnView) -> ArrayRef {
+    fn fill_arrow_array(&self, column_view: AnySlice) -> ArrayRef {
         let values = T::Native::as_nullable_slice(column_view).unwrap();
         let mut builder = PrimitiveBuilder::<T>::with_capacity(values.len());
         for value in values {
@@ -150,7 +150,7 @@ where
         }
     }
 
-    fn fill_arrow_array(&self, column_view: AnyColumnView) -> ArrayRef {
+    fn fill_arrow_array(&self, column_view: AnySlice) -> ArrayRef {
         let slice = column_view.as_slice::<O>().unwrap();
         let mut builder = PrimitiveBuilder::<P>::with_capacity(slice.len());
         for odbc_value in slice {
@@ -189,7 +189,7 @@ where
         }
     }
 
-    fn fill_arrow_array(&self, column_view: AnyColumnView) -> ArrayRef {
+    fn fill_arrow_array(&self, column_view: AnySlice) -> ArrayRef {
         let opts = column_view.as_nullable_slice::<O>().unwrap();
         let mut builder = PrimitiveBuilder::<P>::with_capacity(opts.len());
         for odbc_opt in opts {

@@ -2,7 +2,7 @@ use std::{char::decode_utf16, convert::TryInto, sync::Arc};
 
 use arrow::array::{ArrayRef, StringBuilder};
 use odbc_api::{
-    buffers::{AnyColumnView, BufferDescription, BufferKind},
+    buffers::{AnySlice, BufferDescription, BufferKind},
     DataType as OdbcDataType,
 };
 
@@ -97,7 +97,7 @@ impl ReadStrategy for WideText {
         }
     }
 
-    fn fill_arrow_array(&self, column_view: AnyColumnView) -> ArrayRef {
+    fn fill_arrow_array(&self, column_view: AnySlice) -> ArrayRef {
         let view = column_view.as_w_text_view().unwrap();
         let item_capacity = view.len();
         // Any utf-16 character could take up to 4 Bytes if represented as utf-8, but since mostly
@@ -148,7 +148,7 @@ impl ReadStrategy for NarrowText {
         }
     }
 
-    fn fill_arrow_array(&self, column_view: AnyColumnView) -> ArrayRef {
+    fn fill_arrow_array(&self, column_view: AnySlice) -> ArrayRef {
         let view = column_view.as_text_view().unwrap();
         let mut builder = StringBuilder::with_capacity(view.len(), self.max_str_len * view.len());
         for value in view.iter() {

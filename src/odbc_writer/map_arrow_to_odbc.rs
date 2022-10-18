@@ -4,7 +4,7 @@ use arrow::{
     array::{Array, PrimitiveArray},
     datatypes::ArrowPrimitiveType,
 };
-use odbc_api::buffers::{AnyColumnSliceMut, BufferDescription, Item};
+use odbc_api::buffers::{BufferDescription, Item, AnySliceMut};
 
 use crate::WriterError;
 
@@ -88,7 +88,7 @@ where
     fn write_rows(
         &self,
         param_offset: usize,
-        column_buf: AnyColumnSliceMut<'_>,
+        column_buf: AnySliceMut<'_>,
         array: &dyn Array,
     ) -> Result<(), WriterError> {
         let from = array.as_any().downcast_ref::<PrimitiveArray<P>>().unwrap();
@@ -131,7 +131,7 @@ where
     fn write_rows(
         &self,
         param_offset: usize,
-        column_buf: AnyColumnSliceMut<'_>,
+        column_buf: AnySliceMut<'_>,
         array: &dyn Array,
     ) -> Result<(), WriterError> {
         let from = array.as_any().downcast_ref::<PrimitiveArray<P>>().unwrap();
@@ -170,7 +170,7 @@ where
     fn write_rows(
         &self,
         param_offset: usize,
-        column_buf: AnyColumnSliceMut<'_>,
+        column_buf: AnySliceMut<'_>,
         array: &dyn Array,
     ) -> Result<(), WriterError> {
         let from = array.as_any().downcast_ref::<PrimitiveArray<P>>().unwrap();
@@ -209,7 +209,7 @@ where
     fn write_rows(
         &self,
         param_offset: usize,
-        column_buf: AnyColumnSliceMut<'_>,
+        column_buf: AnySliceMut<'_>,
         array: &dyn Array,
     ) -> Result<(), WriterError> {
         let from = array.as_any().downcast_ref::<PrimitiveArray<P>>().unwrap();

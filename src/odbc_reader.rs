@@ -7,7 +7,7 @@ use arrow::{
     record_batch::{RecordBatch, RecordBatchReader},
 };
 use odbc_api::{
-    buffers::{AnyColumnBuffer, ColumnarAnyBuffer, ColumnarBuffer},
+    buffers::{AnyBuffer, ColumnarAnyBuffer, ColumnarBuffer},
     Cursor, RowSetCursor,
 };
 
@@ -73,7 +73,7 @@ pub struct OdbcReader<C: Cursor> {
     schema: SchemaRef,
     /// Odbc cursor with a bound buffer we repeatedly fill with the batches send to us by the data
     /// source. One column buffer must be bound for each element in column_strategies.
-    cursor: RowSetCursor<C, ColumnarBuffer<AnyColumnBuffer>>,
+    cursor: RowSetCursor<C, ColumnarBuffer<AnyBuffer>>,
 }
 
 impl<C: Cursor> OdbcReader<C> {
@@ -236,7 +236,7 @@ where
 
 fn odbc_batch_to_arrow_columns(
     column_strategies: &[Box<dyn ReadStrategy>],
-    batch: &ColumnarBuffer<AnyColumnBuffer>,
+    batch: &ColumnarBuffer<AnyBuffer>,
 ) -> Vec<ArrayRef> {
     column_strategies
         .iter()

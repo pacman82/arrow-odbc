@@ -1,5 +1,5 @@
 use arrow::array::{Array, Decimal128Array, Decimal256Array};
-use odbc_api::buffers::{AnyColumnSliceMut, BufferDescription, BufferKind};
+use odbc_api::buffers::{BufferDescription, BufferKind, AnySliceMut};
 
 use crate::{odbc_writer::WriteStrategy, WriterError};
 
@@ -45,7 +45,7 @@ impl WriteStrategy for NullableDecimal128AsText {
     fn write_rows(
         &self,
         param_offset: usize,
-        column_buf: AnyColumnSliceMut<'_>,
+        column_buf: AnySliceMut<'_>,
         array: &dyn Array,
     ) -> Result<(), WriterError> {
         let length = len_text(self.scale, self.precision);
@@ -78,7 +78,7 @@ impl WriteStrategy for NullableDecimal256AsText {
     fn write_rows(
         &self,
         param_offset: usize,
-        column_buf: AnyColumnSliceMut<'_>,
+        column_buf: AnySliceMut<'_>,
         array: &dyn Array,
     ) -> Result<(), WriterError> {
         let from = array.as_any().downcast_ref::<Decimal256Array>().unwrap();

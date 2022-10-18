@@ -8,7 +8,7 @@ use arrow::{
 };
 use chrono::{Datelike, NaiveDate, NaiveDateTime, Timelike};
 use odbc_api::{
-    buffers::{AnyColumnSliceMut, BufferDescription, BufferKind, TextColumnSliceMut},
+    buffers::{AnySliceMut, BufferDescription, BufferKind, TextColumnSliceMut},
     sys::{Date, Time, Timestamp},
 };
 
@@ -218,7 +218,7 @@ where
     fn write_rows(
         &self,
         param_offset: usize,
-        column_buf: AnyColumnSliceMut<'_>,
+        column_buf: AnySliceMut<'_>,
         array: &dyn Array,
     ) -> Result<(), WriterError> {
         let from = array.as_any().downcast_ref::<PrimitiveArray<P>>().unwrap();

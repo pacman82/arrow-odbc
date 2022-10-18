@@ -1,5 +1,5 @@
 use arrow::array::{Array, StringArray};
-use odbc_api::buffers::{AnyColumnSliceMut, BufferDescription, BufferKind};
+use odbc_api::buffers::{BufferDescription, BufferKind, AnySliceMut};
 
 use super::{WriteStrategy, WriterError};
 
@@ -22,7 +22,7 @@ impl WriteStrategy for Utf8ToNarrow {
     fn write_rows(
         &self,
         param_offset: usize,
-        to: AnyColumnSliceMut<'_>,
+        to: AnySliceMut<'_>,
         from: &dyn Array,
     ) -> Result<(), WriterError> {
         let from = from.as_any().downcast_ref::<StringArray>().unwrap();
@@ -53,7 +53,7 @@ impl WriteStrategy for Utf8ToWide {
     fn write_rows(
         &self,
         param_offset: usize,
-        to: AnyColumnSliceMut<'_>,
+        to: AnySliceMut<'_>,
         from: &dyn Array,
     ) -> Result<(), WriterError> {
         let from = from.as_any().downcast_ref::<StringArray>().unwrap();

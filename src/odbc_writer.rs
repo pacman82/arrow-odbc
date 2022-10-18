@@ -14,7 +14,7 @@ use arrow::{
     record_batch::{RecordBatch, RecordBatchReader},
 };
 use odbc_api::{
-    buffers::{AnyColumnBuffer, AnyColumnSliceMut, BufferDescription},
+    buffers::{BufferDescription, AnyBuffer, AnySliceMut},
     handles::{AsStatementRef, StatementImpl},
     ColumnarBulkInserter, Connection, Prepared, StatementConnection,
 };
@@ -133,7 +133,7 @@ pub struct OdbcWriter<S> {
     /// Prepared statement with bound array parameter buffers. Data is copied into these buffers
     /// until they are full. Then we execute the statement. This is repeated until we run out of
     /// data.
-    inserter: ColumnarBulkInserter<S, AnyColumnBuffer>,
+    inserter: ColumnarBulkInserter<S, AnyBuffer>,
     /// For each field in the arrow schema we decide on which buffer to use to send the parameters
     /// to the database, and need to remember how to copy the data from an arrow array to an odbc
     /// mutable buffer slice for any column.
@@ -303,7 +303,7 @@ pub trait WriteStrategy {
     fn write_rows(
         &self,
         param_offset: usize,
-        column_buf: AnyColumnSliceMut<'_>,
+        column_buf: AnySliceMut<'_>,
         array: &dyn Array,
     ) -> Result<(), WriterError>;
 }
