@@ -109,7 +109,7 @@ impl ReadStrategy for Decimal {
 
     fn fill_arrow_array(&self, column_view: AnySlice) -> ArrayRef {
         let view = column_view.as_text_view().unwrap();
-        let mut builder = Decimal128Builder::new(self.precision, self.scale);
+        let mut builder = Decimal128Builder::new();
 
         let mut buf_digits = Vec::new();
 
@@ -120,7 +120,7 @@ impl ReadStrategy for Decimal {
 
                 let (num, _consumed) = i128::from_radix_10_signed(&buf_digits);
 
-                builder.append_value(num).unwrap();
+                builder.append_value(num);
             } else {
                 builder.append_null();
             }

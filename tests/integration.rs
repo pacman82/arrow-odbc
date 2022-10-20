@@ -8,10 +8,9 @@ use arrow::{
         Time64MicrosecondArray, Time64NanosecondArray, TimestampMicrosecondArray,
         TimestampMillisecondArray, TimestampNanosecondArray, TimestampSecondArray, UInt8Array,
     },
-    datatypes::{ArrowPrimitiveType, DataType, Field, Float16Type, Schema, SchemaRef, TimeUnit},
+    datatypes::{ArrowPrimitiveType, DataType, Field, Float16Type, Schema, SchemaRef, TimeUnit, Decimal256Type},
     error::ArrowError,
     record_batch::{RecordBatch, RecordBatchReader},
-    util::decimal::Decimal256,
 };
 use chrono::NaiveDate;
 use float_eq::assert_float_eq;
@@ -436,7 +435,7 @@ fn fetch_non_null_date_time_ns() {
     );
 }
 
-/// Fill a record batch of Dates
+/// Fill a record batch of Decimals
 #[test]
 fn fetch_decimals() {
     // Given a cursor over a table with one decimal column
@@ -1431,12 +1430,12 @@ fn insert_decimal_256() {
     let table_name = function_name!().rsplit_once(':').unwrap().1;
     let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
     setup_empty_table(&conn, table_name, &["NUMERIC(5,3)"]).unwrap();
-    let mut builder = Decimal256Builder::new(5, 3);
+    let mut builder = Decimal256Builder::new();
     let mut bytes = [0u8; 32];
+    type I256 = <Decimal256Type as ArrowPrimitiveType>::Native;
     bytes[0..4].copy_from_slice(12345i32.to_le_bytes().as_slice());
     builder
-        .append_value(&Decimal256::new(5, 3, &bytes))
-        .unwrap();
+        .append_value(I256::from_le_bytes(bytes));
     builder.append_null();
     let array = builder.finish();
     let schema = Arc::new(Schema::new(vec![Field::new(
