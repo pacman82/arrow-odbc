@@ -31,7 +31,7 @@ use arrow_odbc::{
     BufferAllocationOptions, ColumnFailure, Error, OdbcReader, OdbcWriter, WriterError,
 };
 
-use odbc_api::{buffers::TextRowSet, Cursor, IntoParameter};
+use odbc_api::{buffers::TextRowSet, Cursor, IntoParameter, StatementConnection};
 
 use stdext::function_name;
 
@@ -1542,16 +1542,7 @@ fn fetch_arrow_data(
     column_type: &str,
     literal: &str,
 ) -> Result<ArrayRef, anyhow::Error> {
-    // Setup a table on the database
-    let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
-    setup_empty_table(&conn, table_name, &[column_type]).unwrap();
-    // Insert values using literals
-    let sql = format!("INSERT INTO {table_name} (a) VALUES {literal}");
-    conn.execute(&sql, ()).unwrap();
-
-    // Query column with values to get a cursor
-    let sql = format!("SELECT a FROM {table_name}");
-    let cursor = conn.execute(&sql, ()).unwrap().unwrap();
+    let cursor = cursor_over(table_name, column_type, literal);
 
     // Now that we have a cursor, we want to iterate over its rows and fill an arrow batch with it.
 
@@ -1564,6 +1555,19 @@ fn fetch_arrow_data(
     let record_batch = reader.next().unwrap()?;
 
     Ok(record_batch.column(0).clone())
+}
+
+fn cursor_over(table_name: &str, column_type: &str, literal: &str) -> odbc_api::CursorImpl<StatementConnection<'static>> {
+    // Setup a table on the database
+    let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
+    setup_empty_table(&conn, table_name, &[column_type]).unwrap();
+    // Insert values using literals
+    let sql = format!("INSERT INTO {table_name} (a) VALUES {literal}");
+    conn.execute(&sql, ()).unwrap();
+    // Query column with values to get a cursor
+    let sql = format!("SELECT a FROM {table_name}");
+    let cursor = conn.into_cursor(&sql, ()).unwrap().unwrap();
+    cursor
 }
 
 fn query_single_value(
