@@ -56,7 +56,7 @@ impl WriteStrategy for NullableDecimal128AsText {
         for (index, cell) in from.iter().enumerate() {
             if let Some(value) = cell {
                 let buf = to.set_mut(index + param_offset, length);
-                write_integer_as_decimal(value.as_i128(), self.precision, self.scale, buf)
+                write_integer_as_decimal(value, self.precision, self.scale, buf)
             } else {
                 to.set_cell(index + param_offset, None)
             }
