@@ -31,7 +31,7 @@ use arrow_odbc::{
     BufferAllocationOptions, ColumnFailure, Error, OdbcReader, OdbcWriter, WriterError,
 };
 
-use odbc_api::{buffers::TextRowSet, Cursor, IntoParameter, StatementConnection};
+use odbc_api::{buffers::TextRowSet, Cursor, CursorImpl, IntoParameter, StatementConnection};
 
 use stdext::function_name;
 
@@ -439,12 +439,19 @@ fn fetch_non_null_date_time_ns() {
 /// Fill a record batch of Dates
 #[test]
 fn fetch_decimals() {
+    // Given a cursor over a table with one decimal column
     let table_name = function_name!().rsplit_once(':').unwrap().1;
+    let cursor = cursor_over(table_name, "DECIMAL(5,2) NOT NULL", "(123.45),(678.90)");
 
-    let array_any =
-        fetch_arrow_data(table_name, "DECIMAL(5,2) NOT NULL", "(123.45),(678.90)").unwrap();
+    // When fetching it in batches of five
+    let max_batch_size = 5;
+    let mut reader = OdbcReader::new(cursor, max_batch_size).unwrap();
+    let record_batch = reader.next().unwrap().unwrap();
 
-    let array_vals = array_any
+    // Then the elements in the first column of the first batch must match the decimals in the
+    // database.
+    let column = record_batch.column(0).clone();
+    let array_vals = column
         .as_any()
         .downcast_ref::<Decimal128Array>()
         .unwrap();
@@ -1543,7 +1550,6 @@ fn fetch_arrow_data(
     literal: &str,
 ) -> Result<ArrayRef, anyhow::Error> {
     let cursor = cursor_over(table_name, column_type, literal);
-
     // Now that we have a cursor, we want to iterate over its rows and fill an arrow batch with it.
 
     // Batches will contain at most 100 entries.
@@ -1557,7 +1563,11 @@ fn fetch_arrow_data(
     Ok(record_batch.column(0).clone())
 }
 
-fn cursor_over(table_name: &str, column_type: &str, literal: &str) -> odbc_api::CursorImpl<StatementConnection<'static>> {
+fn cursor_over(
+    table_name: &str,
+    column_type: &str,
+    literal: &str,
+) -> CursorImpl<StatementConnection<'static>> {
     // Setup a table on the database
     let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
     setup_empty_table(&conn, table_name, &[column_type]).unwrap();
