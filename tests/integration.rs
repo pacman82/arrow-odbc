@@ -8,7 +8,10 @@ use arrow::{
         Time64MicrosecondArray, Time64NanosecondArray, TimestampMicrosecondArray,
         TimestampMillisecondArray, TimestampNanosecondArray, TimestampSecondArray, UInt8Array,
     },
-    datatypes::{ArrowPrimitiveType, DataType, Field, Float16Type, Schema, SchemaRef, TimeUnit, Decimal256Type},
+    datatypes::{
+        ArrowPrimitiveType, DataType, Decimal256Type, Field, Float16Type, Schema, SchemaRef,
+        TimeUnit,
+    },
     error::ArrowError,
     record_batch::{RecordBatch, RecordBatchReader},
 };
@@ -450,10 +453,7 @@ fn fetch_decimals() {
     // Then the elements in the first column of the first batch must match the decimals in the
     // database.
     let column = record_batch.column(0).clone();
-    let array_vals = column
-        .as_any()
-        .downcast_ref::<Decimal128Array>()
-        .unwrap();
+    let array_vals = column.as_any().downcast_ref::<Decimal128Array>().unwrap();
 
     // Assert that the correct values are found within the arrow batch
     assert_eq!("123.45", array_vals.value_as_string(0));
@@ -1434,10 +1434,10 @@ fn insert_decimal_256() {
     let mut bytes = [0u8; 32];
     type I256 = <Decimal256Type as ArrowPrimitiveType>::Native;
     bytes[0..4].copy_from_slice(12345i32.to_le_bytes().as_slice());
-    builder
-        .append_value(I256::from_le_bytes(bytes));
+    builder.append_value(I256::from_le_bytes(bytes));
     builder.append_null();
-    let array = builder.finish();
+    let array = builder.finish().with_precision_and_scale(5, 3).unwrap();
+    assert_eq!("Hi", array.value(0).to_string());
     let schema = Arc::new(Schema::new(vec![Field::new(
         "a",
         DataType::Decimal256(5, 3),
