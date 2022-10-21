@@ -1437,7 +1437,6 @@ fn insert_decimal_256() {
     builder.append_value(I256::from_le_bytes(bytes));
     builder.append_null();
     let array = builder.finish().with_precision_and_scale(5, 3).unwrap();
-    assert_eq!("Hi", array.value(0).to_string());
     let schema = Arc::new(Schema::new(vec![Field::new(
         "a",
         DataType::Decimal256(5, 3),
