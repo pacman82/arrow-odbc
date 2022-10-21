@@ -126,7 +126,12 @@ impl ReadStrategy for Decimal {
             }
         }
 
-        Arc::new(builder.finish())
+        Arc::new(
+            builder
+                .finish()
+                .with_precision_and_scale(self.precision, self.scale)
+                .unwrap(),
+        )
     }
 }
 
