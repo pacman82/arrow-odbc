@@ -11,7 +11,7 @@ use arrow::{
 
 use atoi::FromRadix10Signed;
 use odbc_api::{
-    buffers::{AnySlice, BufferDescription, BufferKind, Item},
+    buffers::{AnySlice, BufferDescription, BufferKind, Item, BufferDesc},
     Bit, DataType as OdbcDataType, ResultSetMetadata,
 };
 use thiserror::Error;
@@ -35,6 +35,11 @@ use crate::date_time::{
 pub trait ReadStrategy {
     /// Describes the buffer which is bound to the ODBC cursor.
     fn buffer_description(&self) -> BufferDescription;
+
+    /// Describes the buffer which is bound to the ODBC cursor.
+    fn buffer_desc(&self) -> BufferDesc {
+        self.buffer_description().into()
+    }
 
     /// Create an arrow array from an ODBC buffer described in [`Self::buffer_description`].
     fn fill_arrow_array(&self, column_view: AnySlice) -> ArrayRef;

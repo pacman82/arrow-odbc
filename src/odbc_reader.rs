@@ -8,7 +8,7 @@ use arrow::{
 };
 use odbc_api::{
     buffers::{AnyBuffer, ColumnarAnyBuffer, ColumnarBuffer},
-    Cursor, RowSetCursor,
+    BlockCursor, Cursor,
 };
 
 use crate::{
@@ -73,7 +73,7 @@ pub struct OdbcReader<C: Cursor> {
     schema: SchemaRef,
     /// Odbc cursor with a bound buffer we repeatedly fill with the batches send to us by the data
     /// source. One column buffer must be bound for each element in column_strategies.
-    cursor: RowSetCursor<C, ColumnarBuffer<AnyBuffer>>,
+    cursor: BlockCursor<C, ColumnarBuffer<AnyBuffer>>,
 }
 
 impl<C: Cursor> OdbcReader<C> {
@@ -163,13 +163,15 @@ impl<C: Cursor> OdbcReader<C> {
             })
             .collect::<Result<_, _>>()?;
 
-        let descs = column_strategies.iter().map(|cs| cs.buffer_description());
+        let descs = column_strategies
+            .iter()
+            .map(|cs| cs.buffer_desc());
 
         let row_set_buffer = if buffer_allocation_options.fallibale_allocations {
-            ColumnarAnyBuffer::try_from_description(max_batch_size, descs)
+            ColumnarAnyBuffer::try_from_descs(max_batch_size, descs)
                 .map_err(|err| map_allocation_error(err, &schema))?
         } else {
-            ColumnarAnyBuffer::from_description(max_batch_size, descs)
+            ColumnarAnyBuffer::from_descs(max_batch_size, descs)
         };
         let cursor = cursor.bind_buffer(row_set_buffer).unwrap();
 

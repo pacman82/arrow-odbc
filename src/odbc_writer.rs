@@ -14,7 +14,7 @@ use arrow::{
     record_batch::{RecordBatch, RecordBatchReader},
 };
 use odbc_api::{
-    buffers::{AnyBuffer, AnySliceMut, BufferDescription},
+    buffers::{AnyBuffer, AnySliceMut, BufferDescription, BufferDesc},
     handles::{AsStatementRef, StatementImpl},
     ColumnarBulkInserter, Connection, Prepared, StatementConnection,
 };
@@ -293,6 +293,11 @@ impl<'o> OdbcWriter<StatementImpl<'o>> {
 pub trait WriteStrategy {
     /// Describe the buffer used to hold the array parameters for the column
     fn buffer_description(&self) -> BufferDescription;
+
+    /// Describe the buffer used to hold the array parameters for the column
+    fn buffer_desc(&self) -> BufferDesc {
+        self.buffer_description().into()
+    }
 
     /// # Parameters
     ///

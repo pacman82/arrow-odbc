@@ -16,61 +16,67 @@ use crate::{odbc_writer::WriteStrategy, WriterError};
 
 /// Transform date to days since unix epoch as i32
 pub fn days_since_epoch(date: &Date) -> i32 {
-    let unix_epoch = NaiveDate::from_ymd(1970, 1, 1);
-    let date = NaiveDate::from_ymd(date.year as i32, date.month as u32, date.day as u32);
+    let unix_epoch = NaiveDate::from_ymd_opt(1970, 1, 1).unwrap();
+    let date =
+        NaiveDate::from_ymd_opt(date.year as i32, date.month as u32, date.day as u32).unwrap();
     let duration = date.signed_duration_since(unix_epoch);
     duration.num_days().try_into().unwrap()
 }
 
 pub fn seconds_since_epoch(from: &Timestamp) -> i64 {
-    let ndt = NaiveDate::from_ymd(from.year as i32, from.month as u32, from.day as u32).and_hms(
-        from.hour as u32,
-        from.minute as u32,
-        from.second as u32,
-    );
+    let ndt = NaiveDate::from_ymd_opt(from.year as i32, from.month as u32, from.day as u32)
+        .unwrap()
+        .and_hms_opt(from.hour as u32, from.minute as u32, from.second as u32)
+        .unwrap();
     ndt.timestamp()
 }
 
 pub fn ms_since_epoch(from: &Timestamp) -> i64 {
-    let ndt = NaiveDate::from_ymd(from.year as i32, from.month as u32, from.day as u32)
-        .and_hms_nano(
+    let ndt = NaiveDate::from_ymd_opt(from.year as i32, from.month as u32, from.day as u32)
+        .unwrap()
+        .and_hms_nano_opt(
             from.hour as u32,
             from.minute as u32,
             from.second as u32,
             from.fraction,
-        );
+        )
+        .unwrap();
     ndt.timestamp_millis()
 }
 
 pub fn us_since_epoch(from: &Timestamp) -> i64 {
-    let ndt = NaiveDate::from_ymd(from.year as i32, from.month as u32, from.day as u32)
-        .and_hms_nano(
+    let ndt = NaiveDate::from_ymd_opt(from.year as i32, from.month as u32, from.day as u32)
+        .unwrap()
+        .and_hms_nano_opt(
             from.hour as u32,
             from.minute as u32,
             from.second as u32,
             from.fraction,
-        );
+        )
+        .unwrap();
     ndt.timestamp_nanos() / 1_000
 }
 
 pub fn ns_since_epoch(from: &Timestamp) -> i64 {
-    let ndt = NaiveDate::from_ymd(from.year as i32, from.month as u32, from.day as u32)
-        .and_hms_nano(
+    let ndt = NaiveDate::from_ymd_opt(from.year as i32, from.month as u32, from.day as u32)
+        .unwrap()
+        .and_hms_nano_opt(
             from.hour as u32,
             from.minute as u32,
             from.second as u32,
             from.fraction,
-        );
+        )
+        .unwrap();
     ndt.timestamp_nanos()
 }
 
 pub fn epoch_to_timestamp<const UNIT_FACTOR: i64>(from: i64) -> Timestamp {
-    let ndt = NaiveDateTime::from_timestamp(
+    let ndt = NaiveDateTime::from_timestamp_opt(
         from / UNIT_FACTOR,
         ((from % UNIT_FACTOR) * (1_000_000_000 / UNIT_FACTOR))
             .try_into()
             .unwrap(),
-    );
+    ).unwrap();
     let date = ndt.date();
     let time = ndt.time();
     Timestamp {
@@ -87,7 +93,7 @@ pub fn epoch_to_timestamp<const UNIT_FACTOR: i64>(from: i64) -> Timestamp {
 pub fn epoch_to_date(from: i32) -> Date {
     // Offset between between ce and unix epoch
     const OFFSET: i32 = 719_163;
-    let nd = NaiveDate::from_num_days_from_ce(from + OFFSET);
+    let nd = NaiveDate::from_num_days_from_ce_opt(from + OFFSET).unwrap();
     Date {
         year: nd.year().try_into().unwrap(),
         month: nd.month().try_into().unwrap(),

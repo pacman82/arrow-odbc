@@ -293,12 +293,12 @@ fn fetch_dates() {
 
     // Assert that the correct values are found within the arrow batch
     assert_eq!(
-        Some(NaiveDate::from_ymd(2021, 4, 9)),
+        Some(NaiveDate::from_ymd_opt(2021, 4, 9).unwrap()),
         array_vals.value_as_date(0)
     );
     assert!(array_vals.is_null(1));
     assert_eq!(
-        Some(NaiveDate::from_ymd(2002, 9, 30)),
+        Some(NaiveDate::from_ymd_opt(2002, 9, 30).unwrap()),
         array_vals.value_as_date(2)
     );
 }
@@ -315,11 +315,11 @@ fn fetch_non_null_dates() {
 
     // Assert that the correct values are found within the arrow batch
     assert_eq!(
-        Some(NaiveDate::from_ymd(2021, 4, 9)),
+        Some(NaiveDate::from_ymd_opt(2021, 4, 9).unwrap()),
         array_vals.value_as_date(0)
     );
     assert_eq!(
-        Some(NaiveDate::from_ymd(2002, 9, 30)),
+        Some(NaiveDate::from_ymd_opt(2002, 9, 30).unwrap()),
         array_vals.value_as_date(1)
     );
 }
@@ -343,11 +343,21 @@ fn fetch_non_null_date_time() {
 
     // Assert that the correct values are found within the arrow batch
     assert_eq!(
-        Some(NaiveDate::from_ymd(2021, 4, 9).and_hms_milli(18, 57, 50, 120)),
+        Some(
+            NaiveDate::from_ymd_opt(2021, 4, 9)
+                .unwrap()
+                .and_hms_milli_opt(18, 57, 50, 120)
+                .unwrap()
+        ),
         array_vals.value_as_datetime(0)
     );
     assert_eq!(
-        Some(NaiveDate::from_ymd(2002, 9, 30).and_hms_milli(12, 43, 17, 450)),
+        Some(
+            NaiveDate::from_ymd_opt(2002, 9, 30)
+                .unwrap()
+                .and_hms_milli_opt(12, 43, 17, 450)
+                .unwrap()
+        ),
         array_vals.value_as_datetime(1)
     );
 }
@@ -371,12 +381,22 @@ fn fetch_date_time_us() {
 
     // Assert that the correct values are found within the arrow batch
     assert_eq!(
-        Some(NaiveDate::from_ymd(2021, 4, 9).and_hms_milli(18, 57, 50, 0)),
+        Some(
+            NaiveDate::from_ymd_opt(2021, 4, 9)
+                .unwrap()
+                .and_hms_milli_opt(18, 57, 50, 0)
+                .unwrap()
+        ),
         array_vals.value_as_datetime(0)
     );
     assert!(array_vals.is_null(1));
     assert_eq!(
-        Some(NaiveDate::from_ymd(2002, 9, 30).and_hms_milli(12, 43, 17, 00)),
+        Some(
+            NaiveDate::from_ymd_opt(2002, 9, 30)
+                .unwrap()
+                .and_hms_milli_opt(12, 43, 17, 00)
+                .unwrap()
+        ),
         array_vals.value_as_datetime(2)
     );
 }
@@ -400,12 +420,22 @@ fn fetch_date_time_ms() {
 
     // Assert that the correct values are found within the arrow batch
     assert_eq!(
-        Some(NaiveDate::from_ymd(2021, 4, 9).and_hms_milli(18, 57, 50, 0)),
+        Some(
+            NaiveDate::from_ymd_opt(2021, 4, 9)
+                .unwrap()
+                .and_hms_milli_opt(18, 57, 50, 0)
+                .unwrap()
+        ),
         array_vals.value_as_datetime(0)
     );
     assert!(array_vals.is_null(1));
     assert_eq!(
-        Some(NaiveDate::from_ymd(2002, 9, 30).and_hms_milli(12, 43, 17, 00)),
+        Some(
+            NaiveDate::from_ymd_opt(2002, 9, 30)
+                .unwrap()
+                .and_hms_milli_opt(12, 43, 17, 00)
+                .unwrap()
+        ),
         array_vals.value_as_datetime(2)
     );
 }
@@ -429,11 +459,21 @@ fn fetch_non_null_date_time_ns() {
 
     // Assert that the correct values are found within the arrow batch
     assert_eq!(
-        Some(NaiveDate::from_ymd(2021, 4, 9).and_hms_nano(18, 57, 50, 123_456_700)),
+        Some(
+            NaiveDate::from_ymd_opt(2021, 4, 9)
+                .unwrap()
+                .and_hms_nano_opt(18, 57, 50, 123_456_700)
+                .unwrap()
+        ),
         array_vals.value_as_datetime(0)
     );
     assert_eq!(
-        Some(NaiveDate::from_ymd(2002, 9, 30).and_hms_nano(12, 43, 17, 456_000_000)),
+        Some(
+            NaiveDate::from_ymd_opt(2002, 9, 30)
+                .unwrap()
+                .and_hms_nano_opt(12, 43, 17, 456_000_000)
+                .unwrap()
+        ),
         array_vals.value_as_datetime(1)
     );
 }
