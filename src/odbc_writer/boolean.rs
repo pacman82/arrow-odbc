@@ -1,6 +1,6 @@
 use arrow::array::{Array, BooleanArray};
 use odbc_api::{
-    buffers::{AnySliceMut, BufferDescription, BufferKind},
+    buffers::{AnySliceMut, BufferDesc},
     Bit,
 };
 
@@ -19,11 +19,8 @@ pub fn boolean_to_bit(nullable: bool) -> Box<dyn WriteStrategy> {
 struct Nullable;
 
 impl WriteStrategy for Nullable {
-    fn buffer_description(&self) -> BufferDescription {
-        BufferDescription {
-            nullable: true,
-            kind: BufferKind::Bit,
-        }
+    fn buffer_desc(&self) -> BufferDesc {
+        BufferDesc::Bit { nullable: true }
     }
 
     fn write_rows(
@@ -44,11 +41,8 @@ impl WriteStrategy for Nullable {
 struct NonNullable;
 
 impl WriteStrategy for NonNullable {
-    fn buffer_description(&self) -> BufferDescription {
-        BufferDescription {
-            nullable: false,
-            kind: BufferKind::Bit,
-        }
+    fn buffer_desc(&self) -> BufferDesc {
+        BufferDesc::Bit { nullable: false }
     }
 
     fn write_rows(

@@ -11,7 +11,7 @@ use arrow::{
 
 use atoi::FromRadix10Signed;
 use odbc_api::{
-    buffers::{AnySlice, BufferDescription, BufferKind, Item, BufferDesc},
+    buffers::{AnySlice, BufferDesc, Item},
     Bit, DataType as OdbcDataType, ResultSetMetadata,
 };
 use thiserror::Error;
@@ -34,12 +34,7 @@ use crate::date_time::{
 /// All decisions needed to copy data from an ODBC buffer to an Arrow Array
 pub trait ReadStrategy {
     /// Describes the buffer which is bound to the ODBC cursor.
-    fn buffer_description(&self) -> BufferDescription;
-
-    /// Describes the buffer which is bound to the ODBC cursor.
-    fn buffer_desc(&self) -> BufferDesc {
-        self.buffer_description().into()
-    }
+    fn buffer_desc(&self) -> BufferDesc;
 
     /// Create an arrow array from an ODBC buffer described in [`Self::buffer_description`].
     fn fill_arrow_array(&self, column_view: AnySlice) -> ArrayRef;
@@ -48,11 +43,8 @@ pub trait ReadStrategy {
 pub struct NonNullableBoolean;
 
 impl ReadStrategy for NonNullableBoolean {
-    fn buffer_description(&self) -> BufferDescription {
-        BufferDescription {
-            nullable: false,
-            kind: BufferKind::Bit,
-        }
+    fn buffer_desc(&self) -> BufferDesc {
+        BufferDesc::Bit { nullable: false }
     }
 
     fn fill_arrow_array(&self, column_view: AnySlice) -> ArrayRef {
@@ -68,11 +60,8 @@ impl ReadStrategy for NonNullableBoolean {
 pub struct NullableBoolean;
 
 impl ReadStrategy for NullableBoolean {
-    fn buffer_description(&self) -> BufferDescription {
-        BufferDescription {
-            nullable: true,
-            kind: BufferKind::Bit,
-        }
+    fn buffer_desc(&self) -> BufferDesc {
+        BufferDesc::Bit { nullable: true }
     }
 
     fn fill_arrow_array(&self, column_view: AnySlice) -> ArrayRef {
@@ -86,29 +75,21 @@ impl ReadStrategy for NullableBoolean {
 }
 
 pub struct Decimal {
-    nullable: bool,
     precision: u8,
     scale: u8,
 }
 
 impl Decimal {
-    pub fn new(nullable: bool, precision: u8, scale: u8) -> Self {
-        Self {
-            nullable,
-            precision,
-            scale,
-        }
+    pub fn new(precision: u8, scale: u8) -> Self {
+        Self { precision, scale }
     }
 }
 
 impl ReadStrategy for Decimal {
-    fn buffer_description(&self) -> BufferDescription {
-        BufferDescription {
-            nullable: self.nullable,
+    fn buffer_desc(&self) -> BufferDesc {
+        BufferDesc::Text {
             // Must be able to hold num precision digits a sign and a decimal point
-            kind: BufferKind::Text {
-                max_str_len: self.precision as usize + 2,
-            },
+            max_str_len: self.precision as usize + 2,
         }
     }
 
@@ -204,13 +185,10 @@ pub fn choose_column_strategy(
             choose_text_strategy(
                 sql_type,
                 lazy_display_size,
-                field.is_nullable(),
                 buffer_allocation_options.max_text_size,
             )?
         }
-        ArrowDataType::Decimal128(precision, scale) => {
-            Box::new(Decimal::new(field.is_nullable(), *precision, *scale))
-        }
+        ArrowDataType::Decimal128(precision, scale) => Box::new(Decimal::new(*precision, *scale)),
         ArrowDataType::Binary => {
             let sql_type = query_metadata
                 .col_data_type(col_index)
@@ -228,7 +206,7 @@ pub fn choose_column_strategy(
                     }
                 }
             };
-            Box::new(Binary::new(field.is_nullable(), length))
+            Box::new(Binary::new(length))
         }
         ArrowDataType::Timestamp(TimeUnit::Second, _) => {
             TimestampSecondType::map_with(field.is_nullable(), seconds_since_epoch)
@@ -242,10 +220,9 @@ pub fn choose_column_strategy(
         ArrowDataType::Timestamp(TimeUnit::Nanosecond, _) => {
             TimestampNanosecondType::map_with(field.is_nullable(), ns_since_epoch)
         }
-        ArrowDataType::FixedSizeBinary(length) => Box::new(FixedSizedBinary::new(
-            field.is_nullable(),
-            (*length).try_into().unwrap(),
-        )),
+        ArrowDataType::FixedSizeBinary(length) => {
+            Box::new(FixedSizedBinary::new((*length).try_into().unwrap()))
+        }
         arrow_type @ (ArrowDataType::Null
         | ArrowDataType::Decimal256(..)
         | ArrowDataType::Date64

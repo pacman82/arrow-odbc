@@ -2,7 +2,7 @@ use std::{char::decode_utf16, convert::TryInto, sync::Arc};
 
 use arrow::array::{ArrayRef, StringBuilder};
 use odbc_api::{
-    buffers::{AnySlice, BufferDescription, BufferKind},
+    buffers::{AnySlice, BufferDesc},
     DataType as OdbcDataType,
 };
 
@@ -15,7 +15,6 @@ use super::{ColumnFailure, ReadStrategy};
 pub fn choose_text_strategy(
     sql_type: OdbcDataType,
     lazy_display_size: impl FnMut() -> Result<isize, odbc_api::Error>,
-    is_nullable: bool,
     max_text_size: Option<usize>,
 ) -> Result<Box<dyn ReadStrategy>, ColumnFailure> {
     let is_narrow = matches!(
@@ -37,11 +36,11 @@ pub fn choose_text_strategy(
         if cfg!(target_os = "windows") {
             let hex_len = sql_type.utf16_len().unwrap();
             let hex_len = apply_buffer_limit(hex_len)?;
-            wide_text_strategy(hex_len, is_nullable)
+            wide_text_strategy(hex_len)
         } else {
             let octet_len = sql_type.utf8_len().unwrap();
             let octet_len = apply_buffer_limit(octet_len)?;
-            narrow_text_strategy(octet_len, is_nullable)
+            narrow_text_strategy(octet_len)
         }
     } else {
         let display_size: usize = sql_type
@@ -55,18 +54,18 @@ pub fn choose_text_strategy(
         let display_size = apply_buffer_limit(display_size)?;
 
         // We assume non text type colmuns to only consist of ASCII characters.
-        narrow_text_strategy(display_size, is_nullable)
+        narrow_text_strategy(display_size)
     };
 
     Ok(strategy)
 }
 
-fn wide_text_strategy(u16_len: usize, is_nullable: bool) -> Box<dyn ReadStrategy> {
-    Box::new(WideText::new(is_nullable, u16_len))
+fn wide_text_strategy(u16_len: usize) -> Box<dyn ReadStrategy> {
+    Box::new(WideText::new(u16_len))
 }
 
-fn narrow_text_strategy(octet_len: usize, is_nullable: bool) -> Box<dyn ReadStrategy> {
-    Box::new(NarrowText::new(is_nullable, octet_len))
+fn narrow_text_strategy(octet_len: usize) -> Box<dyn ReadStrategy> {
+    Box::new(NarrowText::new(octet_len))
 }
 
 /// Strategy requesting the text from the database as UTF-16 (Wide characters) and emmitting it as
@@ -75,25 +74,18 @@ fn narrow_text_strategy(octet_len: usize, is_nullable: bool) -> Box<dyn ReadStra
 pub struct WideText {
     /// Maximum string length in u16, excluding terminating zero
     max_str_len: usize,
-    nullable: bool,
 }
 
 impl WideText {
-    pub fn new(nullable: bool, max_str_len: usize) -> Self {
-        Self {
-            max_str_len,
-            nullable,
-        }
+    pub fn new(max_str_len: usize) -> Self {
+        Self { max_str_len }
     }
 }
 
 impl ReadStrategy for WideText {
-    fn buffer_description(&self) -> BufferDescription {
-        BufferDescription {
-            nullable: self.nullable,
-            kind: BufferKind::WText {
-                max_str_len: self.max_str_len,
-            },
+    fn buffer_desc(&self) -> BufferDesc {
+        BufferDesc::WText {
+            max_str_len: self.max_str_len,
         }
     }
 
@@ -126,25 +118,18 @@ impl ReadStrategy for WideText {
 pub struct NarrowText {
     /// Maximum string length in u8, excluding terminating zero
     max_str_len: usize,
-    nullable: bool,
 }
 
 impl NarrowText {
-    pub fn new(nullable: bool, max_str_len: usize) -> Self {
-        Self {
-            max_str_len,
-            nullable,
-        }
+    pub fn new(max_str_len: usize) -> Self {
+        Self { max_str_len }
     }
 }
 
 impl ReadStrategy for NarrowText {
-    fn buffer_description(&self) -> BufferDescription {
-        BufferDescription {
-            nullable: self.nullable,
-            kind: BufferKind::Text {
-                max_str_len: self.max_str_len,
-            },
+    fn buffer_desc(&self) -> BufferDesc {
+        BufferDesc::Text {
+            max_str_len: self.max_str_len,
         }
     }
 

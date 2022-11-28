@@ -163,9 +163,7 @@ impl<C: Cursor> OdbcReader<C> {
             })
             .collect::<Result<_, _>>()?;
 
-        let descs = column_strategies
-            .iter()
-            .map(|cs| cs.buffer_desc());
+        let descs = column_strategies.iter().map(|cs| cs.buffer_desc());
 
         let row_set_buffer = if buffer_allocation_options.fallibale_allocations {
             ColumnarAnyBuffer::try_from_descs(max_batch_size, descs)

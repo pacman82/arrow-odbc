@@ -1,5 +1,5 @@
 use arrow::array::{Array, BinaryArray};
-use odbc_api::buffers::{AnySliceMut, BufferDescription, BufferKind};
+use odbc_api::buffers::{AnySliceMut, BufferDesc};
 
 use super::{WriteStrategy, WriterError};
 
@@ -14,12 +14,9 @@ impl VariadicBinary {
 }
 
 impl WriteStrategy for VariadicBinary {
-    fn buffer_description(&self) -> BufferDescription {
-        BufferDescription {
-            nullable: true,
-            kind: BufferKind::Binary {
-                length: self.buffer_start_size,
-            },
+    fn buffer_desc(&self) -> BufferDesc {
+        BufferDesc::Binary {
+            length: self.buffer_start_size,
         }
     }
 

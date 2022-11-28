@@ -1,29 +1,25 @@
 use std::{convert::TryInto, sync::Arc};
 
 use arrow::array::{ArrayRef, BinaryBuilder, FixedSizeBinaryBuilder};
-use odbc_api::buffers::{AnySlice, BufferDescription, BufferKind};
+use odbc_api::buffers::{AnySlice, BufferDesc};
 
 use super::ReadStrategy;
 
 pub struct Binary {
     /// Maximum length in bytes of elements
     max_len: usize,
-    nullable: bool,
 }
 
 impl Binary {
-    pub fn new(nullable: bool, max_len: usize) -> Self {
-        Self { max_len, nullable }
+    pub fn new(max_len: usize) -> Self {
+        Self { max_len }
     }
 }
 
 impl ReadStrategy for Binary {
-    fn buffer_description(&self) -> BufferDescription {
-        BufferDescription {
-            nullable: self.nullable,
-            kind: BufferKind::Binary {
-                length: self.max_len,
-            },
+    fn buffer_desc(&self) -> BufferDesc {
+        BufferDesc::Binary {
+            length: self.max_len,
         }
     }
 
@@ -44,22 +40,18 @@ impl ReadStrategy for Binary {
 pub struct FixedSizedBinary {
     /// Length in bytes of elements
     len: u32,
-    nullable: bool,
 }
 
 impl FixedSizedBinary {
-    pub fn new(nullable: bool, len: u32) -> Self {
-        Self { len, nullable }
+    pub fn new(len: u32) -> Self {
+        Self { len }
     }
 }
 
 impl ReadStrategy for FixedSizedBinary {
-    fn buffer_description(&self) -> BufferDescription {
-        BufferDescription {
-            nullable: self.nullable,
-            kind: BufferKind::Binary {
-                length: self.len as usize,
-            },
+    fn buffer_desc(&self) -> BufferDesc {
+        BufferDesc::Binary {
+            length: self.len as usize,
         }
     }
 

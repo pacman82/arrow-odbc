@@ -1158,7 +1158,7 @@ fn insert_timestamp_with_seconds_precisions() {
         false,
     )]));
     // Corresponds to single element array with entry 1970-05-09T14:25:11+0:00
-    let array = TimestampSecondArray::from_vec(vec![11111111], None);
+    let array = TimestampSecondArray::from(vec![11111111]);
     let batch = RecordBatch::try_new(schema.clone(), vec![Arc::new(array)]).unwrap();
     let mut reader = StubBatchReader::new(schema, vec![batch]);
 
@@ -1183,7 +1183,7 @@ fn insert_timestamp_with_milliseconds_precisions() {
         false,
     )]));
     // Corresponds to single element array with entry 1970-05-09T14:25:11.111
-    let array = TimestampMillisecondArray::from_vec(vec![11111111111], None);
+    let array = TimestampMillisecondArray::from(vec![11111111111]);
     let batch = RecordBatch::try_new(schema.clone(), vec![Arc::new(array)]).unwrap();
     let mut reader = StubBatchReader::new(schema, vec![batch]);
 
@@ -1208,7 +1208,7 @@ fn insert_timestamp_with_microseconds_precisions() {
         false,
     )]));
     // Corresponds to single element array with entry 1970-05-09T14:25:11.111111
-    let array = TimestampMicrosecondArray::from_vec(vec![11111111111111], None);
+    let array = TimestampMicrosecondArray::from(vec![11111111111111]);
     let batch = RecordBatch::try_new(schema.clone(), vec![Arc::new(array)]).unwrap();
     let mut reader = StubBatchReader::new(schema, vec![batch]);
 
@@ -1233,7 +1233,7 @@ fn insert_timestamp_with_nanoseconds_precisions() {
         false,
     )]));
     // Corresponds to single element array with entry 1970-05-09T14:25:11.111111111
-    let array = TimestampNanosecondArray::from_vec(vec![11111111111111111], None);
+    let array = TimestampNanosecondArray::from(vec![11111111111111111]);
     let batch = RecordBatch::try_new(schema.clone(), vec![Arc::new(array)]).unwrap();
     let mut reader = StubBatchReader::new(schema, vec![batch]);
 

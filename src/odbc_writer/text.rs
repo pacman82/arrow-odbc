@@ -1,5 +1,5 @@
 use arrow::array::{Array, StringArray};
-use odbc_api::buffers::{AnySliceMut, BufferDescription, BufferKind};
+use odbc_api::buffers::{AnySliceMut, BufferDesc};
 
 use super::{WriteStrategy, WriterError};
 
@@ -12,11 +12,8 @@ pub type Utf8ToNativeText = Utf8ToWide;
 pub struct Utf8ToNarrow;
 
 impl WriteStrategy for Utf8ToNarrow {
-    fn buffer_description(&self) -> BufferDescription {
-        BufferDescription {
-            nullable: true,
-            kind: BufferKind::Text { max_str_len: 1 },
-        }
+    fn buffer_desc(&self) -> BufferDesc {
+        BufferDesc::Text { max_str_len: 1 }
     }
 
     fn write_rows(
@@ -43,11 +40,8 @@ impl WriteStrategy for Utf8ToNarrow {
 pub struct Utf8ToWide;
 
 impl WriteStrategy for Utf8ToWide {
-    fn buffer_description(&self) -> BufferDescription {
-        BufferDescription {
-            nullable: true,
-            kind: BufferKind::WText { max_str_len: 1 },
-        }
+    fn buffer_desc(&self) -> BufferDesc {
+        BufferDesc::WText { max_str_len: 1 }
     }
 
     fn write_rows(

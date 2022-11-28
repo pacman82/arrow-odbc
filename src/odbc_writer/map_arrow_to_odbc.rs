@@ -4,7 +4,7 @@ use arrow::{
     array::{Array, PrimitiveArray},
     datatypes::ArrowPrimitiveType,
 };
-use odbc_api::buffers::{AnySliceMut, BufferDescription, Item};
+use odbc_api::buffers::{AnySliceMut, BufferDesc, Item};
 
 use crate::WriterError;
 
@@ -78,11 +78,8 @@ where
     F: Fn(P::Native) -> U,
     U: Item,
 {
-    fn buffer_description(&self) -> BufferDescription {
-        BufferDescription {
-            nullable: true,
-            kind: U::BUFFER_KIND,
-        }
+    fn buffer_desc(&self) -> BufferDesc {
+        U::buffer_desc(true)
     }
 
     fn write_rows(
@@ -121,11 +118,8 @@ where
     F: Fn(P::Native) -> U,
     U: Item,
 {
-    fn buffer_description(&self) -> BufferDescription {
-        BufferDescription {
-            nullable: false,
-            kind: U::BUFFER_KIND,
-        }
+    fn buffer_desc(&self) -> BufferDesc {
+        U::buffer_desc(false)
     }
 
     fn write_rows(
@@ -160,11 +154,8 @@ where
     P: ArrowPrimitiveType,
     P::Native: Item,
 {
-    fn buffer_description(&self) -> BufferDescription {
-        BufferDescription {
-            nullable: true,
-            kind: P::Native::BUFFER_KIND,
-        }
+    fn buffer_desc(&self) -> BufferDesc {
+        P::Native::buffer_desc(true)
     }
 
     fn write_rows(
@@ -199,11 +190,8 @@ where
     P: ArrowPrimitiveType,
     P::Native: Item,
 {
-    fn buffer_description(&self) -> BufferDescription {
-        BufferDescription {
-            nullable: false,
-            kind: P::Native::BUFFER_KIND,
-        }
+    fn buffer_desc(&self) -> BufferDesc {
+        P::Native::buffer_desc(false)
     }
 
     fn write_rows(

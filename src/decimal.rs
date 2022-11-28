@@ -1,5 +1,8 @@
-use arrow::{array::{Array, Decimal128Array, Decimal256Array}, datatypes::{Decimal256Type, ArrowPrimitiveType}};
-use odbc_api::buffers::{AnySliceMut, BufferDescription, BufferKind};
+use arrow::{
+    array::{Array, Decimal128Array, Decimal256Array},
+    datatypes::{ArrowPrimitiveType, Decimal256Type},
+};
+use odbc_api::buffers::{AnySliceMut, BufferDesc};
 
 use crate::{odbc_writer::WriteStrategy, WriterError};
 
@@ -33,12 +36,9 @@ fn len_text(scale: u8, precision: u8) -> usize {
 }
 
 impl WriteStrategy for NullableDecimal128AsText {
-    fn buffer_description(&self) -> BufferDescription {
-        BufferDescription {
-            nullable: false,
-            kind: BufferKind::Text {
-                max_str_len: len_text(self.scale, self.precision),
-            },
+    fn buffer_desc(&self) -> BufferDesc {
+        BufferDesc::Text {
+            max_str_len: len_text(self.scale, self.precision),
         }
     }
 
@@ -66,12 +66,9 @@ impl WriteStrategy for NullableDecimal128AsText {
 }
 
 impl WriteStrategy for NullableDecimal256AsText {
-    fn buffer_description(&self) -> BufferDescription {
-        BufferDescription {
-            nullable: false,
-            kind: BufferKind::Text {
-                max_str_len: len_text(self.scale, self.precision),
-            },
+    fn buffer_desc(&self) -> BufferDesc {
+        BufferDesc::Text {
+            max_str_len: len_text(self.scale, self.precision),
         }
     }
 

@@ -4,7 +4,7 @@ use arrow::{
     array::{ArrayRef, PrimitiveBuilder},
     datatypes::ArrowPrimitiveType,
 };
-use odbc_api::buffers::{AnySlice, BufferDescription, Item};
+use odbc_api::buffers::{AnySlice, BufferDesc, Item};
 
 use super::ReadStrategy;
 
@@ -72,11 +72,8 @@ where
     T: ArrowPrimitiveType,
     T::Native: Item,
 {
-    fn buffer_description(&self) -> BufferDescription {
-        BufferDescription {
-            kind: T::Native::BUFFER_KIND,
-            nullable: false,
-        }
+    fn buffer_desc(&self) -> BufferDesc {
+        T::Native::buffer_desc(false)
     }
 
     fn fill_arrow_array(&self, column_view: AnySlice) -> ArrayRef {
@@ -104,11 +101,8 @@ where
     T: ArrowPrimitiveType,
     T::Native: Item,
 {
-    fn buffer_description(&self) -> BufferDescription {
-        BufferDescription {
-            kind: T::Native::BUFFER_KIND,
-            nullable: true,
-        }
+    fn buffer_desc(&self) -> BufferDesc {
+        T::Native::buffer_desc(true)
     }
 
     fn fill_arrow_array(&self, column_view: AnySlice) -> ArrayRef {
@@ -143,11 +137,8 @@ where
     O: Item,
     F: Fn(&O) -> P::Native,
 {
-    fn buffer_description(&self) -> BufferDescription {
-        BufferDescription {
-            kind: O::BUFFER_KIND,
-            nullable: false,
-        }
+    fn buffer_desc(&self) -> BufferDesc {
+        O::buffer_desc(false)
     }
 
     fn fill_arrow_array(&self, column_view: AnySlice) -> ArrayRef {
@@ -182,11 +173,8 @@ where
     O: Item,
     F: Fn(&O) -> P::Native,
 {
-    fn buffer_description(&self) -> BufferDescription {
-        BufferDescription {
-            kind: O::BUFFER_KIND,
-            nullable: true,
-        }
+    fn buffer_desc(&self) -> BufferDesc {
+        O::buffer_desc(true)
     }
 
     fn fill_arrow_array(&self, column_view: AnySlice) -> ArrayRef {

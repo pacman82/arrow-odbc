@@ -14,7 +14,7 @@ use arrow::{
     record_batch::{RecordBatch, RecordBatchReader},
 };
 use odbc_api::{
-    buffers::{AnyBuffer, AnySliceMut, BufferDescription, BufferDesc},
+    buffers::{AnyBuffer, AnySliceMut, BufferDesc},
     handles::{AsStatementRef, StatementImpl},
     ColumnarBulkInserter, Connection, Prepared, StatementConnection,
 };
@@ -174,9 +174,9 @@ where
             .iter()
             .map(field_to_write_strategy)
             .collect::<Result<_, _>>()?;
-        let descriptions = strategies.iter().map(|cws| cws.buffer_description());
+        let descriptions = strategies.iter().map(|cws| cws.buffer_desc());
         let inserter = statement
-            .into_any_column_inserter(row_capacity, descriptions)
+            .into_column_inserter(row_capacity, descriptions)
             .map_err(WriterError::BindParameterBuffers)?;
 
         Ok(Self {
@@ -292,12 +292,7 @@ impl<'o> OdbcWriter<StatementImpl<'o>> {
 
 pub trait WriteStrategy {
     /// Describe the buffer used to hold the array parameters for the column
-    fn buffer_description(&self) -> BufferDescription;
-
-    /// Describe the buffer used to hold the array parameters for the column
-    fn buffer_desc(&self) -> BufferDesc {
-        self.buffer_description().into()
-    }
+    fn buffer_desc(&self) -> BufferDesc;
 
     /// # Parameters
     ///

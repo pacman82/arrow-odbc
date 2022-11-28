@@ -8,7 +8,7 @@ use arrow::{
 };
 use chrono::{Datelike, NaiveDate, NaiveDateTime, Timelike};
 use odbc_api::{
-    buffers::{AnySliceMut, BufferDescription, BufferKind, TextColumnSliceMut},
+    buffers::{AnySliceMut, BufferDesc, TextColumnSliceMut},
     sys::{Date, Time, Timestamp},
 };
 
@@ -76,7 +76,8 @@ pub fn epoch_to_timestamp<const UNIT_FACTOR: i64>(from: i64) -> Timestamp {
         ((from % UNIT_FACTOR) * (1_000_000_000 / UNIT_FACTOR))
             .try_into()
             .unwrap(),
-    ).unwrap();
+    )
+    .unwrap();
     let date = ndt.date();
     let time = ndt.time();
     Timestamp {
@@ -212,12 +213,9 @@ impl<P> WriteStrategy for NullableTimeAsText<P>
 where
     P: TimePrimitive,
 {
-    fn buffer_description(&self) -> BufferDescription {
-        BufferDescription {
-            nullable: false,
-            kind: BufferKind::Text {
-                max_str_len: P::STR_LEN,
-            },
+    fn buffer_desc(&self) -> BufferDesc {
+        BufferDesc::Text {
+            max_str_len: P::STR_LEN,
         }
     }
 
