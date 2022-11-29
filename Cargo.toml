@@ -29,7 +29,7 @@ readme = "Readme.md"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-arrow = { version = ">= 25, < 28", default-features = false }
+arrow = { version = ">= 28, < 29", default-features = false }
 atoi = "2.0.0"
 chrono = "0.4.19"
 thiserror = "1.0.31"
