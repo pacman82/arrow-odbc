@@ -76,11 +76,11 @@ impl ReadStrategy for NullableBoolean {
 
 pub struct Decimal {
     precision: u8,
-    scale: u8,
+    scale: i8,
 }
 
 impl Decimal {
-    pub fn new(precision: u8, scale: u8) -> Self {
+    pub fn new(precision: u8, scale: i8) -> Self {
         Self { precision, scale }
     }
 }

@@ -2,37 +2,42 @@ use arrow::{
     array::{Array, Decimal128Array, Decimal256Array},
     datatypes::{ArrowPrimitiveType, Decimal256Type},
 };
-use odbc_api::buffers::{AnySliceMut, BufferDesc};
+use odbc_api::{buffers::{AnySliceMut, BufferDesc}};
 
 use crate::{odbc_writer::WriteStrategy, WriterError};
 
 pub struct NullableDecimal128AsText {
     precision: u8,
-    scale: u8,
+    scale: i8,
 }
 
 impl NullableDecimal128AsText {
-    pub fn new(precision: u8, scale: u8) -> Self {
+    pub fn new(precision: u8, scale: i8) -> Self {
         Self { precision, scale }
     }
 }
 
 pub struct NullableDecimal256AsText {
     precision: u8,
-    scale: u8,
+    scale: i8,
 }
 
 impl NullableDecimal256AsText {
-    pub fn new(precision: u8, scale: u8) -> Self {
+    pub fn new(precision: u8, scale: i8) -> Self {
         Self { precision, scale }
     }
 }
 
 /// Length of a text representation of a decimal
-fn len_text(scale: u8, precision: u8) -> usize {
-    let radix_character_length = if scale == 0 { 0 } else { 1 };
-    // Precision digits + optional point + sign
-    precision as usize + radix_character_length + 1
+fn len_text(scale: i8, precision: u8) -> usize {
+    match scale {
+        // Precision digits + (- scale zeroes)
+        i8::MIN..=-1 => (precision as i32 - scale as i32).try_into().unwrap(),
+        // Precision digits + sign
+        0 => precision as usize + 1,
+        // Precision digits + radix character (`.`) + sign
+        1.. => precision as usize + 1 + 1,
+    }
 }
 
 impl WriteStrategy for NullableDecimal128AsText {
@@ -94,7 +99,7 @@ impl WriteStrategy for NullableDecimal256AsText {
     }
 }
 
-fn write_i128_as_decimal(mut n: i128, precision: u8, scale: u8, text: &mut [u8]) {
+fn write_i128_as_decimal(mut n: i128, precision: u8, scale: i8, text: &mut [u8]) {
     if n.is_negative() {
         n *= n.signum();
         text[0] = b'-';
@@ -103,13 +108,15 @@ fn write_i128_as_decimal(mut n: i128, precision: u8, scale: u8, text: &mut [u8])
     }
 
     // Number of digits + one decimal separator (`.`)
-    let str_len = if scale == 0 { precision } else { precision + 1 };
+    let str_len: i32 = (len_text(scale, precision) - 1).try_into().unwrap();
 
     let ten = 10;
     for index in (0..str_len).rev() {
-        // The separator will not be printed in case of scale == 0 since index is never going to
+        let char = if index < -scale as i32 {
+            b'0'
+        // The separator will not be printed in case of scale <= 0 since index is never going to
         // reach `precision`.
-        let char = if index == precision - scale {
+        } else if index == precision as i32 - scale as i32 {
             b'.'
         } else {
             let digit: u8 = (n % ten) as u8;
@@ -119,11 +126,14 @@ fn write_i128_as_decimal(mut n: i128, precision: u8, scale: u8, text: &mut [u8])
         // +1 offset to make space for sign character
         text[index as usize + 1] = char;
     }
+
+    // In case of negative scale, fill the last digits with zeroes
+    
 }
 
 type I256 = <Decimal256Type as ArrowPrimitiveType>::Native;
 
-fn write_i256_as_decimal(mut n: I256, precision: u8, scale: u8, text: &mut [u8]) {
+fn write_i256_as_decimal(mut n: I256, precision: u8, scale: i8, text: &mut [u8]) {
     if n.lt(&I256::ZERO) {
         n = n.checked_mul(I256::MINUS_ONE).unwrap();
         text[0] = b'-';
@@ -132,13 +142,15 @@ fn write_i256_as_decimal(mut n: I256, precision: u8, scale: u8, text: &mut [u8])
     }
 
     // Number of digits + one decimal separator (`.`)
-    let str_len = if scale == 0 { precision } else { precision + 1 };
+    let str_len: i32 = (len_text(scale, precision) - 1).try_into().unwrap();
 
     let ten = I256::from_i128(10);
     for index in (0..str_len).rev() {
+        let char = if scale < 0 {
+            b'0'
         // The separator will not be printed in case of scale == 0 since index is never going to
         // reach `precision`.
-        let char = if index == precision - scale {
+        } else if index == precision as i32 - scale as i32{
             b'.'
         } else {
             let digit: u8 = n.checked_rem(ten).unwrap().to_i128().unwrap() as u8;

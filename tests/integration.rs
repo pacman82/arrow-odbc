@@ -664,7 +664,7 @@ fn fetch_schema_for_table() {
             nullable: false, \
             dict_id: 0, \
             dict_is_ordered: false, \
-            metadata: None \
+            metadata: {} \
         }",
         schema.to_string()
     )
@@ -1491,6 +1491,33 @@ fn insert_decimal_256() {
     // Then
     let actual = table_to_string(&conn, table_name, &["a"]);
     let expected = "12.345\nNULL";
+    assert_eq!(expected, actual);
+}
+
+#[test]
+fn insert_decimal_128_with_negative_scale() {
+    // Given a table and a record batch reader returning a batch with a text column.
+    let table_name = function_name!().rsplit_once(':').unwrap().1;
+    let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
+    setup_empty_table(&conn, table_name, &["NUMERIC(5,0)"]).unwrap();
+    let array: Decimal128Array = [Some(123), None, Some(456), Some(1), Some(10)]
+        .into_iter()
+        .collect();
+    let array = array.with_precision_and_scale(5, -2).unwrap();
+    let schema = Arc::new(Schema::new(vec![Field::new(
+        "a",
+        DataType::Decimal128(5, -2),
+        true,
+    )]));
+    let batch = RecordBatch::try_new(schema.clone(), vec![Arc::new(array)]).unwrap();
+    let mut reader = StubBatchReader::new(schema, vec![batch]);
+
+    // When
+    insert_into_table(&conn, &mut reader, table_name, 2).unwrap();
+
+    // Then
+    let actual = table_to_string(&conn, table_name, &["a"]);
+    let expected = "12300\nNULL\n45600\n100\n1000";
     assert_eq!(expected, actual);
 }
 
