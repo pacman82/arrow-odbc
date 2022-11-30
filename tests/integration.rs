@@ -165,7 +165,11 @@ fn fetch_decimal128_negative_scale_unsupported() {
 
     // Specify Uint8 manually, since inference of the arrow type from the sql type would yield a
     // signed 8 bit integer.
-    let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Decimal128(3, -2), false)]));
+    let schema = Arc::new(Schema::new(vec![Field::new(
+        "a",
+        DataType::Decimal128(3, -2),
+        false,
+    )]));
 
     let result = OdbcReader::with_arrow_schema(cursor, max_batch_size, schema);
 
@@ -1572,7 +1576,7 @@ fn insert_decimal_256_with_negative_scale() {
     let array = builder.finish().with_precision_and_scale(3, -2).unwrap();
     let schema = Arc::new(Schema::new(vec![Field::new(
         "a",
-        DataType::Decimal256(3, - 2),
+        DataType::Decimal256(3, -2),
         true,
     )]));
     let batch = RecordBatch::try_new(schema.clone(), vec![Arc::new(array)]).unwrap();

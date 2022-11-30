@@ -2,7 +2,7 @@ use arrow::{
     array::{Array, Decimal128Array, Decimal256Array},
     datatypes::{ArrowPrimitiveType, Decimal256Type},
 };
-use odbc_api::{buffers::{AnySliceMut, BufferDesc}};
+use odbc_api::buffers::{AnySliceMut, BufferDesc};
 
 use crate::{odbc_writer::WriteStrategy, WriterError};
 
@@ -148,7 +148,7 @@ fn write_i256_as_decimal(mut n: I256, precision: u8, scale: i8, text: &mut [u8])
             b'0'
         // The separator will not be printed in case of scale == 0 since index is never going to
         // reach `precision`.
-        } else if index == precision as i32 - scale as i32{
+        } else if index == precision as i32 - scale as i32 {
             b'.'
         } else {
             let digit: u8 = n.checked_rem(ten).unwrap().to_i128().unwrap() as u8;
