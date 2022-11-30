@@ -1503,10 +1503,10 @@ fn insert_decimal_128_with_negative_scale() {
     let array: Decimal128Array = [Some(123), None, Some(456), Some(1), Some(10)]
         .into_iter()
         .collect();
-    let array = array.with_precision_and_scale(5, -2).unwrap();
+    let array = array.with_precision_and_scale(3, -2).unwrap();
     let schema = Arc::new(Schema::new(vec![Field::new(
         "a",
-        DataType::Decimal128(5, -2),
+        DataType::Decimal128(3, -2),
         true,
     )]));
     let batch = RecordBatch::try_new(schema.clone(), vec![Arc::new(array)]).unwrap();
@@ -1518,6 +1518,36 @@ fn insert_decimal_128_with_negative_scale() {
     // Then
     let actual = table_to_string(&conn, table_name, &["a"]);
     let expected = "12300\nNULL\n45600\n100\n1000";
+    assert_eq!(expected, actual);
+}
+
+#[test]
+fn insert_decimal_256_with_negative_scale() {
+    // Given a table and a record batch reader returning a batch with a text column.
+    let table_name = function_name!().rsplit_once(':').unwrap().1;
+    let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
+    setup_empty_table(&conn, table_name, &["NUMERIC(5,0)"]).unwrap();
+    let mut builder = Decimal256Builder::new();
+    let mut bytes = [0u8; 32];
+    type I256 = <Decimal256Type as ArrowPrimitiveType>::Native;
+    bytes[0..4].copy_from_slice(123i32.to_le_bytes().as_slice());
+    builder.append_value(I256::from_le_bytes(bytes));
+    builder.append_null();
+    let array = builder.finish().with_precision_and_scale(3, -2).unwrap();
+    let schema = Arc::new(Schema::new(vec![Field::new(
+        "a",
+        DataType::Decimal256(3, - 2),
+        true,
+    )]));
+    let batch = RecordBatch::try_new(schema.clone(), vec![Arc::new(array)]).unwrap();
+    let mut reader = StubBatchReader::new(schema, vec![batch]);
+
+    // When
+    insert_into_table(&conn, &mut reader, table_name, 5).unwrap();
+
+    // Then
+    let actual = table_to_string(&conn, table_name, &["a"]);
+    let expected = "12300\nNULL";
     assert_eq!(expected, actual);
 }
 
