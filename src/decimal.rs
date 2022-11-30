@@ -31,8 +31,8 @@ impl NullableDecimal256AsText {
 /// Length of a text representation of a decimal
 fn len_text(scale: i8, precision: u8) -> usize {
     match scale {
-        // Precision digits + (- scale zeroes)
-        i8::MIN..=-1 => (precision as i32 - scale as i32).try_into().unwrap(),
+        // Precision digits + (- scale zeroes) + sign
+        i8::MIN..=-1 => (precision as i32 - scale as i32 + 1).try_into().unwrap(),
         // Precision digits + sign
         0 => precision as usize + 1,
         // Precision digits + radix character (`.`) + sign
@@ -112,7 +112,8 @@ fn write_i128_as_decimal(mut n: i128, precision: u8, scale: i8, text: &mut [u8])
 
     let ten = 10;
     for index in (0..str_len).rev() {
-        let char = if index < -scale as i32 {
+        // In case of negative scale, fill the last digits with zeroes
+        let char = if (str_len - index) <= -scale as i32 {
             b'0'
         // The separator will not be printed in case of scale <= 0 since index is never going to
         // reach `precision`.
@@ -126,9 +127,6 @@ fn write_i128_as_decimal(mut n: i128, precision: u8, scale: i8, text: &mut [u8])
         // +1 offset to make space for sign character
         text[index as usize + 1] = char;
     }
-
-    // In case of negative scale, fill the last digits with zeroes
-    
 }
 
 type I256 = <Decimal256Type as ArrowPrimitiveType>::Native;
@@ -146,7 +144,7 @@ fn write_i256_as_decimal(mut n: I256, precision: u8, scale: i8, text: &mut [u8])
 
     let ten = I256::from_i128(10);
     for index in (0..str_len).rev() {
-        let char = if scale < 0 {
+        let char = if (str_len - index) <= -scale as i32 {
             b'0'
         // The separator will not be printed in case of scale == 0 since index is never going to
         // reach `precision`.
