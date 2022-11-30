@@ -143,6 +143,42 @@ fn fetch_8bit_unsigned_integer_explicit_schema() {
     assert_eq!([1, 2, 3], array_vals.values());
 }
 
+/// Fill a record batch with non nullable Integer 8 Bit usigned integer. Since that type would never
+/// interferred from the Database automatically it must be specified explicitly in a schema
+#[test]
+fn fetch_decimal128_negative_scale_unsupported() {
+    let table_name = function_name!().rsplit_once(':').unwrap().1;
+    // Setup table with dummy value, we won't be able to read it though
+    let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
+    setup_empty_table(&conn, table_name, &["NUMERIC(5,0) NOT NULL"]).unwrap();
+    let sql = format!("INSERT INTO {} (a) VALUES (12300)", table_name);
+    conn.execute(&sql, ()).unwrap();
+
+    // Query column with values to get a cursor
+    let sql = format!("SELECT a FROM {}", table_name);
+    let cursor = conn.execute(&sql, ()).unwrap().unwrap();
+
+    // Now that we have a cursor, we want to iterate over its rows and fill an arrow batch with it.
+
+    // Batches will contain at most 100 entries.
+    let max_batch_size = 100;
+
+    // Specify Uint8 manually, since inference of the arrow type from the sql type would yield a
+    // signed 8 bit integer.
+    let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Decimal128(3, -2), false)]));
+
+    let result = OdbcReader::with_arrow_schema(cursor, max_batch_size, schema);
+
+    assert!(matches!(
+        result,
+        Err(Error::ColumnFailure {
+            source: ColumnFailure::UnsupportedArrowType(DataType::Decimal128(3, -2)),
+            index: 0,
+            name: _
+        })
+    ))
+}
+
 /// Observe that an explicitly specified Uint16 triggers an unsupported error
 #[test]
 fn unsupported_16bit_unsigned_integer() {

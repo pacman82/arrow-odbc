@@ -188,7 +188,7 @@ pub fn choose_column_strategy(
                 buffer_allocation_options.max_text_size,
             )?
         }
-        ArrowDataType::Decimal128(precision, scale) => Box::new(Decimal::new(*precision, *scale)),
+        ArrowDataType::Decimal128(precision, scale @ 0..) => Box::new(Decimal::new(*precision, *scale)),
         ArrowDataType::Binary => {
             let sql_type = query_metadata
                 .col_data_type(col_index)
@@ -224,6 +224,7 @@ pub fn choose_column_strategy(
             Box::new(FixedSizedBinary::new((*length).try_into().unwrap()))
         }
         arrow_type @ (ArrowDataType::Null
+        | ArrowDataType::Decimal128(_, i8::MIN..=-1)
         | ArrowDataType::Decimal256(..)
         | ArrowDataType::Date64
         | ArrowDataType::Time32(..)
