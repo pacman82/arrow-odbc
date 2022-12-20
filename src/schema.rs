@@ -47,7 +47,7 @@ pub fn arrow_schema_from(resut_set_metadata: &mut impl ResultSetMetadata) -> Res
             })?;
 
         let field = Field::new(
-            &column_description
+            column_description
                 .name_to_string()
                 .expect("Column name must be representable in utf8"),
             match column_description.data_type {
