@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.26.4
+
+* Update arrow `>= 29, < 31` -> `>= 29, < 33`
+* Depreacte `WriterError::TimeZonesNotSupported` in favor of `WriterError::UnsupportedArrowDataType`.
+
 ## 0.26.3
 
 * Update arrow `>= 29, < 31` -> `>= 29, < 32`

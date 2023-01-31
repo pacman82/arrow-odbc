@@ -225,28 +225,10 @@ pub fn choose_column_strategy(
         ArrowDataType::FixedSizeBinary(length) => {
             Box::new(FixedSizedBinary::new((*length).try_into().unwrap()))
         }
-        arrow_type @ (ArrowDataType::Null
-        | ArrowDataType::Decimal128(_, i8::MIN..=-1)
-        | ArrowDataType::Decimal256(..)
-        | ArrowDataType::Date64
-        | ArrowDataType::Time32(..)
-        | ArrowDataType::Time64(..)
-        | ArrowDataType::Duration(..)
-        | ArrowDataType::Interval(..)
-        | ArrowDataType::LargeBinary
-        | ArrowDataType::LargeUtf8
-        | ArrowDataType::List(..)
-        | ArrowDataType::FixedSizeList(..)
-        | ArrowDataType::LargeList(..)
-        | ArrowDataType::Struct(..)
-        | ArrowDataType::Union(..)
-        | ArrowDataType::Dictionary(..)
-        | ArrowDataType::UInt16
-        | ArrowDataType::UInt32
-        | ArrowDataType::UInt64
-        | ArrowDataType::Map(..)
-        | ArrowDataType::Float16) => {
-            return Err(ColumnFailure::UnsupportedArrowType(arrow_type.clone()))
+        unsupported_arrow_type => {
+            return Err(ColumnFailure::UnsupportedArrowType(
+                unsupported_arrow_type.clone(),
+            ))
         }
     };
     Ok(strat)

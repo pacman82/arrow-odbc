@@ -67,7 +67,7 @@ fn insert_statement_text(table: &str, column_names: &[&'_ str]) -> String {
         .map(|_| "?")
         .collect::<Vec<_>>()
         .join(", ");
-    format!("INSERT INTO {} ({}) VALUES ({});", table, columns, values)
+    format!("INSERT INTO {table} ({columns}) VALUES ({values});")
 }
 
 /// Creates an SQL insert statement from an arrow schema. The resulting statement will have one
@@ -124,6 +124,7 @@ pub enum WriterError {
         source: odbc_api::Error,
         sql: String,
     },
+    #[deprecated(note="Use Variant UnsupportedArrowDataType instead")]
     #[error("Inserting arrays with timestamp information is currently not supported.")]
     TimeZonesNotSupported,
 }
@@ -321,51 +322,48 @@ fn field_to_write_strategy(field: &Field) -> Result<Box<dyn WriteStrategy>, Writ
         DataType::Float16 => Float16Type::map_with(is_nullable, |half| half.to_f32()),
         DataType::Float32 => Float32Type::identical(is_nullable),
         DataType::Float64 => Float64Type::identical(is_nullable),
-        DataType::Timestamp(TimeUnit::Second, None) => TimestampSecondType::map_with(is_nullable, epoch_to_timestamp::<1>),
-        DataType::Timestamp(TimeUnit::Millisecond, None) => TimestampMillisecondType::map_with(is_nullable, epoch_to_timestamp::<1_000>),
-        DataType::Timestamp(TimeUnit::Microsecond, None) => TimestampMicrosecondType::map_with(is_nullable, epoch_to_timestamp::<1_000_000>),
-        DataType::Timestamp(TimeUnit::Nanosecond, None) => {TimestampNanosecondType::map_with(is_nullable, |ns| {
-            // Drop the last to digits of precision, since we bind it with precision 7 and not 9.
-            epoch_to_timestamp::<10_000_000>(ns / 100)
-        })},
-        DataType::Date32 => Date32Type::map_with(is_nullable, epoch_to_date),
-        DataType::Date64 => Date64Type::map_with(is_nullable, |days_since_epoch| epoch_to_date(days_since_epoch.try_into().unwrap())),
-        DataType::Time32(TimeUnit::Second) => Time32SecondType::map_with(is_nullable, sec_since_midnight_to_time),
-        DataType::Time32(TimeUnit::Millisecond) => Box::new(NullableTimeAsText::<Time32MillisecondType>::new()),
-        DataType::Time64(TimeUnit::Microsecond) => Box::new(NullableTimeAsText::<Time64MicrosecondType>::new()),
-        DataType::Time64(TimeUnit::Nanosecond) => Box::new(NullableTimeAsText::<Time64NanosecondType>::new()),
-        DataType::Binary => Box::new(VariadicBinary::new(1)),
-        DataType::FixedSizeBinary(length) => Box::new(VariadicBinary::new((*length).try_into().unwrap())),
-        DataType::Decimal128(precision, scale) => Box::new(NullableDecimal128AsText::new(*precision, *scale)),
-        DataType::Decimal256(precision, scale) => Box::new(NullableDecimal256AsText::new(*precision, *scale)),
-        // Maybe we can support timezones, by converting the timestamps to UTC and change the SQL
-        // Data type to timestamp UTC.
-        DataType::Timestamp(_, Some(_)) => return Err(WriterError::TimeZonesNotSupported),
-        unsupported @ (DataType::Null
-        | DataType::LargeBinary
-        | DataType::LargeUtf8
-        // We could support u64 with upstream changes, but best if user supplies the sql data type.
-        | DataType::UInt64
-        // We could support u32 with upstream changes, but best if user supplies the sql data type.
-        | DataType::UInt32
-        // We could support u16 with upstream changes, but best if user supplies the sql data type.
-        | DataType::UInt16
-        // Only Second and millisecond can be represented as a 32Bit integer
-        | DataType::Time32(TimeUnit::Microsecond)
-        | DataType::Time32(TimeUnit::Nanosecond)
-        | DataType::Time64(TimeUnit::Second)
-        | DataType::Time64(TimeUnit::Millisecond)
-        | DataType::Interval(_)
-        | DataType::Duration(_)
-        | DataType::List(_)
-        | DataType::LargeList(_)
-        | DataType::FixedSizeList(_, _)
-        | DataType::Struct(_)
-        | DataType::Union(_, _, _)
-        | DataType::Dictionary(_, _)
-        | DataType::Map(_, _)) => {
-            return Err(WriterError::UnsupportedArrowDataType(unsupported.clone()))
+        DataType::Timestamp(TimeUnit::Second, None) => {
+            TimestampSecondType::map_with(is_nullable, epoch_to_timestamp::<1>)
         }
+        DataType::Timestamp(TimeUnit::Millisecond, None) => {
+            TimestampMillisecondType::map_with(is_nullable, epoch_to_timestamp::<1_000>)
+        }
+        DataType::Timestamp(TimeUnit::Microsecond, None) => {
+            TimestampMicrosecondType::map_with(is_nullable, epoch_to_timestamp::<1_000_000>)
+        }
+        DataType::Timestamp(TimeUnit::Nanosecond, None) => {
+            TimestampNanosecondType::map_with(is_nullable, |ns| {
+                // Drop the last to digits of precision, since we bind it with precision 7 and not 9.
+                epoch_to_timestamp::<10_000_000>(ns / 100)
+            })
+        }
+        DataType::Date32 => Date32Type::map_with(is_nullable, epoch_to_date),
+        DataType::Date64 => Date64Type::map_with(is_nullable, |days_since_epoch| {
+            epoch_to_date(days_since_epoch.try_into().unwrap())
+        }),
+        DataType::Time32(TimeUnit::Second) => {
+            Time32SecondType::map_with(is_nullable, sec_since_midnight_to_time)
+        }
+        DataType::Time32(TimeUnit::Millisecond) => {
+            Box::new(NullableTimeAsText::<Time32MillisecondType>::new())
+        }
+        DataType::Time64(TimeUnit::Microsecond) => {
+            Box::new(NullableTimeAsText::<Time64MicrosecondType>::new())
+        }
+        DataType::Time64(TimeUnit::Nanosecond) => {
+            Box::new(NullableTimeAsText::<Time64NanosecondType>::new())
+        }
+        DataType::Binary => Box::new(VariadicBinary::new(1)),
+        DataType::FixedSizeBinary(length) => {
+            Box::new(VariadicBinary::new((*length).try_into().unwrap()))
+        }
+        DataType::Decimal128(precision, scale) => {
+            Box::new(NullableDecimal128AsText::new(*precision, *scale))
+        }
+        DataType::Decimal256(precision, scale) => {
+            Box::new(NullableDecimal256AsText::new(*precision, *scale))
+        }
+        unsupported => return Err(WriterError::UnsupportedArrowDataType(unsupported.clone())),
     };
     Ok(strategy)
 }

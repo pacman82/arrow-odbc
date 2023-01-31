@@ -149,11 +149,7 @@ impl TimePrimitive for Time32MillisecondType {
         let fraction = from % Self::PRECISION_FACTOR;
         write!(
             to.set_mut(index, Self::STR_LEN),
-            "{:02}:{:02}:{:02}.{:03}",
-            hour,
-            minute,
-            second,
-            fraction
+            "{hour:02}:{minute:02}:{second:02}.{fraction:03}"
         )
         .unwrap();
     }
@@ -174,11 +170,7 @@ impl TimePrimitive for Time64MicrosecondType {
         let fraction = from % Self::PRECISION_FACTOR;
         write!(
             to.set_mut(index, Self::STR_LEN),
-            "{:02}:{:02}:{:02}.{:06}",
-            hour,
-            minute,
-            second,
-            fraction
+            "{hour:02}:{minute:02}:{second:02}.{fraction:06}"
         )
         .unwrap();
     }
@@ -199,11 +191,7 @@ impl TimePrimitive for Time64NanosecondType {
         let fraction = (from % Self::PRECISION_FACTOR) / 100;
         write!(
             to.set_mut(index, Self::STR_LEN),
-            "{:02}:{:02}:{:02}.{:07}",
-            hour,
-            minute,
-            second,
-            fraction
+            "{hour:02}:{minute:02}:{second:02}.{fraction:07}"
         )
         .unwrap();
     }

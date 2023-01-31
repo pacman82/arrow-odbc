@@ -113,11 +113,11 @@ fn fetch_8bit_unsigned_integer_explicit_schema() {
     // Setup a table on the database with some floats (so we can fetch them)
     let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
     setup_empty_table(&conn, table_name, &["TINYINT NOT NULL"]).unwrap();
-    let sql = format!("INSERT INTO {} (a) VALUES (1),(2),(3)", table_name);
+    let sql = format!("INSERT INTO {table_name} (a) VALUES (1),(2),(3)");
     conn.execute(&sql, ()).unwrap();
 
     // Query column with values to get a cursor
-    let sql = format!("SELECT a FROM {}", table_name);
+    let sql = format!("SELECT a FROM {table_name}");
     let cursor = conn.execute(&sql, ()).unwrap().unwrap();
 
     // Now that we have a cursor, we want to iterate over its rows and fill an arrow batch with it.
@@ -151,11 +151,11 @@ fn fetch_decimal128_negative_scale_unsupported() {
     // Setup table with dummy value, we won't be able to read it though
     let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
     setup_empty_table(&conn, table_name, &["NUMERIC(5,0) NOT NULL"]).unwrap();
-    let sql = format!("INSERT INTO {} (a) VALUES (12300)", table_name);
+    let sql = format!("INSERT INTO {table_name} (a) VALUES (12300)");
     conn.execute(&sql, ()).unwrap();
 
     // Query column with values to get a cursor
-    let sql = format!("SELECT a FROM {}", table_name);
+    let sql = format!("SELECT a FROM {table_name}");
     let cursor = conn.execute(&sql, ()).unwrap().unwrap();
 
     // Now that we have a cursor, we want to iterate over its rows and fill an arrow batch with it.
@@ -191,11 +191,11 @@ fn unsupported_16bit_unsigned_integer() {
     // Setup a table on the database with some floats (so we can fetch them)
     let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
     setup_empty_table(&conn, table_name, &["SMALLINT NOT NULL"]).unwrap();
-    let sql = format!("INSERT INTO {} (a) VALUES (1),(2),(3)", table_name);
+    let sql = format!("INSERT INTO {table_name} (a) VALUES (1),(2),(3)");
     conn.execute(&sql, ()).unwrap();
 
     // Query column with values to get a cursor
-    let sql = format!("SELECT a FROM {}", table_name);
+    let sql = format!("SELECT a FROM {table_name}");
     let cursor = conn.execute(&sql, ()).unwrap().unwrap();
 
     // Now that we have a cursor, we want to iterate over its rows and fill an arrow batch with it.
@@ -548,7 +548,7 @@ fn fetch_varbinary_data() {
     // Setup a table on the database with some values (so we can fetch them)
     let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
     setup_empty_table(&conn, table_name, &["VARBINARY(30) NOT NULL"]).unwrap();
-    let sql = format!("INSERT INTO {} (a) VALUES (?)", table_name);
+    let sql = format!("INSERT INTO {table_name} (a) VALUES (?)");
     // Use prepared query and arguments for insertion, since literal representation depends a lot
     // on the DB under test.
     let mut insert = conn.prepare(&sql).unwrap();
@@ -556,7 +556,7 @@ fn fetch_varbinary_data() {
     insert.execute(&b"World".into_parameter()).unwrap();
 
     // Query column with values to get a cursor
-    let sql = format!("SELECT a FROM {} ORDER BY id", table_name);
+    let sql = format!("SELECT a FROM {table_name} ORDER BY id");
     let cursor = conn.execute(&sql, ()).unwrap().unwrap();
 
     // Now that we have a cursor, we want to iterate over its rows and fill an arrow batch with it.
@@ -588,7 +588,7 @@ fn fetch_fixed_sized_binary_data() {
     // Setup a table on the database with some values (so we can fetch them)
     let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
     setup_empty_table(&conn, table_name, &["BINARY(5) NOT NULL"]).unwrap();
-    let sql = format!("INSERT INTO {} (a) VALUES (?)", table_name);
+    let sql = format!("INSERT INTO {table_name} (a) VALUES (?)");
     // Use prepared query and arguments for insertion, since literal representation depends a lot
     // on the DB under test.
     let mut insert = conn.prepare(&sql).unwrap();
@@ -596,7 +596,7 @@ fn fetch_fixed_sized_binary_data() {
     insert.execute(&b"World".into_parameter()).unwrap();
 
     // Query column with values to get a cursor
-    let sql = format!("SELECT a FROM {} ORDER BY id", table_name);
+    let sql = format!("SELECT a FROM {table_name} ORDER BY id");
     let cursor = conn.execute(&sql, ()).unwrap().unwrap();
 
     // Now that we have a cursor, we want to iterate over its rows and fill an arrow batch with it.
@@ -628,11 +628,11 @@ fn prepared_query() {
     // Setup a table on the database with some floats (so we can fetch them)
     let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
     setup_empty_table(&conn, table_name, &["REAL NOT NULL"]).unwrap();
-    let sql = format!("INSERT INTO {} (a) VALUES (1),(2),(3)", table_name);
+    let sql = format!("INSERT INTO {table_name} (a) VALUES (1),(2),(3)");
     conn.execute(&sql, ()).unwrap();
 
     // Query column with values to get a cursor
-    let sql = format!("SELECT a FROM {}", table_name);
+    let sql = format!("SELECT a FROM {table_name}");
     let mut prepared = conn.prepare(&sql).unwrap();
     let cursor = prepared.execute(()).unwrap().unwrap();
 
@@ -665,7 +665,7 @@ fn infer_schema() {
     setup_empty_table(&conn, table_name, &["REAL NOT NULL"]).unwrap();
 
     // Prepare query to get metadata
-    let sql = format!("SELECT a FROM {}", table_name);
+    let sql = format!("SELECT a FROM {table_name}");
     let cursor = conn.execute(&sql, ()).unwrap().unwrap();
 
     // Now that we have a cursor, we want to iterate over its rows and fill an arrow batch with it.
@@ -691,7 +691,7 @@ fn fetch_schema_for_table() {
     setup_empty_table(&conn, table_name, &["REAL NOT NULL"]).unwrap();
 
     // Prepare query to get metadata
-    let sql = format!("SELECT a FROM {}", table_name);
+    let sql = format!("SELECT a FROM {table_name}");
     let mut prepared = conn.prepare(&sql).unwrap();
 
     // Now that we have prepared statement, we want to use it to query metadata.
@@ -1622,20 +1622,17 @@ fn setup_empty_table(
     table_name: &str,
     column_types: &[&str],
 ) -> Result<(), odbc_api::Error> {
-    let drop_table = &format!("DROP TABLE IF EXISTS {}", table_name);
+    let drop_table = &format!("DROP TABLE IF EXISTS {table_name}");
 
     let column_names = &["a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l"];
     let cols = column_types
         .iter()
         .zip(column_names)
-        .map(|(ty, name)| format!("{} {}", name, ty))
+        .map(|(ty, name)| format!("{name} {ty}"))
         .collect::<Vec<_>>()
         .join(", ");
 
-    let create_table = format!(
-        "CREATE TABLE {} (id int IDENTITY(1,1),{});",
-        table_name, cols
-    );
+    let create_table = format!("CREATE TABLE {table_name} (id int IDENTITY(1,1),{cols});");
     conn.execute(drop_table, ())?;
     conn.execute(&create_table, ())?;
     Ok(())
@@ -1644,7 +1641,7 @@ fn setup_empty_table(
 /// Query the table and prints it contents to a string
 pub fn table_to_string(conn: &Connection<'_>, table_name: &str, column_names: &[&str]) -> String {
     let cols = column_names.join(", ");
-    let query = format!("SELECT {} FROM {}", cols, table_name);
+    let query = format!("SELECT {cols} FROM {table_name}");
     let cursor = conn.execute(&query, ()).unwrap().unwrap();
     cursor_to_string(cursor)
 }
