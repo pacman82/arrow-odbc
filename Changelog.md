@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.26.9
+
+* Fix code sample in Readme
+
 ## 0.26.8
 
 * Update odbc-api `>= 0.52.3, < 0.55.0` -> `>= 0.52.3, < 0.56.0`
