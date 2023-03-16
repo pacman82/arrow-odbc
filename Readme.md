@@ -17,7 +17,7 @@ Fill Apache Arrow arrays from ODBC data sources. `arrow-odbc` is build on top of
 ## Usage
 
 ```rust
-use arrow_odbc::{odbc_api::Environment, OdbcReader};
+use arrow_odbc::{odbc_api::{Environment, ConnectionOptions}, OdbcReader};
 
 const CONNECTION_STRING: &str = "\
     Driver={ODBC Driver 17 for SQL Server};\
@@ -31,7 +31,10 @@ fn main() -> Result<(), anyhow::Error> {
     let odbc_environment = Environment::new()?;
     
     // Connect with database.
-    let connection = odbc_environment.connect_with_connection_string(CONNECTION_STRING)?;
+    let connection = odbc_environment.connect_with_connection_string(
+        CONNECTION_STRING,
+        ConnectionOptions::default(),
+    )?;
 
     // This SQL statement does not require any arguments.
     let parameters = ();
