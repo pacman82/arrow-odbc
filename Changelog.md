@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.26.7
+
+* Fix crate version for release
+
 ## 0.26.6
 
 * Update arrow `>= 29, < 34` -> `>= 29, < 36`
