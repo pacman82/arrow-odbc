@@ -27,13 +27,13 @@ use arrow_odbc::{
     arrow::array::Float64Array,
     arrow_schema_from, insert_into_table,
     odbc_api::{
+        buffers::TextRowSet,
         sys::{AttrConnectionPooling, AttrCpMatch},
-        Connection, Environment,
+        Connection, ConnectionOptions, Cursor, CursorImpl, Environment, IntoParameter,
+        StatementConnection,
     },
     BufferAllocationOptions, ColumnFailure, Error, OdbcReader, OdbcWriter, WriterError,
 };
-
-use odbc_api::{buffers::TextRowSet, Cursor, CursorImpl, IntoParameter, StatementConnection};
 
 use stdext::function_name;
 
@@ -111,7 +111,9 @@ fn fetch_8bit_unsigned_integer_explicit_schema() {
     let table_name = function_name!().rsplit_once(':').unwrap().1;
 
     // Setup a table on the database with some floats (so we can fetch them)
-    let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
+    let conn = ENV
+        .connect_with_connection_string(MSSQL, Default::default())
+        .unwrap();
     setup_empty_table(&conn, table_name, &["TINYINT NOT NULL"]).unwrap();
     let sql = format!("INSERT INTO {table_name} (a) VALUES (1),(2),(3)");
     conn.execute(&sql, ()).unwrap();
@@ -149,7 +151,9 @@ fn fetch_8bit_unsigned_integer_explicit_schema() {
 fn fetch_decimal128_negative_scale_unsupported() {
     let table_name = function_name!().rsplit_once(':').unwrap().1;
     // Setup table with dummy value, we won't be able to read it though
-    let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
+    let conn = ENV
+        .connect_with_connection_string(MSSQL, Default::default())
+        .unwrap();
     setup_empty_table(&conn, table_name, &["NUMERIC(5,0) NOT NULL"]).unwrap();
     let sql = format!("INSERT INTO {table_name} (a) VALUES (12300)");
     conn.execute(&sql, ()).unwrap();
@@ -189,7 +193,9 @@ fn unsupported_16bit_unsigned_integer() {
     let table_name = function_name!().rsplit_once(':').unwrap().1;
 
     // Setup a table on the database with some floats (so we can fetch them)
-    let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
+    let conn = ENV
+        .connect_with_connection_string(MSSQL, Default::default())
+        .unwrap();
     setup_empty_table(&conn, table_name, &["SMALLINT NOT NULL"]).unwrap();
     let sql = format!("INSERT INTO {table_name} (a) VALUES (1),(2),(3)");
     conn.execute(&sql, ()).unwrap();
@@ -546,7 +552,9 @@ fn fetch_varbinary_data() {
     let table_name = function_name!().rsplit_once(':').unwrap().1;
 
     // Setup a table on the database with some values (so we can fetch them)
-    let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
+    let conn = ENV
+        .connect_with_connection_string(MSSQL, Default::default())
+        .unwrap();
     setup_empty_table(&conn, table_name, &["VARBINARY(30) NOT NULL"]).unwrap();
     let sql = format!("INSERT INTO {table_name} (a) VALUES (?)");
     // Use prepared query and arguments for insertion, since literal representation depends a lot
@@ -586,7 +594,9 @@ fn fetch_fixed_sized_binary_data() {
     let table_name = function_name!().rsplit_once(':').unwrap().1;
 
     // Setup a table on the database with some values (so we can fetch them)
-    let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
+    let conn = ENV
+        .connect_with_connection_string(MSSQL, Default::default())
+        .unwrap();
     setup_empty_table(&conn, table_name, &["BINARY(5) NOT NULL"]).unwrap();
     let sql = format!("INSERT INTO {table_name} (a) VALUES (?)");
     // Use prepared query and arguments for insertion, since literal representation depends a lot
@@ -626,7 +636,9 @@ fn prepared_query() {
     let table_name = function_name!().rsplit_once(':').unwrap().1;
 
     // Setup a table on the database with some floats (so we can fetch them)
-    let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
+    let conn = ENV
+        .connect_with_connection_string(MSSQL, Default::default())
+        .unwrap();
     setup_empty_table(&conn, table_name, &["REAL NOT NULL"]).unwrap();
     let sql = format!("INSERT INTO {table_name} (a) VALUES (1),(2),(3)");
     conn.execute(&sql, ()).unwrap();
@@ -661,7 +673,9 @@ fn infer_schema() {
     let table_name = function_name!().rsplit_once(':').unwrap().1;
 
     // Setup a table on the database with some floats (so we can fetch them)
-    let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
+    let conn = ENV
+        .connect_with_connection_string(MSSQL, Default::default())
+        .unwrap();
     setup_empty_table(&conn, table_name, &["REAL NOT NULL"]).unwrap();
 
     // Prepare query to get metadata
@@ -687,7 +701,9 @@ fn fetch_schema_for_table() {
     let table_name = function_name!().rsplit_once(':').unwrap().1;
 
     // Setup a table on the database with some floats (so we can fetch them)
-    let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
+    let conn = ENV
+        .connect_with_connection_string(MSSQL, Default::default())
+        .unwrap();
     setup_empty_table(&conn, table_name, &["REAL NOT NULL"]).unwrap();
 
     // Prepare query to get metadata
@@ -764,7 +780,9 @@ fn should_allocate_enough_memory_for_varchar_column_bound_to_u16() {
 fn should_allow_to_fetch_from_varchar_max() {
     // Given
     let table_name = function_name!().rsplit_once(':').unwrap().1;
-    let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
+    let conn = ENV
+        .connect_with_connection_string(MSSQL, Default::default())
+        .unwrap();
     setup_empty_table(&conn, table_name, &["VARCHAR(MAX)"]).unwrap();
     let sql = format!("SELECT a FROM {table_name}");
     let cursor = conn.execute(&sql, ()).unwrap().unwrap();
@@ -788,7 +806,9 @@ fn should_allow_to_fetch_from_varchar_max() {
 fn should_error_for_truncation() {
     // Given a column with one value of length 9
     let table_name = function_name!().rsplit_once(':').unwrap().1;
-    let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
+    let conn = ENV
+        .connect_with_connection_string(MSSQL, Default::default())
+        .unwrap();
     setup_empty_table(&conn, table_name, &["VARCHAR(MAX)"]).unwrap();
     let sql = format!("INSERT INTO {table_name} (a) VALUES ('123456789')");
     conn.execute(&sql, ()).unwrap();
@@ -814,7 +834,9 @@ fn should_error_for_truncation() {
 fn should_allow_to_fetch_from_varbinary_max() {
     // Given
     let table_name = function_name!().rsplit_once(':').unwrap().1;
-    let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
+    let conn = ENV
+        .connect_with_connection_string(MSSQL, Default::default())
+        .unwrap();
     setup_empty_table(&conn, table_name, &["VARBINARY(MAX)"]).unwrap();
     let sql = format!("SELECT a FROM {table_name}");
     let cursor = conn.execute(&sql, ()).unwrap().unwrap();
@@ -837,7 +859,9 @@ fn should_allow_to_fetch_from_varbinary_max() {
 fn fallibale_allocations() {
     // Given
     let table_name = function_name!().rsplit_once(':').unwrap().1;
-    let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
+    let conn = ENV
+        .connect_with_connection_string(MSSQL, Default::default())
+        .unwrap();
     setup_empty_table(&conn, table_name, &["VARBINARY(4096)"]).unwrap();
     let sql = format!("SELECT a FROM {table_name}");
     let cursor = conn.execute(&sql, ()).unwrap().unwrap();
@@ -871,7 +895,9 @@ fn fallibale_allocations() {
 fn insert_does_not_support_list_type() {
     // Given a table and a db connection.
     let table_name = function_name!().rsplit_once(':').unwrap().1;
-    let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
+    let conn = ENV
+        .connect_with_connection_string(MSSQL, Default::default())
+        .unwrap();
     setup_empty_table(&conn, table_name, &["VARCHAR(4096)"]).unwrap();
 
     // When we try to create an OdbcWriter inserting an Arrow List
@@ -896,7 +922,9 @@ fn insert_does_not_support_list_type() {
 fn insert_text() {
     // Given a table and a record batch reader returning a batch with a text column.
     let table_name = function_name!().rsplit_once(':').unwrap().1;
-    let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
+    let conn = ENV
+        .connect_with_connection_string(MSSQL, Default::default())
+        .unwrap();
     setup_empty_table(&conn, table_name, &["VARCHAR(4096)"]).unwrap();
     let array = StringArray::from(vec![Some("Hello"), None, Some("World")]);
     let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Utf8, true)]));
@@ -918,7 +946,9 @@ fn insert_text() {
 fn insert_non_ascii_text() {
     // Given a table and a record batch reader returning a batch with a text column.
     let table_name = function_name!().rsplit_once(':').unwrap().1;
-    let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
+    let conn = ENV
+        .connect_with_connection_string(MSSQL, Default::default())
+        .unwrap();
     setup_empty_table(&conn, table_name, &["VARCHAR(50)"]).unwrap();
     let array = StringArray::from(vec![Some("Frühstück µ")]);
     let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Utf8, true)]));
@@ -938,7 +968,9 @@ fn insert_non_ascii_text() {
 fn insert_nullable_booleans() {
     // Given a table and a record batch reader returning a batch with a text column.
     let table_name = function_name!().rsplit_once(':').unwrap().1;
-    let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
+    let conn = ENV
+        .connect_with_connection_string(MSSQL, Default::default())
+        .unwrap();
     setup_empty_table(&conn, table_name, &["BIT"]).unwrap();
     let array = BooleanArray::from(vec![Some(true), None, Some(false)]);
     let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Boolean, true)]));
@@ -958,7 +990,9 @@ fn insert_nullable_booleans() {
 fn insert_non_nullable_booleans() {
     // Given a table and a record batch reader returning a batch with a text column.
     let table_name = function_name!().rsplit_once(':').unwrap().1;
-    let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
+    let conn = ENV
+        .connect_with_connection_string(MSSQL, Default::default())
+        .unwrap();
     setup_empty_table(&conn, table_name, &["BIT"]).unwrap();
     let array = BooleanArray::from(vec![Some(true), Some(false), Some(false)]);
     let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Boolean, false)]));
@@ -978,7 +1012,9 @@ fn insert_non_nullable_booleans() {
 fn insert_nullable_int8() {
     // Given a table and a record batch reader returning a batch with a text column.
     let table_name = function_name!().rsplit_once(':').unwrap().1;
-    let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
+    let conn = ENV
+        .connect_with_connection_string(MSSQL, Default::default())
+        .unwrap();
     setup_empty_table(&conn, table_name, &["TINYINT"]).unwrap();
     let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Int8, true)]));
     let array1 = Int8Array::from(vec![Some(1), None, Some(3)]);
@@ -1000,7 +1036,9 @@ fn insert_nullable_int8() {
 fn insert_non_nullable_int8() {
     // Given a table and a record batch reader returning a batch with a text column.
     let table_name = function_name!().rsplit_once(':').unwrap().1;
-    let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
+    let conn = ENV
+        .connect_with_connection_string(MSSQL, Default::default())
+        .unwrap();
     setup_empty_table(&conn, table_name, &["TINYINT"]).unwrap();
     let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Int8, false)]));
     let array1 = Int8Array::from(vec![Some(1), Some(2), Some(3)]);
@@ -1022,7 +1060,9 @@ fn insert_non_nullable_int8() {
 fn insert_nullable_int16() {
     // Given a table and a record batch reader returning a batch with a text column.
     let table_name = function_name!().rsplit_once(':').unwrap().1;
-    let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
+    let conn = ENV
+        .connect_with_connection_string(MSSQL, Default::default())
+        .unwrap();
     setup_empty_table(&conn, table_name, &["SMALLINT"]).unwrap();
     let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Int16, true)]));
     let array1 = Int16Array::from(vec![Some(1), None, Some(3)]);
@@ -1042,7 +1082,9 @@ fn insert_nullable_int16() {
 fn insert_nullable_int32() {
     // Given a table and a record batch reader returning a batch with a text column.
     let table_name = function_name!().rsplit_once(':').unwrap().1;
-    let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
+    let conn = ENV
+        .connect_with_connection_string(MSSQL, Default::default())
+        .unwrap();
     setup_empty_table(&conn, table_name, &["INTEGER"]).unwrap();
     let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Int32, true)]));
     let array1 = Int32Array::from(vec![Some(1), None, Some(3)]);
@@ -1062,7 +1104,9 @@ fn insert_nullable_int32() {
 fn insert_nullable_int64() {
     // Given a table and a record batch reader returning a batch with a text column.
     let table_name = function_name!().rsplit_once(':').unwrap().1;
-    let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
+    let conn = ENV
+        .connect_with_connection_string(MSSQL, Default::default())
+        .unwrap();
     setup_empty_table(&conn, table_name, &["BIGINT"]).unwrap();
     let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Int64, true)]));
     let array1 = Int64Array::from(vec![Some(1), None, Some(3)]);
@@ -1082,7 +1126,9 @@ fn insert_nullable_int64() {
 fn insert_non_nullable_unsigned_int8() {
     // Given a table and a record batch reader returning a batch with a text column.
     let table_name = function_name!().rsplit_once(':').unwrap().1;
-    let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
+    let conn = ENV
+        .connect_with_connection_string(MSSQL, Default::default())
+        .unwrap();
     setup_empty_table(&conn, table_name, &["SMALLINT"]).unwrap();
     let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::UInt8, false)]));
     let array1 = UInt8Array::from(vec![Some(1), Some(2), Some(3)]);
@@ -1102,7 +1148,9 @@ fn insert_non_nullable_unsigned_int8() {
 fn insert_nullable_f32() {
     // Given a table and a record batch reader returning a batch with a text column.
     let table_name = function_name!().rsplit_once(':').unwrap().1;
-    let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
+    let conn = ENV
+        .connect_with_connection_string(MSSQL, Default::default())
+        .unwrap();
     setup_empty_table(&conn, table_name, &["REAL"]).unwrap();
     let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Float32, true)]));
     let array1 = Float32Array::from(vec![Some(1.), None, Some(3.)]);
@@ -1122,7 +1170,9 @@ fn insert_nullable_f32() {
 fn insert_nullable_f64() {
     // Given a table and a record batch reader returning a batch with a text column.
     let table_name = function_name!().rsplit_once(':').unwrap().1;
-    let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
+    let conn = ENV
+        .connect_with_connection_string(MSSQL, Default::default())
+        .unwrap();
     setup_empty_table(&conn, table_name, &["FLOAT(25)"]).unwrap();
     let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Float64, true)]));
     let array1 = Float64Array::from(vec![Some(1.), None, Some(3.)]);
@@ -1142,7 +1192,9 @@ fn insert_nullable_f64() {
 fn insert_nullable_f16() {
     // Given a table and a record batch reader returning a batch with a text column.
     let table_name = function_name!().rsplit_once(':').unwrap().1;
-    let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
+    let conn = ENV
+        .connect_with_connection_string(MSSQL, Default::default())
+        .unwrap();
     setup_empty_table(&conn, table_name, &["REAL"]).unwrap();
     let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Float16, true)]));
     let array1: Float16Array = [Some(F16::from_f32(1.0)), None, Some(F16::from_f32(3.0))]
@@ -1164,7 +1216,9 @@ fn insert_nullable_f16() {
 fn insert_non_nullable_f16() {
     // Given a table and a record batch reader returning a batch with a text column.
     let table_name = function_name!().rsplit_once(':').unwrap().1;
-    let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
+    let conn = ENV
+        .connect_with_connection_string(MSSQL, Default::default())
+        .unwrap();
     setup_empty_table(&conn, table_name, &["REAL"]).unwrap();
     let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Float16, false)]));
     let array1: Float16Array = [
@@ -1190,7 +1244,9 @@ fn insert_non_nullable_f16() {
 fn insert_timestamp_with_seconds_precisions() {
     // Given a table and a record batch reader returning a batch with a text column.
     let table_name = function_name!().rsplit_once(':').unwrap().1;
-    let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
+    let conn = ENV
+        .connect_with_connection_string(MSSQL, Default::default())
+        .unwrap();
     setup_empty_table(&conn, table_name, &["DATETIME2(0)"]).unwrap();
     let schema = Arc::new(Schema::new(vec![Field::new(
         "a",
@@ -1215,7 +1271,9 @@ fn insert_timestamp_with_seconds_precisions() {
 fn insert_timestamp_with_milliseconds_precisions() {
     // Given a table and a record batch reader returning a batch with a text column.
     let table_name = function_name!().rsplit_once(':').unwrap().1;
-    let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
+    let conn = ENV
+        .connect_with_connection_string(MSSQL, Default::default())
+        .unwrap();
     setup_empty_table(&conn, table_name, &["DATETIME2(3)"]).unwrap();
     let schema = Arc::new(Schema::new(vec![Field::new(
         "a",
@@ -1240,7 +1298,9 @@ fn insert_timestamp_with_milliseconds_precisions() {
 fn insert_timestamp_with_microseconds_precisions() {
     // Given a table and a record batch reader returning a batch with a text column.
     let table_name = function_name!().rsplit_once(':').unwrap().1;
-    let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
+    let conn = ENV
+        .connect_with_connection_string(MSSQL, Default::default())
+        .unwrap();
     setup_empty_table(&conn, table_name, &["DATETIME2(6)"]).unwrap();
     let schema = Arc::new(Schema::new(vec![Field::new(
         "a",
@@ -1265,7 +1325,9 @@ fn insert_timestamp_with_microseconds_precisions() {
 fn insert_timestamp_with_nanoseconds_precisions() {
     // Given a table and a record batch reader returning a batch with a text column.
     let table_name = function_name!().rsplit_once(':').unwrap().1;
-    let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
+    let conn = ENV
+        .connect_with_connection_string(MSSQL, Default::default())
+        .unwrap();
     setup_empty_table(&conn, table_name, &["DATETIME2(7)"]).unwrap();
     let schema = Arc::new(Schema::new(vec![Field::new(
         "a",
@@ -1290,7 +1352,9 @@ fn insert_timestamp_with_nanoseconds_precisions() {
 fn insert_date32_array() {
     // Given a table and a record batch reader returning a batch with a text column.
     let table_name = function_name!().rsplit_once(':').unwrap().1;
-    let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
+    let conn = ENV
+        .connect_with_connection_string(MSSQL, Default::default())
+        .unwrap();
     setup_empty_table(&conn, table_name, &["DATE"]).unwrap();
     let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Date32, false)]));
     // Corresponds to single element array with entry 1970-01-01
@@ -1311,7 +1375,9 @@ fn insert_date32_array() {
 fn insert_date64_array() {
     // Given a table and a record batch reader returning a batch with a text column.
     let table_name = function_name!().rsplit_once(':').unwrap().1;
-    let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
+    let conn = ENV
+        .connect_with_connection_string(MSSQL, Default::default())
+        .unwrap();
     setup_empty_table(&conn, table_name, &["DATE"]).unwrap();
     let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Date64, false)]));
     // Corresponds to single element array with entry 1970-01-01
@@ -1332,7 +1398,9 @@ fn insert_date64_array() {
 fn insert_time32_second_array() {
     // Given a table and a record batch reader returning a batch with a text column.
     let table_name = function_name!().rsplit_once(':').unwrap().1;
-    let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
+    let conn = ENV
+        .connect_with_connection_string(MSSQL, Default::default())
+        .unwrap();
     setup_empty_table(&conn, table_name, &["TIME(0)"]).unwrap();
     let schema = Arc::new(Schema::new(vec![Field::new(
         "a",
@@ -1357,7 +1425,9 @@ fn insert_time32_second_array() {
 fn insert_time32_ms_array() {
     // Given a table and a record batch reader returning a batch with a text column.
     let table_name = function_name!().rsplit_once(':').unwrap().1;
-    let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
+    let conn = ENV
+        .connect_with_connection_string(MSSQL, Default::default())
+        .unwrap();
     setup_empty_table(&conn, table_name, &["TIME(3)"]).unwrap();
     let schema = Arc::new(Schema::new(vec![Field::new(
         "a",
@@ -1382,7 +1452,9 @@ fn insert_time32_ms_array() {
 fn insert_time64_us_array() {
     // Given a table and a record batch reader returning a batch with a text column.
     let table_name = function_name!().rsplit_once(':').unwrap().1;
-    let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
+    let conn = ENV
+        .connect_with_connection_string(MSSQL, Default::default())
+        .unwrap();
     setup_empty_table(&conn, table_name, &["TIME(6)"]).unwrap();
     let schema = Arc::new(Schema::new(vec![Field::new(
         "a",
@@ -1407,7 +1479,9 @@ fn insert_time64_us_array() {
 fn insert_time64_ns_array() {
     // Given a table and a record batch reader returning a batch with a text column.
     let table_name = function_name!().rsplit_once(':').unwrap().1;
-    let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
+    let conn = ENV
+        .connect_with_connection_string(MSSQL, Default::default())
+        .unwrap();
     setup_empty_table(&conn, table_name, &["TIME(7)"]).unwrap();
     let schema = Arc::new(Schema::new(vec![Field::new(
         "a",
@@ -1433,7 +1507,9 @@ fn insert_time64_ns_array() {
 fn insert_binary() {
     // Given a table and a record batch reader returning a batch with a text column.
     let table_name = function_name!().rsplit_once(':').unwrap().1;
-    let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
+    let conn = ENV
+        .connect_with_connection_string(MSSQL, Default::default())
+        .unwrap();
     setup_empty_table(&conn, table_name, &["VARBINARY(4096)"]).unwrap();
     let array = BinaryArray::from(vec![
         Some([1, 2].as_slice()),
@@ -1457,7 +1533,9 @@ fn insert_binary() {
 fn insert_fixed_binary() {
     // Given a table and a record batch reader returning a batch with a text column.
     let table_name = function_name!().rsplit_once(':').unwrap().1;
-    let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
+    let conn = ENV
+        .connect_with_connection_string(MSSQL, Default::default())
+        .unwrap();
     setup_empty_table(&conn, table_name, &["VARBINARY(4096)"]).unwrap();
     let array = BinaryArray::from(vec![
         Some([1, 2].as_slice()),
@@ -1481,7 +1559,9 @@ fn insert_fixed_binary() {
 fn insert_decimal_128() {
     // Given a table and a record batch reader returning a batch with a text column.
     let table_name = function_name!().rsplit_once(':').unwrap().1;
-    let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
+    let conn = ENV
+        .connect_with_connection_string(MSSQL, Default::default())
+        .unwrap();
     setup_empty_table(&conn, table_name, &["NUMERIC(5,3)"]).unwrap();
     let array: Decimal128Array = [Some(12345), None, Some(67891), Some(1), Some(1000)]
         .into_iter()
@@ -1508,7 +1588,9 @@ fn insert_decimal_128() {
 fn insert_decimal_256() {
     // Given a table and a record batch reader returning a batch with a text column.
     let table_name = function_name!().rsplit_once(':').unwrap().1;
-    let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
+    let conn = ENV
+        .connect_with_connection_string(MSSQL, Default::default())
+        .unwrap();
     setup_empty_table(&conn, table_name, &["NUMERIC(5,3)"]).unwrap();
     let mut builder = Decimal256Builder::new();
     let mut bytes = [0u8; 32];
@@ -1538,7 +1620,9 @@ fn insert_decimal_256() {
 fn insert_decimal_128_with_negative_scale() {
     // Given a table and a record batch reader returning a batch with a text column.
     let table_name = function_name!().rsplit_once(':').unwrap().1;
-    let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
+    let conn = ENV
+        .connect_with_connection_string(MSSQL, Default::default())
+        .unwrap();
     setup_empty_table(&conn, table_name, &["NUMERIC(5,0)"]).unwrap();
     let array: Decimal128Array = [Some(123), None, Some(456), Some(1), Some(10)]
         .into_iter()
@@ -1565,7 +1649,9 @@ fn insert_decimal_128_with_negative_scale() {
 fn insert_decimal_256_with_negative_scale() {
     // Given a table and a record batch reader returning a batch with a text column.
     let table_name = function_name!().rsplit_once(':').unwrap().1;
-    let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
+    let conn = ENV
+        .connect_with_connection_string(MSSQL, Default::default())
+        .unwrap();
     setup_empty_table(&conn, table_name, &["NUMERIC(5,0)"]).unwrap();
     let mut builder = Decimal256Builder::new();
     let mut bytes = [0u8; 32];
@@ -1595,7 +1681,9 @@ fn insert_decimal_256_with_negative_scale() {
 fn insert_taking_ownership_of_connection() {
     // Given a table and a record batch reader returning a batch with a text column.
     let table_name = function_name!().rsplit_once(':').unwrap().1;
-    let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
+    let conn = ENV
+        .connect_with_connection_string(MSSQL, Default::default())
+        .unwrap();
     setup_empty_table(&conn, table_name, &["VARCHAR(4096)"]).unwrap();
     let array = StringArray::from(vec![Some("Hello"), None, Some("World")]);
     let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Utf8, true)]));
@@ -1604,7 +1692,9 @@ fn insert_taking_ownership_of_connection() {
 
     // When
     let mut inserter = {
-        let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
+        let conn = ENV
+            .connect_with_connection_string(MSSQL, Default::default())
+            .unwrap();
         let row_capacity = 50;
         OdbcWriter::from_connection(conn, &schema, table_name, row_capacity).unwrap()
     };
@@ -1701,7 +1791,9 @@ fn cursor_over(
     literal: &str,
 ) -> CursorImpl<StatementConnection<'static>> {
     // Setup a table on the database
-    let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
+    let conn = ENV
+        .connect_with_connection_string(MSSQL, ConnectionOptions::default())
+        .unwrap();
     setup_empty_table(&conn, table_name, &[column_type]).unwrap();
     // Insert values using literals
     let sql = format!("INSERT INTO {table_name} (a) VALUES {literal}");
@@ -1718,7 +1810,9 @@ fn query_single_value(
     value: impl IntoParameter,
 ) -> impl Cursor {
     // Setup a table on the database
-    let conn = ENV.connect_with_connection_string(MSSQL).unwrap();
+    let conn = ENV
+        .connect_with_connection_string(MSSQL, Default::default())
+        .unwrap();
     setup_empty_table(&conn, table_name, &[column_type]).unwrap();
     // Insert values using literals
     let sql = format!("INSERT INTO {table_name} (a) VALUES (?)");

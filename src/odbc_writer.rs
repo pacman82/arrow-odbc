@@ -124,7 +124,7 @@ pub enum WriterError {
         source: odbc_api::Error,
         sql: String,
     },
-    #[deprecated(note="Use Variant UnsupportedArrowDataType instead")]
+    #[deprecated(note = "Use Variant UnsupportedArrowDataType instead")]
     #[error("Inserting arrays with timestamp information is currently not supported.")]
     TimeZonesNotSupported,
 }
