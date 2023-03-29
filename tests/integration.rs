@@ -68,7 +68,7 @@ fn fetch_nullable_32bit_integer() {
     assert!(array_vals.is_valid(0));
     assert!(array_vals.is_null(1));
     assert!(array_vals.is_valid(2));
-    assert_eq!([1, 0, 3], array_vals.values());
+    assert_eq!([1, 0, 3], *array_vals.values());
 }
 
 /// Fill a record batch with non nullable Integer 32 Bit directly from the datasource
@@ -79,7 +79,7 @@ fn fetch_32bit_integer() {
     let array_any = fetch_arrow_data(table_name, "INTEGER NOT NULL", "(1),(2),(3)").unwrap();
 
     let array_vals = array_any.as_any().downcast_ref::<Int32Array>().unwrap();
-    assert_eq!([1, 2, 3], array_vals.values());
+    assert_eq!([1, 2, 3], *array_vals.values());
 }
 
 /// Fill a record batch with non nullable Integer 16 Bit directly from the datasource
@@ -90,7 +90,7 @@ fn fetch_16bit_integer() {
     let array_any = fetch_arrow_data(table_name, "SMALLINT NOT NULL", "(1),(2),(3)").unwrap();
 
     let array_vals = array_any.as_any().downcast_ref::<Int16Array>().unwrap();
-    assert_eq!([1, 2, 3], array_vals.values());
+    assert_eq!([1, 2, 3], *array_vals.values());
 }
 
 /// Fill a record batch with non nullable Integer 8 Bit directly from the datasource
@@ -101,7 +101,7 @@ fn fetch_8bit_integer() {
     let array_any = fetch_arrow_data(table_name, "TINYINT NOT NULL", "(1),(2),(3)").unwrap();
 
     let array_vals = array_any.as_any().downcast_ref::<Int8Array>().unwrap();
-    assert_eq!([1, 2, 3], array_vals.values());
+    assert_eq!([1, 2, 3], *array_vals.values());
 }
 
 /// Fill a record batch with non nullable Integer 8 Bit usigned integer. Since that type would never
@@ -142,7 +142,7 @@ fn fetch_8bit_unsigned_integer_explicit_schema() {
         .as_any()
         .downcast_ref::<UInt8Array>()
         .unwrap();
-    assert_eq!([1, 2, 3], array_vals.values());
+    assert_eq!([1, 2, 3], *array_vals.values());
 }
 
 /// Fill a record batch with non nullable Integer 8 Bit usigned integer. Since that type would never
@@ -265,7 +265,7 @@ fn fetch_32bit_floating_point() {
     let array_any = fetch_arrow_data(table_name, "REAL NOT NULL", "(1),(2),(3)").unwrap();
 
     let array_vals = array_any.as_any().downcast_ref::<Float32Array>().unwrap();
-    assert_float_eq!(&[1., 2., 3.][..], array_vals.values(), abs_all <= 000.1);
+    assert_float_eq!([1., 2., 3.][..], array_vals.values(), abs_all <= 000.1);
 }
 
 /// Fill a record batch with non nullable `f64` directly from the datasource
@@ -279,7 +279,7 @@ fn fetch_64bit_floating_point() {
     let array_vals = array_any.as_any().downcast_ref::<Float64Array>().unwrap();
 
     // Assert that the correct values are found within the arrow batch
-    assert_float_eq!(&[1., 2., 3.][..], array_vals.values(), abs_all <= 000.1);
+    assert_float_eq!([1., 2., 3.][..], array_vals.values(), abs_all <= 000.1);
 }
 
 /// Fill a record batch with non nullable `i64` directly from the datasource
@@ -292,7 +292,7 @@ fn fetch_64bit_integer() {
     let array_vals = array_any.as_any().downcast_ref::<Int64Array>().unwrap();
 
     // Assert that the correct values are found within the arrow batch
-    assert_eq!([1, 2, 3], array_vals.values());
+    assert_eq!([1, 2, 3], *array_vals.values());
 }
 
 /// Fill a record batch of Strings from a varchar source column
@@ -665,7 +665,7 @@ fn prepared_query() {
         .as_any()
         .downcast_ref::<Float32Array>()
         .unwrap();
-    assert_float_eq!(&[1., 2., 3.][..], array_vals.values(), abs_all <= 000.1);
+    assert_float_eq!([1., 2., 3.][..], array_vals.values(), abs_all <= 000.1);
 }
 
 #[test]

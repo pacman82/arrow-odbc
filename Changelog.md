@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.26.10
+
+* Update arrow `>= 29, < 36` -> `>= 29, < 37`
+
 ## 0.26.9
 
 * Fix code sample in Readme
