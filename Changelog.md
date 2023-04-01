@@ -1,5 +1,9 @@
 # Changelog
 
+## next
+
+* Support for `LargeUtf8` then inserting data.
+
 ## 0.26.10
 
 * Update arrow `>= 29, < 36` -> `>= 29, < 37`

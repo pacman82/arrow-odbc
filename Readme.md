@@ -88,6 +88,7 @@ fn main() -> Result<(), anyhow::Error> {
 | Arrow                 | ODBC               |
 | --------------------- | ------------------ |
 | Utf8                  | VarChar            |
+| LargeUtf8             | VarChar            |
 | Decimal128(p, s = 0)  | VarChar(p + 1)     |
 | Decimal128(p, s != 0) | VarChar(p + 2)     |
 | Decimal128(p, s < 0)  | VarChar(p - s + 1) |

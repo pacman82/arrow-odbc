@@ -27,8 +27,10 @@ use crate::{
 };
 
 use self::{
-    binary::VariadicBinary, boolean::boolean_to_bit, map_arrow_to_odbc::MapArrowToOdbc,
-    text::Utf8ToNativeText,
+    binary::VariadicBinary,
+    boolean::boolean_to_bit,
+    map_arrow_to_odbc::MapArrowToOdbc,
+    text::{LargeUtf8ToNativeText, Utf8ToNativeText},
 };
 
 mod binary;
@@ -314,6 +316,7 @@ fn field_to_write_strategy(field: &Field) -> Result<Box<dyn WriteStrategy>, Writ
     let strategy = match field.data_type() {
         DataType::Utf8 => Box::new(Utf8ToNativeText {}),
         DataType::Boolean => boolean_to_bit(is_nullable),
+        DataType::LargeUtf8 => Box::new(LargeUtf8ToNativeText {}),
         DataType::Int8 => Int8Type::identical(is_nullable),
         DataType::Int16 => Int16Type::identical(is_nullable),
         DataType::Int32 => Int32Type::identical(is_nullable),
