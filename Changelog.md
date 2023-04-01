@@ -1,6 +1,6 @@
 # Changelog
 
-## next
+## 0.26.11
 
 * Support for `LargeUtf8` then inserting data.
 
