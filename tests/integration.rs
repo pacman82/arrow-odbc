@@ -893,6 +893,26 @@ fn fallibale_allocations() {
 }
 
 #[test]
+fn read_multiple_result_sets() {
+    // Given a cursor returning two result sets
+    let conn = ENV
+        .connect_with_connection_string(MSSQL, Default::default())
+        .unwrap();
+    let cursor = conn
+        .execute("SELECT 1 AS A; SELECT 2 AS B;", ())
+        .unwrap()
+        .unwrap();
+
+    // When
+    let mut reader = OdbcReader::new(cursor, 1).unwrap();
+    let first = reader.next().unwrap().unwrap();
+
+    // Then
+    let first_vals = first.column(0).as_any().downcast_ref::<Int32Array>().unwrap();
+    assert_eq!(1, first_vals.value(0));
+}
+
+#[test]
 fn insert_does_not_support_list_type() {
     // Given a table and a db connection.
     let table_name = function_name!().rsplit_once(':').unwrap().1;
