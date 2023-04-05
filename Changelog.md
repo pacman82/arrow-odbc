@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.26.12
+
+* Update odbc-api `>= 0.52.3, < 0.56.0` -> `>= 0.52.3, < 0.57.0`
+
 ## 0.26.11
 
 * Support for `LargeUtf8` then inserting data.
