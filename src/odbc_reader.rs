@@ -182,6 +182,15 @@ impl<C: Cursor> OdbcReader<C> {
             cursor,
         })
     }
+
+    /// Destroy the ODBC arrow reader and yield the underlyinng cursor object.
+    /// 
+    /// One application of this is to process more than one result set in case you executed a stored
+    /// procedure.
+    pub fn into_cursor(self) -> Result<C, odbc_api::Error> {
+        let (cursor, _buffer) = self.cursor.unbind()?;
+        Ok(cursor)
+    }
 }
 
 fn map_allocation_error(error: odbc_api::Error, schema: &Schema) -> Error {

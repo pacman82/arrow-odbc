@@ -906,10 +906,16 @@ fn read_multiple_result_sets() {
     // When
     let mut reader = OdbcReader::new(cursor, 1).unwrap();
     let first = reader.next().unwrap().unwrap();
+    let cursor = reader.into_cursor().unwrap();
+    let cursor = cursor.more_results().unwrap().unwrap();
+    let mut reader = OdbcReader::new(cursor, 1).unwrap();
+    let second = reader.next().unwrap().unwrap();
 
     // Then
     let first_vals = first.column(0).as_any().downcast_ref::<Int32Array>().unwrap();
     assert_eq!(1, first_vals.value(0));
+    let second_vals = second.column(0).as_any().downcast_ref::<Int32Array>().unwrap();
+    assert_eq!(2, second_vals.value(0));
 }
 
 #[test]
