@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.27.0
+
+* Update odbc-api `>= 0.52.3, < 0.57.0` -> `>= 0.56.1, < 0.57.0`
+* Introduced `OdbcReader::into_cursor` in order to enable processing stored procedures returning multiple result sets.
+
 ## 0.26.12
 
 * Update odbc-api `>= 0.52.3, < 0.56.0` -> `>= 0.52.3, < 0.57.0`
