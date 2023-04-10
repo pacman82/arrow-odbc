@@ -6,6 +6,8 @@
 
 Fill Apache Arrow arrays from ODBC data sources. `arrow-odbc` is build on top of the [`arrow`](https://crates.io/crates/arrow) and [`odbc-api`](https://crates.io/crates/odbc-api) crates and enables you to read the data of an ODBC data source as sequence of Apache Arrow record batches. `arrow-odbc` can also be used to insert the contens of Arrow record batches into a database table.
 
+This repository contains the code of the `arrow-odbc` Rust crate. The repository containing the code for the [`arrow-odbc` Python wheel](https://pypi.org/project/arrow-odbc/) resides in the [`arrow-odbc-py` repository](https://github.com/pacman82/arrow-odbc-py).
+
 ## About Arrow
 
 > [Apache Arrow](https://arrow.apache.org/) defines a language-independent columnar memory format for flat and hierarchical data, organized for efficient analytic operations on modern hardware like CPUs and GPUs. The Arrow memory format also supports zero-copy reads for lightning-fast data access without serialization overhead.
