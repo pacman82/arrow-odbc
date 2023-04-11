@@ -930,7 +930,7 @@ fn insert_does_not_support_list_type() {
     // When we try to create an OdbcWriter inserting an Arrow List
     let schema = Arc::new(Schema::new(vec![Field::new(
         "a",
-        DataType::List(Box::new(Field::new("b", DataType::Utf8, true))),
+        DataType::List(Arc::new(Field::new("b", DataType::Utf8, true))),
         true,
     )]));
 

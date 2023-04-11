@@ -175,7 +175,7 @@ where
         let strategies: Vec<_> = schema
             .fields()
             .iter()
-            .map(field_to_write_strategy)
+            .map(|field| field_to_write_strategy(field.as_ref()))
             .collect::<Result<_, _>>()?;
         let descriptions = strategies.iter().map(|cws| cws.buffer_desc());
         let inserter = statement
