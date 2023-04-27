@@ -1,7 +1,7 @@
 # arrow-odbc
 
 [![Docs](https://docs.rs/arrow-odbc/badge.svg)](https://docs.rs/arrow-odbc/)
-[![Licence](https://img.shields.io/crates/l/arrow-odbc)](https://github.com/pacman82/arrow-odbc/blob/master/License)
+[![Licence](https://img.shields.io/crates/l/arrow-odbc)](https://github.com/pacman82/arrow-odbc/blob/main/License)
 [![Crates.io](https://img.shields.io/crates/v/arrow-odbc)](https://crates.io/crates/arrow-odbc)
 
 Fill Apache Arrow arrays from ODBC data sources. `arrow-odbc` is build on top of the [`arrow`](https://crates.io/crates/arrow) and [`odbc-api`](https://crates.io/crates/odbc-api) crates and enables you to read the data of an ODBC data source as sequence of Apache Arrow record batches. `arrow-odbc` can also be used to insert the contens of Arrow record batches into a database table.
