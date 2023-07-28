@@ -110,17 +110,17 @@ pub fn insert_statement_from_schema(schema: &Schema, table_name: &str) -> String
 /// Emitted writing values from arror arrays into a table on the database
 #[derive(Debug, Error)]
 pub enum WriterError {
-    #[error("Failure to bind the array parameter buffers to the statement.")]
+    #[error("Failure to bind the array parameter buffers to the statement.\n{0}")]
     BindParameterBuffers(#[source] odbc_api::Error),
-    #[error("Failure to execute the sql statement, sending the data to the database.")]
+    #[error("Failure to execute the sql statement, sending the data to the database.\n{0}")]
     ExecuteStatment(#[source] odbc_api::Error),
-    #[error("An error occured rebinding a parameter buffer to the sql statement.")]
+    #[error("An error occured rebinding a parameter buffer to the sql statement.\n{0}")]
     RebindBuffer(#[source] odbc_api::Error),
     #[error("The arrow data type {0} is not supported for insertion.")]
     UnsupportedArrowDataType(DataType),
-    #[error("An error occured extracting a record batch from an error reader.")]
+    #[error("An error occured extracting a record batch from an error reader.\n{0}")]
     ReadingRecordBatch(#[source] ArrowError),
-    #[error("An error occurred preparing SQL statement: {0}", sql)]
+    #[error("An error occurred preparing SQL statement. SQL:\n{sql}\n{source}")]
     PreparingInsertStatement {
         #[source]
         source: odbc_api::Error,
