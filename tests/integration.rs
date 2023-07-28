@@ -1759,6 +1759,32 @@ fn insert_large_text() {
     assert_eq!(expected, actual);
 }
 
+#[test]
+fn error_preparing_sql_statement_should_contain_sql_and_original_error() {
+    // Given a table containing an INTEGER column and an arrow array of String
+    let table_name = function_name!().rsplit_once(':').unwrap().1;
+    let conn = ENV
+        .connect_with_connection_string(MSSQL, Default::default())
+        .unwrap();
+    setup_empty_table(&conn, table_name, &["Integer"]).unwrap();
+    let array = StringArray::from(vec![Some("Hello")]);
+    let schema = Arc::new(Schema::new(vec![Field::new(
+        "a",
+        DataType::Utf8,
+        true,
+    )]));
+    let batch = RecordBatch::try_new(schema.clone(), vec![Arc::new(array)]).unwrap();
+    let mut reader = StubBatchReader::new(schema, vec![batch]);
+
+    // When creating the writer provokes an error indicating the mismatch in types
+    let err = insert_into_table(&conn, &mut reader, table_name, 5).unwrap_err();
+
+    // Then the emmitted error message should contain both the statement and the diagnostic record
+    let actual = err.to_string();
+    let expected = "Hello";
+    assert_eq!(expected, actual);
+}
+
 /// Creates the table and assures it is empty. Columns are named a,b,c, etc.
 fn setup_empty_table(
     conn: &Connection,
