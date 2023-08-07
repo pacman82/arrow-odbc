@@ -1,6 +1,6 @@
 [package]
 name = "arrow-odbc"
-version = "0.28.9"
+version = "0.28.10"
 authors = ["Markus Klein"]
 edition = "2021"
 license = "MIT"
@@ -29,7 +29,7 @@ readme = "Readme.md"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-arrow = { version = ">= 29, < 45", default-features = false }
+arrow = { version = ">= 29, < 46", default-features = false }
 atoi = "2.0.0"
 chrono = "0.4.19"
 thiserror = "1.0.31"
@@ -38,7 +38,7 @@ thiserror = "1.0.31"
 # features implying the use of UTF-16 for queries, connection strings and error messages. This
 # should work on any system
 [target.'cfg(target_os = "windows")'.dependencies]
-odbc-api = ">= 0.56.1, < 0.58.0"
+odbc-api = ">= 0.56.1, < 0.58"
 
 # On linux we assume use of a UTF-8 locale. So we set the narrow features implying that for queries,
 # connection strings and error messages the driver and driver manager supply utf8-strings. This
@@ -47,7 +47,7 @@ odbc-api = ">= 0.56.1, < 0.58.0"
 # importantly, UTF-8 is likely to be more battled tested on these platforms, while UTF-16 is "only"
 # required by the standard.
 [target.'cfg(not(target_os = "windows"))'.dependencies]
-odbc-api = { version = ">= 0.56.1, < 0.58.0", features = ["narrow"] }
+odbc-api = { version = ">= 0.56.1, < 0.58", features = ["narrow"] }
 
 [dev-dependencies]
 anyhow = "1.0.57"

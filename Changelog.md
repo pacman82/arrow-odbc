@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.28.10
+
+* Update arrow `>= 29, < 45` -> `>= 29, < 46`
+
 ## 0.28.9
 
 * Better error messages which contain the original error emitted by `odbc-api` even then printed using the `Display` trait.
