@@ -5,6 +5,7 @@ use arrow::{
     datatypes::ArrowPrimitiveType,
 };
 use odbc_api::buffers::{AnySlice, BufferDesc, Item};
+use thiserror::Error;
 
 use super::ReadStrategy;
 
@@ -186,3 +187,8 @@ where
         Arc::new(builder.finish())
     }
 }
+
+/// The source value returned from the ODBC datasource is out of range and can not be mapped into
+/// its Arrow target type.
+#[derive(Error, Debug)]
+pub enum MappingError {}

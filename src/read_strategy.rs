@@ -20,16 +20,18 @@ mod binary;
 mod map_odbc_to_arrow;
 mod text;
 
-pub use self::{
-    binary::{Binary, FixedSizedBinary},
-    text::choose_text_strategy,
-};
-
 use self::map_odbc_to_arrow::MapOdbcToArrow;
 
 use crate::date_time::{
     days_since_epoch, ms_since_epoch, ns_since_epoch, seconds_since_epoch, us_since_epoch,
 };
+
+pub use self::{
+    binary::{Binary, FixedSizedBinary},
+    text::choose_text_strategy,
+};
+
+pub use self::map_odbc_to_arrow::MappingError;
 
 /// All decisions needed to copy data from an ODBC buffer to an Arrow Array
 pub trait ReadStrategy {

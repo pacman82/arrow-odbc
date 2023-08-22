@@ -10,18 +10,12 @@ use odbc_api::{
     buffers::{AnyBuffer, ColumnarAnyBuffer, ColumnarBuffer},
     BlockCursor, Cursor,
 };
-use thiserror::Error;
 
 use crate::{
     arrow_schema_from,
-    read_strategy::{choose_column_strategy, ReadStrategy},
+    read_strategy::{choose_column_strategy, MappingError, ReadStrategy},
     BufferAllocationOptions, ColumnFailure, Error,
 };
-
-/// The source value returned from the ODBC datasource is out of range and can not be mapped into
-/// its Arrow target type.
-#[derive(Error, Debug)]
-enum MappingError {}
 
 /// Arrow ODBC reader. Implements the [`arrow::record_batch::RecordBatchReader`] trait so it can be
 /// used to fill Arrow arrays from an ODBC data source.
