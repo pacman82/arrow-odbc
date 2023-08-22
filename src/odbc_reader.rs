@@ -10,12 +10,18 @@ use odbc_api::{
     buffers::{AnyBuffer, ColumnarAnyBuffer, ColumnarBuffer},
     BlockCursor, Cursor,
 };
+use thiserror::Error;
 
 use crate::{
     arrow_schema_from,
     read_strategy::{choose_column_strategy, ReadStrategy},
     BufferAllocationOptions, ColumnFailure, Error,
 };
+
+/// The source value returned from the ODBC datasource is out of range and can not be mapped into
+/// its Arrow target type.
+#[derive(Error, Debug)]
+enum MappingError {}
 
 /// Arrow ODBC reader. Implements the [`arrow::record_batch::RecordBatchReader`] trait so it can be
 /// used to fill Arrow arrays from an ODBC data source.
@@ -184,7 +190,7 @@ impl<C: Cursor> OdbcReader<C> {
     }
 
     /// Destroy the ODBC arrow reader and yield the underlyinng cursor object.
-    /// 
+    ///
     /// One application of this is to process more than one result set in case you executed a stored
     /// procedure.
     pub fn into_cursor(self) -> Result<C, odbc_api::Error> {
@@ -224,9 +230,17 @@ where
             // We successfully fetched a batch from the database. Try to copy it into a record batch
             // and forward errors if any.
             Ok(Some(batch)) => {
-                let columns = odbc_batch_to_arrow_columns(&self.column_strategies, batch);
-                let arrow_batch = RecordBatch::try_new(self.schema.clone(), columns).unwrap();
-                Some(Ok(arrow_batch))
+                let result_columns = odbc_batch_to_arrow_columns(&self.column_strategies, batch);
+                // Fetching the but has been succesful, but could we convert all the values returned
+                // by the database into their respective arrow data types?
+                match result_columns {
+                    Ok(columns) => {
+                        let arrow_batch =
+                            RecordBatch::try_new(self.schema.clone(), columns).unwrap();
+                        Some(Ok(arrow_batch))
+                    }
+                    Err(err) => Some(Err(ArrowError::ExternalError(Box::new(err)))),
+                }
             }
             // We ran out of batches in the result set. End the iterator.
             Ok(None) => None,
@@ -249,13 +263,14 @@ where
 fn odbc_batch_to_arrow_columns(
     column_strategies: &[Box<dyn ReadStrategy>],
     batch: &ColumnarBuffer<AnyBuffer>,
-) -> Vec<ArrayRef> {
-    column_strategies
+) -> Result<Vec<ArrayRef>, MappingError> {
+    let arrow_columns = column_strategies
         .iter()
         .enumerate()
         .map(|(index, strat)| {
             let column_view = batch.column(index);
             strat.fill_arrow_array(column_view)
         })
-        .collect()
+        .collect();
+    Ok(arrow_columns)
 }

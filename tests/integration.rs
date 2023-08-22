@@ -912,9 +912,17 @@ fn read_multiple_result_sets() {
     let second = reader.next().unwrap().unwrap();
 
     // Then
-    let first_vals = first.column(0).as_any().downcast_ref::<Int32Array>().unwrap();
+    let first_vals = first
+        .column(0)
+        .as_any()
+        .downcast_ref::<Int32Array>()
+        .unwrap();
     assert_eq!(1, first_vals.value(0));
-    let second_vals = second.column(0).as_any().downcast_ref::<Int32Array>().unwrap();
+    let second_vals = second
+        .column(0)
+        .as_any()
+        .downcast_ref::<Int32Array>()
+        .unwrap();
     assert_eq!(2, second_vals.value(0));
 }
 
