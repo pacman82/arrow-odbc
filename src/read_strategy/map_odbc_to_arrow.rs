@@ -191,4 +191,13 @@ where
 /// The source value returned from the ODBC datasource is out of range and can not be mapped into
 /// its Arrow target type.
 #[derive(Error, Debug)]
-pub enum MappingError {}
+pub enum MappingError {
+    // #[error("\
+    //     Timestamp is not representable in arrow: {value}\n\
+    //     Timestamps with nanoseconds precision are represented using a signed 64 Bit integer. This\
+    //     limits their range to values between 1677-09-21 00:12:44 and 2262-04-11 23:47:16.854775807.\
+    //     The value returned from the database is outside of this range. Suggestions to fix this \
+    //     error either reduce the precision or fetch the values as text.\
+    // ")]
+    // OutOfRangeTimestampNs{ value: NaiveDateTime}
+}
