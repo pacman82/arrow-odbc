@@ -39,7 +39,7 @@ pub trait ReadStrategy {
     fn buffer_desc(&self) -> BufferDesc;
 
     /// Create an arrow array from an ODBC buffer described in [`Self::buffer_description`].
-    fn fill_arrow_array(&self, column_view: AnySlice) -> ArrayRef;
+    fn fill_arrow_array(&self, column_view: AnySlice) -> Result<ArrayRef, MappingError>;
 }
 
 pub struct NonNullableBoolean;
@@ -49,13 +49,13 @@ impl ReadStrategy for NonNullableBoolean {
         BufferDesc::Bit { nullable: false }
     }
 
-    fn fill_arrow_array(&self, column_view: AnySlice) -> ArrayRef {
+    fn fill_arrow_array(&self, column_view: AnySlice) -> Result<ArrayRef, MappingError> {
         let values = Bit::as_slice(column_view).unwrap();
         let mut builder = BooleanBuilder::new();
         for bit in values {
             builder.append_value(bit.as_bool());
         }
-        Arc::new(builder.finish())
+        Ok(Arc::new(builder.finish()))
     }
 }
 
@@ -66,13 +66,13 @@ impl ReadStrategy for NullableBoolean {
         BufferDesc::Bit { nullable: true }
     }
 
-    fn fill_arrow_array(&self, column_view: AnySlice) -> ArrayRef {
+    fn fill_arrow_array(&self, column_view: AnySlice) -> Result<ArrayRef, MappingError> {
         let values = Bit::as_nullable_slice(column_view).unwrap();
         let mut builder = BooleanBuilder::new();
         for bit in values {
             builder.append_option(bit.copied().map(Bit::as_bool))
         }
-        Arc::new(builder.finish())
+        Ok(Arc::new(builder.finish()))
     }
 }
 
@@ -95,7 +95,7 @@ impl ReadStrategy for Decimal {
         }
     }
 
-    fn fill_arrow_array(&self, column_view: AnySlice) -> ArrayRef {
+    fn fill_arrow_array(&self, column_view: AnySlice) -> Result<ArrayRef, MappingError> {
         let view = column_view.as_text_view().unwrap();
         let mut builder = Decimal128Builder::new();
 
@@ -114,12 +114,12 @@ impl ReadStrategy for Decimal {
             }
         }
 
-        Arc::new(
+        Ok(Arc::new(
             builder
                 .finish()
                 .with_precision_and_scale(self.precision, self.scale)
                 .unwrap(),
-        )
+        ))
     }
 }
 

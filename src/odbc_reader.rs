@@ -265,6 +265,6 @@ fn odbc_batch_to_arrow_columns(
             let column_view = batch.column(index);
             strat.fill_arrow_array(column_view)
         })
-        .collect();
+        .collect::<Result<Vec<_>, _>>()?;
     Ok(arrow_columns)
 }

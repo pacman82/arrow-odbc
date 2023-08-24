@@ -67,6 +67,32 @@ pub fn ns_since_epoch(from: &Timestamp) -> i64 {
             from.fraction,
         )
         .unwrap();
+
+    // // 2262-04-11 23:47:16.854775807 is the highest timestamp representable.
+    // let max = NaiveDateTime::from_timestamp_opt(
+    //     i64::MAX / 1_000_000_000,
+    //     (i64::MAX % 1_000_000_000) as u32,
+    // )
+    // .unwrap();
+    // // 1677-09-21 00:12:44
+    // let min_without_fraction =
+    //     NaiveDateTime::from_timestamp_opt(i64::MIN / 1_000_000_000, 0)
+    //         .unwrap()
+    //         .timestamp_nanos();
+    // let min =
+    //     NaiveDateTime::from_timestamp_opt(min_without_fraction / 1_000_000_000, 0)
+    //         .unwrap();
+
+    // if min > datetime || datetime > max {
+    //     return Err(anyhow!(
+    //     "Invalid timestamp: {}. The valid range for timestamps with nano seconds \
+    //     precision is between {} and {}. Other timestamps can not be represented in \
+    //     parquet. To mitigate this you could downcast the precision in the query or \
+    //     convert the column to text.",
+    //     datetime, min, max
+    // ));
+    // }
+
     ndt.timestamp_nanos()
 }
 

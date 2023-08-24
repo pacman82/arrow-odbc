@@ -77,11 +77,11 @@ where
         T::Native::buffer_desc(false)
     }
 
-    fn fill_arrow_array(&self, column_view: AnySlice) -> ArrayRef {
+    fn fill_arrow_array(&self, column_view: AnySlice) -> Result<ArrayRef, MappingError> {
         let slice = T::Native::as_slice(column_view).unwrap();
         let mut builder = PrimitiveBuilder::<T>::with_capacity(slice.len());
         builder.append_slice(slice);
-        Arc::new(builder.finish())
+        Ok(Arc::new(builder.finish()))
     }
 }
 
@@ -106,13 +106,13 @@ where
         T::Native::buffer_desc(true)
     }
 
-    fn fill_arrow_array(&self, column_view: AnySlice) -> ArrayRef {
+    fn fill_arrow_array(&self, column_view: AnySlice) -> Result<ArrayRef, MappingError> {
         let values = T::Native::as_nullable_slice(column_view).unwrap();
         let mut builder = PrimitiveBuilder::<T>::with_capacity(values.len());
         for value in values {
             builder.append_option(value.copied());
         }
-        Arc::new(builder.finish())
+        Ok(Arc::new(builder.finish()))
     }
 }
 
@@ -142,13 +142,13 @@ where
         O::buffer_desc(false)
     }
 
-    fn fill_arrow_array(&self, column_view: AnySlice) -> ArrayRef {
+    fn fill_arrow_array(&self, column_view: AnySlice) -> Result<ArrayRef, MappingError> {
         let slice = column_view.as_slice::<O>().unwrap();
         let mut builder = PrimitiveBuilder::<P>::with_capacity(slice.len());
         for odbc_value in slice {
             builder.append_value((self.odbc_to_arrow)(odbc_value));
         }
-        Arc::new(builder.finish())
+        Ok(Arc::new(builder.finish()))
     }
 }
 
@@ -178,13 +178,13 @@ where
         O::buffer_desc(true)
     }
 
-    fn fill_arrow_array(&self, column_view: AnySlice) -> ArrayRef {
+    fn fill_arrow_array(&self, column_view: AnySlice) -> Result<ArrayRef, MappingError> {
         let opts = column_view.as_nullable_slice::<O>().unwrap();
         let mut builder = PrimitiveBuilder::<P>::with_capacity(opts.len());
         for odbc_opt in opts {
             builder.append_option(odbc_opt.map(&self.odbc_to_arrow));
         }
-        Arc::new(builder.finish())
+        Ok(Arc::new(builder.finish()))
     }
 }
 

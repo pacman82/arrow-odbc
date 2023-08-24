@@ -3,7 +3,7 @@ use std::{convert::TryInto, sync::Arc};
 use arrow::array::{ArrayRef, BinaryBuilder, FixedSizeBinaryBuilder};
 use odbc_api::buffers::{AnySlice, BufferDesc};
 
-use super::ReadStrategy;
+use super::{MappingError, ReadStrategy};
 
 pub struct Binary {
     /// Maximum length in bytes of elements
@@ -23,7 +23,7 @@ impl ReadStrategy for Binary {
         }
     }
 
-    fn fill_arrow_array(&self, column_view: AnySlice) -> ArrayRef {
+    fn fill_arrow_array(&self, column_view: AnySlice) -> Result<ArrayRef, MappingError> {
         let view = column_view.as_bin_view().unwrap();
         let mut builder = BinaryBuilder::new();
         for value in view.iter() {
@@ -33,7 +33,7 @@ impl ReadStrategy for Binary {
                 builder.append_null();
             }
         }
-        Arc::new(builder.finish())
+        Ok(Arc::new(builder.finish()))
     }
 }
 
@@ -55,7 +55,7 @@ impl ReadStrategy for FixedSizedBinary {
         }
     }
 
-    fn fill_arrow_array(&self, column_view: AnySlice) -> ArrayRef {
+    fn fill_arrow_array(&self, column_view: AnySlice) -> Result<ArrayRef, MappingError> {
         let view = column_view.as_bin_view().unwrap();
         let mut builder = FixedSizeBinaryBuilder::new(self.len.try_into().unwrap());
         for value in view.iter() {
@@ -65,6 +65,6 @@ impl ReadStrategy for FixedSizedBinary {
                 builder.append_null();
             }
         }
-        Arc::new(builder.finish())
+        Ok(Arc::new(builder.finish()))
     }
 }

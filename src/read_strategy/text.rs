@@ -6,7 +6,7 @@ use odbc_api::{
     DataType as OdbcDataType,
 };
 
-use super::{ColumnFailure, ReadStrategy};
+use super::{ColumnFailure, MappingError, ReadStrategy};
 
 /// This function decides wether this column will be queried as narrow (assumed to be utf-8) or
 /// wide text (assumed to be utf-16). The reason we do not always use narrow is that the encoding
@@ -89,7 +89,7 @@ impl ReadStrategy for WideText {
         }
     }
 
-    fn fill_arrow_array(&self, column_view: AnySlice) -> ArrayRef {
+    fn fill_arrow_array(&self, column_view: AnySlice) -> Result<ArrayRef, MappingError> {
         let view = column_view.as_w_text_view().unwrap();
         let item_capacity = view.len();
         // Any utf-16 character could take up to 4 Bytes if represented as utf-8, but since mostly
@@ -111,7 +111,7 @@ impl ReadStrategy for WideText {
             };
             builder.append_option(opt);
         }
-        Arc::new(builder.finish())
+        Ok(Arc::new(builder.finish()))
     }
 }
 
@@ -133,7 +133,7 @@ impl ReadStrategy for NarrowText {
         }
     }
 
-    fn fill_arrow_array(&self, column_view: AnySlice) -> ArrayRef {
+    fn fill_arrow_array(&self, column_view: AnySlice) -> Result<ArrayRef, MappingError> {
         let view = column_view.as_text_view().unwrap();
         let mut builder = StringBuilder::with_capacity(view.len(), self.max_str_len * view.len());
         for value in view.iter() {
@@ -142,6 +142,6 @@ impl ReadStrategy for NarrowText {
                     .expect("ODBC column had been expected to return valid utf8, but did not.")
             }));
         }
-        Arc::new(builder.finish())
+        Ok(Arc::new(builder.finish()))
     }
 }
