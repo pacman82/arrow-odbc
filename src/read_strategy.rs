@@ -177,7 +177,9 @@ pub fn choose_column_strategy(
         ArrowDataType::UInt8 => UInt8Type::identical(field.is_nullable()),
         ArrowDataType::Float32 => Float32Type::identical(field.is_nullable()),
         ArrowDataType::Float64 => Float64Type::identical(field.is_nullable()),
-        ArrowDataType::Date32 => Date32Type::map_with(field.is_nullable(), days_since_epoch),
+        ArrowDataType::Date32 => {
+            Date32Type::map_with(field.is_nullable(), |e| Ok(days_since_epoch(e)))
+        }
         ArrowDataType::Utf8 => {
             let sql_type = query_metadata
                 .col_data_type(col_index)
@@ -213,13 +215,13 @@ pub fn choose_column_strategy(
             Box::new(Binary::new(length))
         }
         ArrowDataType::Timestamp(TimeUnit::Second, _) => {
-            TimestampSecondType::map_with(field.is_nullable(), seconds_since_epoch)
+            TimestampSecondType::map_with(field.is_nullable(), |e| Ok(seconds_since_epoch(e)))
         }
         ArrowDataType::Timestamp(TimeUnit::Millisecond, _) => {
-            TimestampMillisecondType::map_with(field.is_nullable(), ms_since_epoch)
+            TimestampMillisecondType::map_with(field.is_nullable(), |e| Ok(ms_since_epoch(e)))
         }
         ArrowDataType::Timestamp(TimeUnit::Microsecond, _) => {
-            TimestampMicrosecondType::map_with(field.is_nullable(), us_since_epoch)
+            TimestampMicrosecondType::map_with(field.is_nullable(), |e| Ok(us_since_epoch(e)))
         }
         ArrowDataType::Timestamp(TimeUnit::Nanosecond, _) => {
             TimestampNanosecondType::map_with(field.is_nullable(), ns_since_epoch)

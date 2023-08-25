@@ -12,7 +12,7 @@ use odbc_api::{
     sys::{Date, Time, Timestamp},
 };
 
-use crate::{odbc_writer::WriteStrategy, WriterError};
+use crate::{odbc_writer::WriteStrategy, read_strategy::MappingError, WriterError};
 
 /// Transform date to days since unix epoch as i32
 pub fn days_since_epoch(date: &Date) -> i32 {
@@ -57,7 +57,7 @@ pub fn us_since_epoch(from: &Timestamp) -> i64 {
     ndt.timestamp_nanos() / 1_000
 }
 
-pub fn ns_since_epoch(from: &Timestamp) -> i64 {
+pub fn ns_since_epoch(from: &Timestamp) -> Result<i64, MappingError> {
     let ndt = NaiveDate::from_ymd_opt(from.year as i32, from.month as u32, from.day as u32)
         .unwrap()
         .and_hms_nano_opt(
@@ -69,11 +69,10 @@ pub fn ns_since_epoch(from: &Timestamp) -> i64 {
         .unwrap();
 
     if min_datetime_ns() > ndt || ndt > max_datetime_ns() {
-        panic!("Out of range timestamp")
-        // return Err(MappingError::OutOfRangeTimestampNs { value: ndt })
+        return Err(MappingError::OutOfRangeTimestampNs { value: ndt });
     }
 
-    ndt.timestamp_nanos()
+    Ok(ndt.timestamp_nanos())
 }
 
 /// 2262-04-11 23:47:16.854775807 is the latest timestamp representable with nanoseconds precision

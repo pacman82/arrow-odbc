@@ -4,6 +4,7 @@ use arrow::{
     array::{ArrayRef, PrimitiveBuilder},
     datatypes::ArrowPrimitiveType,
 };
+use chrono::NaiveDateTime;
 use odbc_api::buffers::{AnySlice, BufferDesc, Item};
 use thiserror::Error;
 
@@ -14,7 +15,7 @@ pub trait MapOdbcToArrow {
 
     fn map_with<U>(
         nullable: bool,
-        odbc_to_arrow: impl Fn(&U) -> Self::ArrowElement + 'static,
+        odbc_to_arrow: impl Fn(&U) -> Result<Self::ArrowElement, MappingError> + 'static,
     ) -> Box<dyn ReadStrategy>
     where
         U: Item + 'static;
@@ -32,7 +33,7 @@ where
 
     fn map_with<U>(
         nullable: bool,
-        odbc_to_arrow: impl Fn(&U) -> Self::ArrowElement + 'static,
+        odbc_to_arrow: impl Fn(&U) -> Result<Self::ArrowElement, MappingError> + 'static,
     ) -> Box<dyn ReadStrategy>
     where
         U: Item + 'static,
@@ -136,7 +137,7 @@ impl<P, O, F> ReadStrategy for NonNullableStrategy<P, O, F>
 where
     P: ArrowPrimitiveType,
     O: Item,
-    F: Fn(&O) -> P::Native,
+    F: Fn(&O) -> Result<P::Native, MappingError>,
 {
     fn buffer_desc(&self) -> BufferDesc {
         O::buffer_desc(false)
@@ -146,7 +147,7 @@ where
         let slice = column_view.as_slice::<O>().unwrap();
         let mut builder = PrimitiveBuilder::<P>::with_capacity(slice.len());
         for odbc_value in slice {
-            builder.append_value((self.odbc_to_arrow)(odbc_value));
+            builder.append_value((self.odbc_to_arrow)(odbc_value)?);
         }
         Ok(Arc::new(builder.finish()))
     }
@@ -172,7 +173,7 @@ impl<P, O, F> ReadStrategy for NullableStrategy<P, O, F>
 where
     P: ArrowPrimitiveType,
     O: Item,
-    F: Fn(&O) -> P::Native,
+    F: Fn(&O) -> Result<P::Native, MappingError>,
 {
     fn buffer_desc(&self) -> BufferDesc {
         O::buffer_desc(true)
@@ -182,7 +183,7 @@ where
         let opts = column_view.as_nullable_slice::<O>().unwrap();
         let mut builder = PrimitiveBuilder::<P>::with_capacity(opts.len());
         for odbc_opt in opts {
-            builder.append_option(odbc_opt.map(&self.odbc_to_arrow));
+            builder.append_option(odbc_opt.map(&self.odbc_to_arrow).transpose()?);
         }
         Ok(Arc::new(builder.finish()))
     }
@@ -192,12 +193,15 @@ where
 /// its Arrow target type.
 #[derive(Error, Debug)]
 pub enum MappingError {
-    // #[error("\
-    //     Timestamp is not representable in arrow: {value}\n\
-    //     Timestamps with nanoseconds precision are represented using a signed 64 Bit integer. This\
-    //     limits their range to values between 1677-09-21 00:12:44 and 2262-04-11 23:47:16.854775807.\
-    //     The value returned from the database is outside of this range. Suggestions to fix this \
-    //     error either reduce the precision or fetch the values as text.\
-    // ")]
-    // OutOfRangeTimestampNs{ value: NaiveDateTime}
+    #[error(
+        "\
+        Timestamp is not representable in arrow: {value}\n\
+        Timestamps with nanoseconds precision are represented using a signed 64 Bit integer. This \
+        limits their range to values between 1677-09-21 00:12:44 and \
+        2262-04-11 23:47:16.854775807. The value returned from the database is outside of this \
+        range. Suggestions to fix this error either reduce the precision or fetch the values as \
+        text.\
+    "
+    )]
+    OutOfRangeTimestampNs { value: NaiveDateTime },
 }

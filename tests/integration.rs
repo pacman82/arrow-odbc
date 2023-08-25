@@ -529,16 +529,25 @@ fn fetch_non_null_date_time_ns() {
 /// range in arrow between 1677-09-21 00:12:44 and 2262-04-11 23:47:16.854775807 due to be
 /// represented as a signed 64Bit Integer
 #[test]
-#[should_panic] // WIP
 fn fetch_out_of_range_date_time_ns() {
     let table_name = function_name!().rsplit_once(':').unwrap().1;
 
-    let _error = fetch_arrow_data(
+    let error = fetch_arrow_data(
         table_name,
         "DATETIME2 NOT NULL",
         "('2300-01-01 00:00:00.1234567')",
     )
     .unwrap_err();
+
+    assert_eq!(
+        "External error: Timestamp is not representable in arrow: 2300-01-01 00:00:00.123456700\n\
+        Timestamps with nanoseconds precision are represented using a signed 64 Bit integer. This \
+        limits their range to values between 1677-09-21 00:12:44 and \
+        2262-04-11 23:47:16.854775807. The value returned from the database is outside of this \
+        range. Suggestions to fix this error either reduce the precision or fetch the values as \
+        text.",
+        error.to_string()
+    )
 }
 
 /// Fill a record batch of Decimals

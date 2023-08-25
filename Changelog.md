@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.28.11
+
+* Fix: Emit an error if nanoprecision timestamps are outside of valid range, rather than overflowing silently.
+
 ## 0.28.10
 
 * Update arrow `>= 29, < 45` -> `>= 29, < 46`
