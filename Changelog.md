@@ -3,6 +3,7 @@
 ## 0.28.11
 
 * Fix: Emit an error if nanoprecision timestamps are outside of valid range, rather than overflowing silently.
+* Update arrow `>= 29, < 46` -> `>= 29, < 47`
 
 ## 0.28.10
 
