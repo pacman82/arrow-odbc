@@ -69,7 +69,10 @@ fn insert_statement_text(table: &str, column_names: &[&'_ str]) -> String {
         .map(|_| "?")
         .collect::<Vec<_>>()
         .join(", ");
-    format!("INSERT INTO {table} ({columns}) VALUES ({values});")
+    // Do not finish the statement with a semicolon. There is anecodtical evidence of IBM db2 not
+    // allowing the command, because it expects now multiple statements.
+    // See: <https://github.com/pacman82/arrow-odbc/issues/63>
+    format!("INSERT INTO {table} ({columns}) VALUES ({values})")
 }
 
 /// Creates an SQL insert statement from an arrow schema. The resulting statement will have one
@@ -94,7 +97,7 @@ fn insert_statement_text(table: &str, column_names: &[&'_ str]) -> String {
 /// let schema = Schema::new(vec![field_a, field_b]);
 /// let sql = insert_statement_from_schema(&schema, "MyTable");
 ///
-/// assert_eq!("INSERT INTO MyTable (a, b) VALUES (?, ?);", sql)
+/// assert_eq!("INSERT INTO MyTable (a, b) VALUES (?, ?)", sql)
 /// ```
 ///
 /// This function is automatically invoked by [`crate::OdbcWriter::with_connection`].
