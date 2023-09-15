@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.0
+
+* Update odbc-api `>= 0.56.1, < 0.58.0` ->  `>= 0.56.1, < 2`
+
 ## 0.28.12
 
 * `insert_statement_from_schema` will no longer end statements with a semicolon (`;`) as to not confuse an IBM db2 driver into thinking that multiple statements are intended to be executed. Thanks to @rosscoleman for reporting the issue and spending a lot of effort reproducing the issue.
