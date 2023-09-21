@@ -1,4 +1,4 @@
-use std::{char::decode_utf16, convert::TryInto, sync::Arc};
+use std::{char::decode_utf16, convert::TryInto, sync::Arc, cmp::min};
 
 use arrow::array::{ArrayRef, StringBuilder};
 use odbc_api::{
@@ -30,7 +30,7 @@ pub fn choose_text_strategy(
         (0, None) => Err(ColumnFailure::ZeroSizedColumn { sql_type }),
         (0, Some(limit)) => Ok(limit),
         (len, None) => Ok(len),
-        (len, Some(limit)) => Ok(if len < limit { len } else { limit }),
+        (len, Some(limit)) => Ok(min(len, limit)),
     };
     let strategy = if is_text {
         if cfg!(target_os = "windows") {
