@@ -44,8 +44,9 @@
 //!     Ok(())
 //! }
 //!
+//!
+//!
 //! ```
-mod concurrent_odbc_reader;
 mod date_time;
 mod decimal;
 mod error;
@@ -61,7 +62,6 @@ pub use arrow;
 pub use odbc_api;
 
 pub use self::{
-    concurrent_odbc_reader::ConcurrentOdbcReader,
     error::Error,
     odbc_reader::OdbcReader,
     odbc_writer::{insert_into_table, insert_statement_from_schema, OdbcWriter, WriterError},

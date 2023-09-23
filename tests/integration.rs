@@ -33,7 +33,7 @@ use arrow_odbc::{
         Connection, ConnectionOptions, Cursor, CursorImpl, Environment, IntoParameter,
         StatementConnection,
     },
-    BufferAllocationOptions, ColumnFailure, Error, OdbcReader, OdbcWriter, WriterError, ConcurrentOdbcReader,
+    BufferAllocationOptions, ColumnFailure, Error, OdbcReader, OdbcWriter, WriterError,
 };
 
 use stdext::function_name;
@@ -64,20 +64,6 @@ fn fetch_nullable_32bit_integer() {
     let table_name = function_name!().rsplit_once(':').unwrap().1;
 
     let array_any = fetch_arrow_data(table_name, "INTEGER", "(1),(NULL),(3)").unwrap();
-
-    let array_vals = array_any.as_any().downcast_ref::<Int32Array>().unwrap();
-    assert!(array_vals.is_valid(0));
-    assert!(array_vals.is_null(1));
-    assert!(array_vals.is_valid(2));
-    assert_eq!([1, 0, 3], *array_vals.values());
-}
-
-/// Fill a record batch with non nullable Integer 32 Bit directly from the datasource
-#[test]
-fn fetch_concurrent_nullable_32bit_integer() {
-    let table_name = function_name!().rsplit_once(':').unwrap().1;
-
-    let array_any = fetch_arrow_data_concurrent(table_name, "INTEGER", "(1),(NULL),(3)").unwrap();
 
     let array_vals = array_any.as_any().downcast_ref::<Int32Array>().unwrap();
     assert!(array_vals.is_valid(0));
@@ -1878,26 +1864,6 @@ fn fetch_arrow_data(
     let max_batch_size = 100;
 
     let mut reader = OdbcReader::new(cursor, max_batch_size)?;
-
-    // Batch for batch copy values from ODBC buffer into arrow batches
-    let record_batch = reader.next().unwrap()?;
-
-    Ok(record_batch.column(0).clone())
-}
-
-/// Inserts the values in the literal into the database and returns them as an Arrow array.
-fn fetch_arrow_data_concurrent(
-    table_name: &str,
-    column_type: &str,
-    literal: &str,
-) -> Result<ArrayRef, anyhow::Error> {
-    let cursor = cursor_over(table_name, column_type, literal);
-    // Now that we have a cursor, we want to iterate over its rows and fill an arrow batch with it.
-
-    // Batches will contain at most 100 entries.
-    let max_batch_size = 100;
-
-    let mut reader = ConcurrentOdbcReader::new(cursor, max_batch_size)?;
 
     // Batch for batch copy values from ODBC buffer into arrow batches
     let record_batch = reader.next().unwrap()?;
