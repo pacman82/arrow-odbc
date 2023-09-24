@@ -50,7 +50,6 @@
 mod date_time;
 mod decimal;
 mod error;
-mod odbc_reader;
 
 mod odbc_writer;
 mod reader;
@@ -63,8 +62,7 @@ pub use odbc_api;
 
 pub use self::{
     error::Error,
-    odbc_reader::OdbcReader,
     odbc_writer::{insert_into_table, insert_statement_from_schema, OdbcWriter, WriterError},
-    reader::{BufferAllocationOptions, ColumnFailure},
+    reader::{BufferAllocationOptions, ColumnFailure, OdbcReader},
     schema::arrow_schema_from,
 };

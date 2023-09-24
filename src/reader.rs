@@ -18,6 +18,7 @@ use thiserror::Error;
 
 mod binary;
 mod map_odbc_to_arrow;
+mod odbc_reader;
 mod text;
 
 use self::map_odbc_to_arrow::MapOdbcToArrow;
@@ -29,9 +30,9 @@ use crate::date_time::{
 pub use self::{
     binary::{Binary, FixedSizedBinary},
     text::choose_text_strategy,
+    map_odbc_to_arrow::MappingError,
+    odbc_reader::OdbcReader,
 };
-
-pub use self::map_odbc_to_arrow::MappingError;
 
 /// All decisions needed to copy data from an ODBC buffer to an Arrow Array
 pub trait ReadStrategy {
