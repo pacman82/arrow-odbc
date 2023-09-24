@@ -53,7 +53,7 @@ mod error;
 mod odbc_reader;
 
 mod odbc_writer;
-mod read_strategy;
+mod reader;
 mod schema;
 
 // Rexport odbc_api and arrow to make it easier for downstream crates to depend to avoid version
@@ -65,6 +65,6 @@ pub use self::{
     error::Error,
     odbc_reader::OdbcReader,
     odbc_writer::{insert_into_table, insert_statement_from_schema, OdbcWriter, WriterError},
-    read_strategy::{BufferAllocationOptions, ColumnFailure},
+    reader::{BufferAllocationOptions, ColumnFailure},
     schema::arrow_schema_from,
 };

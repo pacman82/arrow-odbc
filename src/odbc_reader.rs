@@ -13,7 +13,7 @@ use odbc_api::{
 
 use crate::{
     arrow_schema_from,
-    read_strategy::{choose_column_strategy, MappingError, ReadStrategy},
+    reader::{choose_column_strategy, MappingError, ReadStrategy},
     BufferAllocationOptions, ColumnFailure, Error,
 };
 
