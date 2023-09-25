@@ -54,7 +54,7 @@ pub fn us_since_epoch(from: &Timestamp) -> i64 {
             from.fraction,
         )
         .unwrap();
-    ndt.timestamp_nanos() / 1_000
+    ndt.timestamp_micros()
 }
 
 pub fn ns_since_epoch(from: &Timestamp) -> Result<i64, MappingError> {
@@ -68,27 +68,9 @@ pub fn ns_since_epoch(from: &Timestamp) -> Result<i64, MappingError> {
         )
         .unwrap();
 
-    if min_datetime_ns() > ndt || ndt > max_datetime_ns() {
-        return Err(MappingError::OutOfRangeTimestampNs { value: ndt });
-    }
-
-    Ok(ndt.timestamp_nanos())
-}
-
-/// 2262-04-11 23:47:16.854775807 is the latest timestamp representable with nanoseconds precision
-/// due to arrow using a signed 64 Bit integer.
-fn max_datetime_ns() -> NaiveDateTime {
-    NaiveDateTime::from_timestamp_opt(i64::MAX / 1_000_000_000, (i64::MAX % 1_000_000_000) as u32)
-        .unwrap()
-}
-
-/// 1677-09-21 00:12:44 is the earliest timestamp representable with nanoseconds precision due to
-/// arrow using a signed 64 Bit integer.
-fn min_datetime_ns() -> NaiveDateTime {
-    let min_without_fraction = NaiveDateTime::from_timestamp_opt(i64::MIN / 1_000_000_000, 0)
-        .unwrap()
-        .timestamp_nanos();
-    NaiveDateTime::from_timestamp_opt(min_without_fraction / 1_000_000_000, 0).unwrap()
+    // The dates that can be represented as nanoseconds are between 1677-09-21T00:12:44.0 and
+    // 2262-04-11T23:47:16.854775804
+    ndt.timestamp_nanos_opt().ok_or(MappingError::OutOfRangeTimestampNs { value: ndt })
 }
 
 pub fn epoch_to_timestamp<const UNIT_FACTOR: i64>(from: i64) -> Timestamp {
