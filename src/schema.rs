@@ -45,16 +45,17 @@ pub fn arrow_schema_from(resut_set_metadata: &mut impl ResultSetMetadata) -> Res
                 index: index as usize,
                 source: ColumnFailure::FailedToDescribeColumn(cause),
             })?;
+        let name = column_description
+            .name_to_string()
+            .expect("Column name must be representable in utf8");
         debug!(
-            "ODBC driver reported for column {index}. Relational type: {:?}; Nullability: {:?};",
-            column_description.data_type,
-            column_description.nullability
+            "ODBC driver reported for column {index}. Relational type: {:?}; Nullability: {:?}; \
+            Name: '{name}';",
+            column_description.data_type, column_description.nullability
         );
 
         let field = Field::new(
-            column_description
-                .name_to_string()
-                .expect("Column name must be representable in utf8"),
+            name,
             match column_description.data_type {
                 OdbcDataType::Numeric {
                     precision: p @ 0..=38,

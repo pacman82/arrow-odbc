@@ -10,6 +10,7 @@ use arrow::{
 };
 
 use atoi::FromRadix10Signed;
+use log::debug;
 use odbc_api::{
     buffers::{AnySlice, BufferDesc, Item},
     Bit, DataType as OdbcDataType, ResultSetMetadata,
@@ -185,6 +186,9 @@ pub fn choose_column_strategy(
             let sql_type = query_metadata
                 .col_data_type(col_index)
                 .map_err(ColumnFailure::FailedToDescribeColumn)?;
+            // Use a zero based index here, because we use it everywhere else there we communicate
+            // with users.
+            debug!("Relational type of column {}: {sql_type:?}", col_index - 1);
             let lazy_display_size = || query_metadata.col_display_size(col_index);
             // Use the SQL type first to determine buffer length.
             choose_text_strategy(

@@ -17,7 +17,7 @@ pub enum Error {
     ColumnFailure {
         // Name of the erroneous column
         name: String,
-        // Index of the erroneous column
+        // Zero based index of the erroneous column
         index: usize,
         // Cause of the error
         source: ColumnFailure,
