@@ -1,7 +1,7 @@
-use std::convert::TryInto;
-
 use arrow::datatypes::{DataType as ArrowDataType, Field, Schema, TimeUnit};
+use log::debug;
 use odbc_api::{ColumnDescription, DataType as OdbcDataType, ResultSetMetadata};
+use std::convert::TryInto;
 
 use crate::{ColumnFailure, Error};
 
@@ -45,6 +45,11 @@ pub fn arrow_schema_from(resut_set_metadata: &mut impl ResultSetMetadata) -> Res
                 index: index as usize,
                 source: ColumnFailure::FailedToDescribeColumn(cause),
             })?;
+        debug!(
+            "ODBC driver reported for column {index}. Relational type: {:?}; Nullability: {:?};",
+            column_description.data_type,
+            column_description.nullability
+        );
 
         let field = Field::new(
             column_description
