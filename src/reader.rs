@@ -189,7 +189,11 @@ pub fn choose_column_strategy(
             // Use a zero based index here, because we use it everywhere else there we communicate
             // with users.
             debug!("Relational type of column {}: {sql_type:?}", col_index - 1);
-            let lazy_display_size = || query_metadata.col_display_size(col_index);
+            let lazy_display_size = || {
+                let display_size = query_metadata.col_display_size(col_index)?;
+                debug!("Display size of column {}: {display_size}", col_index - 1);
+                Ok(display_size)
+            };
             // Use the SQL type first to determine buffer length.
             choose_text_strategy(
                 sql_type,
