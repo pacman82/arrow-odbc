@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.2.1
+
+* Additional debug messages emmitted to indicate relational types reported by ODBC
+
 ## 1.2.0
 
 * Update odbc-api `>= 0.56.1, < 2` ->  `>= 0.56.1, < 3`
