@@ -8,7 +8,7 @@ use arrow::{
 };
 use odbc_api::{
     buffers::{AnyBuffer, ColumnarAnyBuffer, ColumnarBuffer},
-    BlockCursor, Cursor,
+    Cursor,
 };
 
 use crate::{
@@ -16,6 +16,8 @@ use crate::{
     reader::{choose_column_strategy, MappingError, ReadStrategy},
     BufferAllocationOptions, ColumnFailure, Error,
 };
+
+use super::odbc_batch_stream::OdbcBatchStream;
 
 /// Arrow ODBC reader. Implements the [`arrow::record_batch::RecordBatchReader`] trait so it can be
 /// used to fill Arrow arrays from an ODBC data source.
@@ -74,9 +76,9 @@ pub struct OdbcReader<C: Cursor> {
     column_strategies: Vec<Box<dyn ReadStrategy>>,
     /// Arrow schema describing the arrays we want to fill from the Odbc data source.
     schema: SchemaRef,
-    /// Odbc cursor with a bound buffer we repeatedly fill with the batches send to us by the data
-    /// source. One column buffer must be bound for each element in column_strategies.
-    cursor: BlockCursor<C, ColumnarBuffer<AnyBuffer>>,
+    /// Fetches values from the ODBC datasource using columnar batches. Values are streamed batch
+    /// by batch in order to avoid reallocation of the buffers used for tranistion.
+    batch_stream: OdbcBatchStream<C>,
 }
 
 impl<C: Cursor> OdbcReader<C> {
@@ -175,11 +177,12 @@ impl<C: Cursor> OdbcReader<C> {
             ColumnarAnyBuffer::from_descs(max_batch_size, descs)
         };
         let cursor = cursor.bind_buffer(row_set_buffer).unwrap();
+        let batch_stream = OdbcBatchStream { cursor };
 
         Ok(Self {
             column_strategies,
             schema,
-            cursor,
+            batch_stream,
         })
     }
 
@@ -188,7 +191,7 @@ impl<C: Cursor> OdbcReader<C> {
     /// One application of this is to process more than one result set in case you executed a stored
     /// procedure.
     pub fn into_cursor(self) -> Result<C, odbc_api::Error> {
-        let (cursor, _buffer) = self.cursor.unbind()?;
+        let (cursor, _buffer) = self.batch_stream.cursor.unbind()?;
         Ok(cursor)
     }
 }
@@ -220,7 +223,7 @@ where
     type Item = Result<RecordBatch, ArrowError>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        match self.cursor.fetch_with_truncation_check(true) {
+        match self.batch_stream.cursor.fetch_with_truncation_check(true) {
             // We successfully fetched a batch from the database. Try to copy it into a record batch
             // and forward errors if any.
             Ok(Some(batch)) => {

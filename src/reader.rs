@@ -19,6 +19,7 @@ use thiserror::Error;
 
 mod binary;
 mod map_odbc_to_arrow;
+mod odbc_batch_stream;
 mod odbc_reader;
 mod text;
 
