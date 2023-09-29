@@ -176,8 +176,7 @@ impl<C: Cursor> OdbcReader<C> {
         } else {
             ColumnarAnyBuffer::from_descs(max_batch_size, descs)
         };
-        let cursor = cursor.bind_buffer(row_set_buffer).unwrap();
-        let batch_stream = OdbcBatchStream::new(cursor);
+        let batch_stream = OdbcBatchStream::new(cursor, row_set_buffer);
 
         Ok(Self {
             column_strategies,
