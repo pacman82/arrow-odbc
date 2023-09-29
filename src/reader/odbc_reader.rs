@@ -177,7 +177,7 @@ impl<C: Cursor> OdbcReader<C> {
             ColumnarAnyBuffer::from_descs(max_batch_size, descs)
         };
         let cursor = cursor.bind_buffer(row_set_buffer).unwrap();
-        let batch_stream = OdbcBatchStream { cursor };
+        let batch_stream = OdbcBatchStream::new(cursor);
 
         Ok(Self {
             column_strategies,
@@ -191,8 +191,7 @@ impl<C: Cursor> OdbcReader<C> {
     /// One application of this is to process more than one result set in case you executed a stored
     /// procedure.
     pub fn into_cursor(self) -> Result<C, odbc_api::Error> {
-        let (cursor, _buffer) = self.batch_stream.cursor.unbind()?;
-        Ok(cursor)
+        self.batch_stream.into_cursor()
     }
 }
 
@@ -223,7 +222,7 @@ where
     type Item = Result<RecordBatch, ArrowError>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        match self.batch_stream.cursor.fetch_with_truncation_check(true) {
+        match self.batch_stream.next() {
             // We successfully fetched a batch from the database. Try to copy it into a record batch
             // and forward errors if any.
             Ok(Some(batch)) => {
