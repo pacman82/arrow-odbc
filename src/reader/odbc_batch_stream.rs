@@ -10,7 +10,8 @@ pub struct OdbcBatchStream<C: Cursor> {
 
 impl<C> OdbcBatchStream<C> where C: Cursor {
 
-    pub fn new(cursor: BlockCursor<C, ColumnarBuffer<AnyBuffer>>) -> Self {
+    pub fn new(cursor: C, buffer: ColumnarAnyBuffer) -> Self {
+        let cursor = cursor.bind_buffer(buffer).unwrap();
         OdbcBatchStream { cursor }
     }
 
