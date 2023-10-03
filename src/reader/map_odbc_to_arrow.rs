@@ -10,9 +10,12 @@ use thiserror::Error;
 
 use super::ReadStrategy;
 
+/// Extend an arrow primitive type to serve as a builder for Read strategies.
 pub trait MapOdbcToArrow {
     type ArrowElement;
 
+    /// Use the provided function to convert an element of an ODBC column buffer into the desired
+    /// element of an arrow array.
     fn map_with<U>(
         nullable: bool,
         odbc_to_arrow: impl Fn(&U) -> Result<Self::ArrowElement, MappingError> + 'static,
@@ -20,6 +23,8 @@ pub trait MapOdbcToArrow {
     where
         U: Item + 'static;
 
+    /// Should the arrow array element be identical to an item in the ODBC buffer no mapping is
+    /// needed. We still need to account for nullability.
     fn identical(nullable: bool) -> Box<dyn ReadStrategy>
     where
         Self::ArrowElement: Item;
