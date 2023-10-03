@@ -1,23 +1,15 @@
-use std::{convert::TryInto, sync::Arc};
+use std::sync::Arc;
 
 use arrow::{
-    array::ArrayRef,
-    datatypes::{Schema, SchemaRef},
+    datatypes::SchemaRef,
     error::ArrowError,
     record_batch::{RecordBatch, RecordBatchReader},
 };
-use odbc_api::{
-    buffers::{AnyBuffer, ColumnarAnyBuffer, ColumnarBuffer},
-    Cursor,
-};
+use odbc_api::Cursor;
 
-use crate::{
-    arrow_schema_from,
-    reader::{choose_column_strategy, MappingError, ReadStrategy},
-    BufferAllocationOptions, ColumnFailure, Error,
-};
+use crate::{arrow_schema_from, BufferAllocationOptions, Error};
 
-use super::odbc_batch_stream::OdbcBatchStream;
+use super::{odbc_batch_stream::OdbcBatchStream, to_record_batch::ToRecordBatch};
 
 /// Arrow ODBC reader. Implements the [`arrow::record_batch::RecordBatchReader`] trait so it can be
 /// used to fill Arrow arrays from an ODBC data source.
@@ -71,11 +63,8 @@ use super::odbc_batch_stream::OdbcBatchStream;
 /// }
 /// ```
 pub struct OdbcReader<C: Cursor> {
-    /// Must contain one item for each field in [`Self::schema`]. Encapsulates all the column type
-    /// specific decisions which go into filling an Arrow array from an ODBC data source.
-    column_strategies: Vec<Box<dyn ReadStrategy>>,
-    /// Arrow schema describing the arrays we want to fill from the Odbc data source.
-    schema: SchemaRef,
+    /// Converts the content of ODBC buffers into Arrow record batches
+    converter: ToRecordBatch,
     /// Fetches values from the ODBC datasource using columnar batches. Values are streamed batch
     /// by batch in order to avoid reallocation of the buffers used for tranistion.
     batch_stream: OdbcBatchStream<C>,
@@ -150,37 +139,16 @@ impl<C: Cursor> OdbcReader<C> {
         schema: Option<SchemaRef>,
         buffer_allocation_options: BufferAllocationOptions,
     ) -> Result<Self, Error> {
-        // Infer schema if not given by the user
-        let schema = if let Some(schema) = schema {
-            schema
-        } else {
-            Arc::new(arrow_schema_from(&mut cursor)?)
-        };
+        let converter = ToRecordBatch::new(&mut cursor, schema.clone(), buffer_allocation_options)?;
 
-        let column_strategies: Vec<Box<dyn ReadStrategy>> = schema
-            .fields()
-            .iter()
-            .enumerate()
-            .map(|(index, field)| {
-                let col_index = (index + 1).try_into().unwrap();
-                choose_column_strategy(field, &mut cursor, col_index, buffer_allocation_options)
-                    .map_err(|cause| cause.into_crate_error(field.name().clone(), index))
-            })
-            .collect::<Result<_, _>>()?;
-
-        let descs = column_strategies.iter().map(|cs| cs.buffer_desc());
-
-        let row_set_buffer = if buffer_allocation_options.fallibale_allocations {
-            ColumnarAnyBuffer::try_from_descs(max_batch_size, descs)
-                .map_err(|err| map_allocation_error(err, &schema))?
-        } else {
-            ColumnarAnyBuffer::from_descs(max_batch_size, descs)
-        };
+        let row_set_buffer = converter.allocate_buffer(
+            max_batch_size,
+            buffer_allocation_options.fallibale_allocations,
+        )?;
         let batch_stream = OdbcBatchStream::new(cursor, row_set_buffer);
 
         Ok(Self {
-            column_strategies,
-            schema,
+            converter,
             batch_stream,
         })
     }
@@ -191,26 +159,6 @@ impl<C: Cursor> OdbcReader<C> {
     /// procedure.
     pub fn into_cursor(self) -> Result<C, odbc_api::Error> {
         self.batch_stream.into_cursor()
-    }
-}
-
-fn map_allocation_error(error: odbc_api::Error, schema: &Schema) -> Error {
-    match error {
-        odbc_api::Error::TooLargeColumnBufferSize {
-            buffer_index,
-            num_elements,
-            element_size,
-        } => Error::ColumnFailure {
-            name: schema.field(buffer_index as usize).name().clone(),
-            index: buffer_index as usize,
-            source: ColumnFailure::TooLarge {
-                num_elements,
-                element_size,
-            },
-        },
-        _ => {
-            panic!("Unexpected error in upstream ODBC api error library")
-        }
     }
 }
 
@@ -225,17 +173,11 @@ where
             // We successfully fetched a batch from the database. Try to copy it into a record batch
             // and forward errors if any.
             Ok(Some(batch)) => {
-                let result_columns = odbc_batch_to_arrow_columns(&self.column_strategies, batch);
-                // Fetching the but has been succesful, but could we convert all the values returned
-                // by the database into their respective arrow data types?
-                match result_columns {
-                    Ok(columns) => {
-                        let arrow_batch =
-                            RecordBatch::try_new(self.schema.clone(), columns).unwrap();
-                        Some(Ok(arrow_batch))
-                    }
-                    Err(err) => Some(Err(ArrowError::ExternalError(Box::new(err)))),
-                }
+                let result_record_batch = self
+                    .converter
+                    .buffer_to_record_batch(batch)
+                    .map_err(|mapping_error| ArrowError::ExternalError(Box::new(mapping_error)));
+                Some(result_record_batch)
             }
             // We ran out of batches in the result set. End the iterator.
             Ok(None) => None,
@@ -251,21 +193,6 @@ where
     C: Cursor,
 {
     fn schema(&self) -> SchemaRef {
-        self.schema.clone()
+        self.converter.schema().clone()
     }
-}
-
-fn odbc_batch_to_arrow_columns(
-    column_strategies: &[Box<dyn ReadStrategy>],
-    batch: &ColumnarBuffer<AnyBuffer>,
-) -> Result<Vec<ArrayRef>, MappingError> {
-    let arrow_columns = column_strategies
-        .iter()
-        .enumerate()
-        .map(|(index, strat)| {
-            let column_view = batch.column(index);
-            strat.fill_arrow_array(column_view)
-        })
-        .collect::<Result<Vec<_>, _>>()?;
-    Ok(arrow_columns)
 }

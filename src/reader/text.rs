@@ -1,4 +1,4 @@
-use std::{char::decode_utf16, convert::TryInto, sync::Arc, cmp::min};
+use std::{char::decode_utf16, cmp::min, convert::TryInto, sync::Arc};
 
 use arrow::array::{ArrayRef, StringBuilder};
 use odbc_api::{

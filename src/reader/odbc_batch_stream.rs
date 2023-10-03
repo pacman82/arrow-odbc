@@ -1,4 +1,7 @@
-use odbc_api::{BlockCursor, buffers::{ColumnarBuffer, AnyBuffer, ColumnarAnyBuffer}, Cursor};
+use odbc_api::{
+    buffers::{AnyBuffer, ColumnarAnyBuffer, ColumnarBuffer},
+    BlockCursor, Cursor,
+};
 
 /// Fetches values from the ODBC datasource using columnar batches. Values are streamed batch by
 /// batch in order to avoid reallocation of the buffers used for tranistion.
@@ -8,8 +11,10 @@ pub struct OdbcBatchStream<C: Cursor> {
     cursor: BlockCursor<C, ColumnarBuffer<AnyBuffer>>,
 }
 
-impl<C> OdbcBatchStream<C> where C: Cursor {
-
+impl<C> OdbcBatchStream<C>
+where
+    C: Cursor,
+{
     pub fn new(cursor: C, buffer: ColumnarAnyBuffer) -> Self {
         let cursor = cursor.bind_buffer(buffer).unwrap();
         OdbcBatchStream { cursor }

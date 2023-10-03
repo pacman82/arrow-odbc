@@ -70,7 +70,8 @@ pub fn ns_since_epoch(from: &Timestamp) -> Result<i64, MappingError> {
 
     // The dates that can be represented as nanoseconds are between 1677-09-21T00:12:44.0 and
     // 2262-04-11T23:47:16.854775804
-    ndt.timestamp_nanos_opt().ok_or(MappingError::OutOfRangeTimestampNs { value: ndt })
+    ndt.timestamp_nanos_opt()
+        .ok_or(MappingError::OutOfRangeTimestampNs { value: ndt })
 }
 
 pub fn epoch_to_timestamp<const UNIT_FACTOR: i64>(from: i64) -> Timestamp {
