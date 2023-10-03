@@ -5,7 +5,7 @@ use arrow::{
     error::ArrowError,
     record_batch::{RecordBatch, RecordBatchReader},
 };
-use odbc_api::Cursor;
+use odbc_api::{buffers::ColumnarAnyBuffer, BlockCursor, Cursor};
 
 use crate::{arrow_schema_from, BufferAllocationOptions, Error};
 
@@ -67,7 +67,7 @@ pub struct OdbcReader<C: Cursor> {
     converter: ToRecordBatch,
     /// Fetches values from the ODBC datasource using columnar batches. Values are streamed batch
     /// by batch in order to avoid reallocation of the buffers used for tranistion.
-    batch_stream: OdbcBatchStream<C>,
+    batch_stream: BlockCursor<C, ColumnarAnyBuffer>,
 }
 
 impl<C: Cursor> OdbcReader<C> {
@@ -145,7 +145,7 @@ impl<C: Cursor> OdbcReader<C> {
             max_batch_size,
             buffer_allocation_options.fallibale_allocations,
         )?;
-        let batch_stream = OdbcBatchStream::new(cursor, row_set_buffer);
+        let batch_stream = cursor.bind_buffer(row_set_buffer).unwrap();
 
         Ok(Self {
             converter,
@@ -158,7 +158,8 @@ impl<C: Cursor> OdbcReader<C> {
     /// One application of this is to process more than one result set in case you executed a stored
     /// procedure.
     pub fn into_cursor(self) -> Result<C, odbc_api::Error> {
-        self.batch_stream.into_cursor()
+        let (cursor, _buffer) = self.batch_stream.unbind()?;
+        Ok(cursor)
     }
 }
 
