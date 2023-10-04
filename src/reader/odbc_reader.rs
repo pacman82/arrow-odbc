@@ -170,22 +170,7 @@ where
     type Item = Result<RecordBatch, ArrowError>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        match self.batch_stream.next() {
-            // We successfully fetched a batch from the database. Try to copy it into a record batch
-            // and forward errors if any.
-            Ok(Some(batch)) => {
-                let result_record_batch = self
-                    .converter
-                    .buffer_to_record_batch(batch)
-                    .map_err(|mapping_error| ArrowError::ExternalError(Box::new(mapping_error)));
-                Some(result_record_batch)
-            }
-            // We ran out of batches in the result set. End the iterator.
-            Ok(None) => None,
-            // We had an error fetching the next batch from the database, let's report it as an
-            // external error.
-            Err(odbc_error) => Some(Err(ArrowError::ExternalError(Box::new(odbc_error)))),
-        }
+        next(&mut self.batch_stream, &mut self.converter)
     }
 }
 
@@ -195,5 +180,23 @@ where
 {
     fn schema(&self) -> SchemaRef {
         self.converter.schema().clone()
+    }
+}
+
+pub fn next(batch_stream: &mut impl OdbcBatchStream, converter: &mut ToRecordBatch) -> Option<Result<RecordBatch, ArrowError>> {
+    match batch_stream.next() {
+        // We successfully fetched a batch from the database. Try to copy it into a record batch
+        // and forward errors if any.
+        Ok(Some(batch)) => {
+            let result_record_batch = converter
+                .buffer_to_record_batch(batch)
+                .map_err(|mapping_error| ArrowError::ExternalError(Box::new(mapping_error)));
+            Some(result_record_batch)
+        }
+        // We ran out of batches in the result set. End the iterator.
+        Ok(None) => None,
+        // We had an error fetching the next batch from the database, let's report it as an
+        // external error.
+        Err(odbc_error) => Some(Err(ArrowError::ExternalError(Box::new(odbc_error)))),
     }
 }

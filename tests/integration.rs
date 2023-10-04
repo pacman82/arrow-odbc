@@ -33,7 +33,8 @@ use arrow_odbc::{
         Connection, ConnectionOptions, Cursor, CursorImpl, Environment, IntoParameter,
         StatementConnection,
     },
-    BufferAllocationOptions, ColumnFailure, Error, OdbcReader, OdbcWriter, WriterError,
+    BufferAllocationOptions, ColumnFailure, ConcurrentOdbcReader, Error, OdbcReader, OdbcWriter,
+    WriterError,
 };
 
 use stdext::function_name;
@@ -1792,6 +1793,120 @@ fn insert_large_text() {
     assert_eq!(expected, actual);
 }
 
+/// Fill a record batch with non nullable Integer 32 Bit directly from the datasource
+#[test]
+fn fetch_integer_concurrently() {
+    let table_name = function_name!().rsplit_once(':').unwrap().1;
+    let cursor = cursor_over(table_name, "INTEGER", "(1),(NULL),(3)");
+    // Now that we have a cursor, we want to iterate over its rows and fill an arrow batch with it.
+
+    // Batches will contain at most 100 entries.
+    let max_batch_size = 100;
+    let mut reader = ConcurrentOdbcReader::new(cursor, max_batch_size).unwrap();
+    // Batch for batch copy values from ODBC buffer into arrow batches
+    let record_batch = reader.next().unwrap().unwrap();
+
+    let array_any = record_batch.column(0).clone();
+    let array_vals = array_any.as_any().downcast_ref::<Int32Array>().unwrap();
+    assert!(array_vals.is_valid(0));
+    assert!(array_vals.is_null(1));
+    assert!(array_vals.is_valid(2));
+    assert_eq!([1, 0, 3], *array_vals.values());
+}
+
+#[test]
+fn fetch_empty_cursor_concurrently() {
+    let table_name = function_name!().rsplit_once(':').unwrap().1;
+    let cursor = empty_cursor(table_name, "INTEGER");
+    // Now that we have a cursor, we want to iterate over its rows and fill an arrow batch with it.
+
+    // Batches will contain at most 100 entries.
+    let max_batch_size = 100;
+    let mut reader = ConcurrentOdbcReader::new(cursor, max_batch_size).unwrap();
+    // Batch for batch copy values from ODBC buffer into arrow batches
+    let record_batch = reader.next();
+
+    assert!(record_batch.is_none())
+}
+
+
+/// Concurrent ODBC reader should forward errors from the fetch thread correctly to the main branch
+/// calling next.
+#[test]
+fn fetch_with_error_concurrently() {
+    let table_name = function_name!().rsplit_once(':').unwrap().1;
+    let cursor = cursor_over(table_name, "VARCHAR(50)", "('Hello, World!')");
+    // Now that we have a cursor, we want to iterate over its rows and fill an arrow batch with it.
+
+    // Batches will contain at most 100 entries.
+    let max_batch_size = 100;
+    let mut reader = ConcurrentOdbcReader::with(
+        cursor,
+        max_batch_size,
+        None,
+        BufferAllocationOptions {
+            // We set text size too small to hold 'Hello, World!' so we get a truncation error.
+            max_text_size: Some(1),
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    // Batch for batch copy values from ODBC buffer into arrow batches
+    let record_batch = reader.next().unwrap();
+
+    assert!(record_batch.is_err())
+}
+
+#[test]
+fn fetch_empty_cursor_concurrently_twice() {
+    let table_name = function_name!().rsplit_once(':').unwrap().1;
+    let cursor = empty_cursor(table_name, "INTEGER");
+    // Now that we have a cursor, we want to iterate over its rows and fill an arrow batch with it.
+
+    // Batches will contain at most 100 entries.
+    let max_batch_size = 100;
+    let mut reader = ConcurrentOdbcReader::new(cursor, max_batch_size).unwrap();
+    let _ = reader.next();
+    let record_batch = reader.next();
+
+    assert!(record_batch.is_none())
+}
+
+
+#[test]
+fn read_multiple_result_sets_using_concurrent_cursor() {
+    // Given a cursor returning two result sets
+    let conn = ENV
+        .connect_with_connection_string(MSSQL, Default::default())
+        .unwrap();
+    let cursor = conn
+        .into_cursor("SELECT 1 AS A; SELECT 2 AS B;", ())
+        .unwrap()
+        .unwrap();
+
+    // When
+    let mut reader = ConcurrentOdbcReader::new(cursor, 1).unwrap();
+    let first = reader.next().unwrap().unwrap();
+    let cursor = reader.into_cursor().unwrap();
+    let cursor = cursor.more_results().unwrap().unwrap();
+    let mut reader = ConcurrentOdbcReader::new(cursor, 1).unwrap();
+    let second = reader.next().unwrap().unwrap();
+
+    // Then
+    let first_vals = first
+        .column(0)
+        .as_any()
+        .downcast_ref::<Int32Array>()
+        .unwrap();
+    assert_eq!(1, first_vals.value(0));
+    let second_vals = second
+        .column(0)
+        .as_any()
+        .downcast_ref::<Int32Array>()
+        .unwrap();
+    assert_eq!(2, second_vals.value(0));
+}
+
 /// Creates the table and assures it is empty. Columns are named a,b,c, etc.
 fn setup_empty_table(
     conn: &Connection,
@@ -1884,6 +1999,18 @@ fn cursor_over(
     // Insert values using literals
     let sql = format!("INSERT INTO {table_name} (a) VALUES {literal}");
     conn.execute(&sql, ()).unwrap();
+    // Query column with values to get a cursor
+    let sql = format!("SELECT a FROM {table_name}");
+    let cursor = conn.into_cursor(&sql, ()).unwrap().unwrap();
+    cursor
+}
+
+fn empty_cursor(table_name: &str, column_type: &str) -> CursorImpl<StatementConnection<'static>> {
+    // Setup a table on the database
+    let conn = ENV
+        .connect_with_connection_string(MSSQL, ConnectionOptions::default())
+        .unwrap();
+    setup_empty_table(&conn, table_name, &[column_type]).unwrap();
     // Query column with values to get a cursor
     let sql = format!("SELECT a FROM {table_name}");
     let cursor = conn.into_cursor(&sql, ()).unwrap().unwrap();
