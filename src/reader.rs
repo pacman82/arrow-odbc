@@ -18,6 +18,7 @@ use odbc_api::{
 use thiserror::Error;
 
 mod binary;
+mod concurrent_odbc_reader;
 mod map_odbc_to_arrow;
 mod odbc_batch_stream;
 mod odbc_reader;
@@ -32,6 +33,7 @@ use crate::date_time::{
 
 pub use self::{
     binary::{Binary, FixedSizedBinary},
+    concurrent_odbc_reader::ConcurrentOdbcReader,
     map_odbc_to_arrow::MappingError,
     odbc_reader::OdbcReader,
     text::choose_text_strategy,

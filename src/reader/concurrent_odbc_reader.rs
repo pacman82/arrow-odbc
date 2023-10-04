@@ -1,0 +1,302 @@
+use std::{
+    sync::{
+        mpsc::{sync_channel, Receiver, SyncSender},
+        Arc,
+    },
+    thread::{self, JoinHandle},
+};
+
+use arrow::{
+    datatypes::SchemaRef,
+    error::ArrowError,
+    record_batch::{RecordBatch, RecordBatchReader},
+};
+use odbc_api::{buffers::ColumnarAnyBuffer, Cursor};
+
+use crate::{arrow_schema_from, BufferAllocationOptions, Error};
+
+use super::{
+    odbc_batch_stream::OdbcBatchStream, odbc_reader::next, to_record_batch::ToRecordBatch,
+};
+
+/// Arrow ODBC reader. Implements the [`arrow::record_batch::RecordBatchReader`] trait so it can be
+/// used to fill Arrow arrays from an ODBC data source.
+///
+/// This reader is generic over the cursor type so it can be used in cases there the cursor only
+/// borrows a statement handle (most likely the case then using prepared queries), or owned
+/// statement handles (recommened then using one shot queries, to have an easier life with the
+/// borrow checker).
+///
+/// # Example
+///
+/// ```no_run
+/// use arrow_odbc::{odbc_api::{Environment, ConnectionOptions}, ConcurrentOdbcReader};
+/// use std::sync::OnceLock;
+/// 
+/// static ENV: OnceLock<Environment> = OnceLock::new();
+///
+/// const CONNECTION_STRING: &str = "\
+///     Driver={ODBC Driver 17 for SQL Server};\
+///     Server=localhost;\
+///     UID=SA;\
+///     PWD=My@Test@Password1;\
+/// ";
+///
+/// fn main() -> Result<(), anyhow::Error> {
+///
+///     let odbc_environment = ENV.get_or_init(|| {Environment::new().unwrap() });
+///     
+///     // Connect with database.
+///     let connection = odbc_environment.connect_with_connection_string(
+///         CONNECTION_STRING,
+///         ConnectionOptions::default()
+///     )?;
+///
+///     // This SQL statement does not require any arguments.
+///     let parameters = ();
+///
+///     // Execute query and create result set
+///     let cursor = connection
+///         .into_cursor("SELECT * FROM MyTable", parameters)?
+///         .expect("SELECT statement must produce a cursor");
+///
+///     // Each batch shall only consist of maximum 10.000 rows.
+///     let max_batch_size = 10_000;
+///
+///     // Read result set as arrow batches. Infer Arrow types automatically using the meta
+///     // information of `cursor`.
+///     let arrow_record_batches = ConcurrentOdbcReader::new(cursor, max_batch_size)?;
+///
+///     for batch in arrow_record_batches {
+///         // ... process batch ...
+///     }
+///     Ok(())
+/// }
+/// ```
+pub struct ConcurrentOdbcReader<C: Cursor> {
+    /// Converts the content of ODBC buffers into Arrow record batches
+    converter: ToRecordBatch,
+    /// Fetches values from the ODBC datasource using columnar batches. Values are streamed batch
+    /// by batch in order to avoid reallocation of the buffers used for tranistion.
+    batch_stream: ConcurrentBlockCursor<C>,
+}
+
+impl<C: Cursor + Send +'static> ConcurrentOdbcReader<C> {
+    /// Construct a new `OdbcReader` instance. This constructor infers the Arrow schema from the
+    /// metadata of the cursor. If you want to set it explicitly use [`Self::with_arrow_schema`].
+    ///
+    /// # Parameters
+    ///
+    /// * `cursor`: ODBC cursor used to fetch batches from the data source. The constructor will
+    ///   bind buffers to this cursor in order to perform bulk fetches from the source. This is
+    ///   usually faster than fetching results row by row as it saves roundtrips to the database.
+    ///   The type of these buffers will be inferred from the arrow schema. Not every arrow type is
+    ///   supported though.
+    /// * `max_batch_size`: Maximum batch size requested from the datasource.
+    pub fn new(mut cursor: C, max_batch_size: usize) -> Result<Self, Error> {
+        // Get number of columns from result set. We know it to contain at least one column,
+        // otherwise it would not have been created.
+        let schema = Arc::new(arrow_schema_from(&mut cursor)?);
+        Self::with_arrow_schema(cursor, max_batch_size, schema)
+    }
+
+    /// Construct a new `OdbcReader instance.
+    ///
+    /// # Parameters
+    ///
+    /// * `cursor`: ODBC cursor used to fetch batches from the data source. The constructor will
+    ///   bind buffers to this cursor in order to perform bulk fetches from the source. This is
+    ///   usually faster than fetching results row by row as it saves roundtrips to the database.
+    ///   The type of these buffers will be inferred from the arrow schema. Not every arrow type is
+    ///   supported though.
+    /// * `max_batch_size`: Maximum batch size requested from the datasource.
+    /// * `schema`: Arrow schema. Describes the type of the Arrow Arrays in the record batches, but
+    ///    is also used to determine CData type requested from the data source.
+    pub fn with_arrow_schema(
+        cursor: C,
+        max_batch_size: usize,
+        schema: SchemaRef,
+    ) -> Result<Self, Error> {
+        Self::with(
+            cursor,
+            max_batch_size,
+            Some(schema),
+            BufferAllocationOptions::default(),
+        )
+    }
+
+    /// Construct a new [`crate::OdbcReader`] instance. This method allows you full control over
+    /// what options to explicitly specify, and what options you want to leave to this crate to
+    /// automatically decide.
+    ///
+    /// # Parameters
+    ///
+    /// * `cursor`: ODBC cursor used to fetch batches from the data source. The constructor will
+    ///   bind buffers to this cursor in order to perform bulk fetches from the source. This is
+    ///   usually faster than fetching results row by row as it saves roundtrips to the database.
+    ///   The type of these buffers will be inferred from the arrow schema. Not every arrow type is
+    ///   supported though.
+    /// * `max_batch_size`: Maximum batch size requested from the datasource.
+    /// * `schema`: Arrow schema. Describes the type of the Arrow Arrays in the record batches, but
+    ///    is also used to determine CData type requested from the data source. Set to `None` to
+    ///    infer schema from the data source.
+    /// * `buffer_allocation_options`: Allows you to specify upper limits for binary and / or text
+    ///    buffer types. This is useful support fetching data from e.g. VARCHAR(max) or
+    ///    VARBINARY(max) columns, which otherwise might lead to errors, due to the ODBC driver
+    ///    having a hard time specifying a good upper bound for the largest possible expected value.
+    pub fn with(
+        mut cursor: C,
+        max_batch_size: usize,
+        schema: Option<SchemaRef>,
+        buffer_allocation_options: BufferAllocationOptions,
+    ) -> Result<Self, Error> {
+        let converter = ToRecordBatch::new(&mut cursor, schema.clone(), buffer_allocation_options)?;
+        let batch_stream = ConcurrentBlockCursor::new(cursor, || {
+            converter.allocate_buffer(
+                max_batch_size,
+                buffer_allocation_options.fallibale_allocations,
+            )
+        })?;
+
+        Ok(Self {
+            converter,
+            batch_stream,
+        })
+    }
+
+    /// Destroy the ODBC arrow reader and yield the underlyinng cursor object.
+    ///
+    /// One application of this is to process more than one result set in case you executed a stored
+    /// procedure.
+    pub fn into_cursor(self) -> Result<C, odbc_api::Error> {
+        self.batch_stream.into_cursor()
+    }
+}
+
+impl<C> Iterator for ConcurrentOdbcReader<C>
+where
+    C: Cursor,
+{
+    type Item = Result<RecordBatch, ArrowError>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        next(&mut self.batch_stream, &mut self.converter)
+    }
+}
+
+impl<C> RecordBatchReader for ConcurrentOdbcReader<C>
+where
+    C: Cursor,
+{
+    fn schema(&self) -> SchemaRef {
+        self.converter.schema().clone()
+    }
+}
+
+pub struct ConcurrentBlockCursor<C> {
+    buffer: Option<ColumnarAnyBuffer>,
+    send_buffer: SyncSender<ColumnarAnyBuffer>,
+    receive_batch: Receiver<ColumnarAnyBuffer>,
+    fetch_thread: Option<JoinHandle<Result<C, odbc_api::Error>>>,
+    /// Only `Some`, if the cursor has been consumed succesfully and `fetch_thread` has been joined.
+    /// Can only be `Some` if `fetch_thread` is `None`. If both `fetch_thread` and `cursor` are
+    /// `None`, it is implied that `fetch_thread` returned an error joining.
+    cursor: Option<C>,
+}
+
+impl<C> ConcurrentBlockCursor<C>
+where
+    C: Cursor + Send + 'static,
+{
+    pub fn new(
+        mut cursor: C,
+        make_buffer: impl Fn() -> Result<ColumnarAnyBuffer, Error>,
+    ) -> Result<Self, Error> {
+        let (send_buffer, receive_buffer) = sync_channel(1);
+        let (send_batch, receive_batch) = sync_channel(1);
+
+        let fetch_thread = thread::spawn(move || {
+            while let Ok(buffer) = receive_buffer.recv() {
+                let mut block_cursor = cursor.bind_buffer(buffer).unwrap();
+                match block_cursor.fetch_with_truncation_check(true) {
+                    Ok(Some(_batch)) => {
+                        match block_cursor.unbind() {
+                            Ok((unbound_cursor, buffer)) => {
+                                cursor = unbound_cursor;
+                                if send_batch.send(buffer).is_err() {
+                                    return Ok(cursor);
+                                }
+                            }
+                            // Error unbinding buffer from cursor
+                            Err(odbc_error) => return Err(odbc_error),
+                        }
+                    }
+                    Ok(None) => {
+                        return block_cursor
+                            .unbind()
+                            .map(|(undbound_cursor, _buffer)| undbound_cursor);
+                    }
+                    Err(odbc_error) => {
+                        drop(send_batch);
+                        return Err(odbc_error);
+                    }
+                }
+            }
+            Ok(cursor)
+        });
+
+        let _ = send_buffer.send(make_buffer()?);
+        let buffer = Some(make_buffer()?);
+
+        Ok(Self {
+            buffer,
+            send_buffer,
+            receive_batch,
+            fetch_thread: Some(fetch_thread),
+            cursor: None,
+        })
+    }
+
+    pub fn into_cursor(self) -> Result<C, odbc_api::Error> {
+        // Fetch thread should never be blocked for a long time in receiving buffers. Yet it could
+        // wait for a long time on the application logic to receive an arrow buffer using next. We
+        // drop the receiver here explicitly in order to be always able to join the fetch thread,
+        // even if the iterator has not been consumed to completion.
+        drop(self.receive_batch);
+        if let Some(cursor) = self.cursor {
+            Ok(cursor)
+        } else {
+            self.fetch_thread.unwrap().join().unwrap()
+        }
+    }
+}
+
+impl<C> OdbcBatchStream for ConcurrentBlockCursor<C> {
+    type Cursor = C;
+
+    fn next(&mut self) -> Result<Option<&ColumnarAnyBuffer>, odbc_api::Error> {
+        match self.receive_batch.recv() {
+            // We successfully fetched a batch from the database.
+            Ok(batch) => {
+                let _ = self.send_buffer.send(self.buffer.take().unwrap());
+                self.buffer = Some(batch);
+                Ok(self.buffer.as_ref())
+            }
+            // Fetch thread stopped sending batches. Either because we consumed the result set
+            // completly or we hit an error.
+            Err(_receive_error) => {
+                if let Some(join_handle) = self.fetch_thread.take() {
+                    // If there has been an error returning the batch, or unbinding the buffer `?`
+                    // will raise it.
+                    self.cursor = Some(join_handle.join().unwrap()?);
+                    // We ran out of batches in the result set. End the stream.
+                    Ok(None)
+                } else {
+                    // This only happen if `next` is called after it returned either a `None` or
+                    // `Err` once. Let us just answer with `None`.
+                    Ok(None)
+                }
+            }
+        }
+    }
+}
