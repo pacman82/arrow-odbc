@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.3.0
+
+* Add `ConcurrentOdbcReader` to allow fetching ODBC row groups concurrently.
+
 ## 1.2.1
 
 * Additional debug messages emmitted to indicate relational types reported by ODBC
