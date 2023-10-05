@@ -3,7 +3,7 @@ use std::{
         mpsc::{sync_channel, Receiver, SyncSender},
         Arc,
     },
-    thread::{self, JoinHandle},
+    thread::{self, JoinHandle}, mem::swap,
 };
 
 use arrow::{
@@ -20,12 +20,13 @@ use super::{
 };
 
 /// Arrow ODBC reader. Implements the [`arrow::record_batch::RecordBatchReader`] trait so it can be
-/// used to fill Arrow arrays from an ODBC data source.
-///
-/// This reader is generic over the cursor type so it can be used in cases there the cursor only
-/// borrows a statement handle (most likely the case then using prepared queries), or owned
-/// statement handles (recommened then using one shot queries, to have an easier life with the
-/// borrow checker).
+/// used to fill Arrow arrays from an ODBC data source. Similar to [`crate::OdbcReader`], yet
+/// [`ConcurrentOdbcReader`] fetches ODBC batches in a second transit buffer eagerly from the
+/// database in a dedicated system thread. This allows the allocation of the Arrow arrays and your
+/// application logic to run on the main thread, while fetching the batches from the source happens
+/// concurrently. You need twice the memory for the transit buffer for this strategy, since one is
+/// may be in use by the main thread in order to copy values into arrow arrays, while the other is
+/// used to write values from the database.
 ///
 /// # Example
 ///
@@ -82,8 +83,8 @@ pub struct ConcurrentOdbcReader<C: Cursor> {
 }
 
 impl<C: Cursor + Send +'static> ConcurrentOdbcReader<C> {
-    /// Construct a new `OdbcReader` instance. This constructor infers the Arrow schema from the
-    /// metadata of the cursor. If you want to set it explicitly use [`Self::with_arrow_schema`].
+    /// This constructor infers the Arrow schema from the metadata of the cursor. If you want to set
+    /// it explicitly use [`Self::with_arrow_schema`].
     ///
     /// # Parameters
     ///
@@ -100,7 +101,7 @@ impl<C: Cursor + Send +'static> ConcurrentOdbcReader<C> {
         Self::with_arrow_schema(cursor, max_batch_size, schema)
     }
 
-    /// Construct a new `OdbcReader instance.
+    /// Construct a new [`crate::ConcurrentOdbcReader`] instance.
     ///
     /// # Parameters
     ///
@@ -125,9 +126,9 @@ impl<C: Cursor + Send +'static> ConcurrentOdbcReader<C> {
         )
     }
 
-    /// Construct a new [`crate::OdbcReader`] instance. This method allows you full control over
-    /// what options to explicitly specify, and what options you want to leave to this crate to
-    /// automatically decide.
+    /// Construct a new [`crate::ConcurrentOdbcReader`] instance. This method allows you full
+    /// control over what options to explicitly specify, and what options you want to leave to this
+    /// crate to automatically decide.
     ///
     /// # Parameters
     ///
@@ -168,6 +169,10 @@ impl<C: Cursor + Send +'static> ConcurrentOdbcReader<C> {
     ///
     /// One application of this is to process more than one result set in case you executed a stored
     /// procedure.
+    /// 
+    /// Due to the concurrent fetching of row groups you can not know how many row groups have been
+    /// extracted once the cursor is returned. Unless that is that the entire cursor has been
+    /// consumed i.e. [`Self::next`] returned `None`.
     pub fn into_cursor(self) -> Result<C, odbc_api::Error> {
         self.batch_stream.into_cursor()
     }
@@ -194,9 +199,19 @@ where
 }
 
 pub struct ConcurrentBlockCursor<C> {
-    buffer: Option<ColumnarAnyBuffer>,
+    /// We currently only borrow these buffers to the converter, so we take ownership of them here.
+    buffer: ColumnarAnyBuffer,
+    /// In order to avoid reallocating buffers over and over again, we use this channel to send the
+    /// buffers back to the fetch thread after we copied their contents into arrow arrays.
     send_buffer: SyncSender<ColumnarAnyBuffer>,
+    /// Receives filled batches from the fetch thread. Once the source is empty or if an error
+    /// occurs its associated sender is dropped, and receiving batches will return an error (which
+    /// we expect during normal operation and cleanup, and is not forwarded to the user).
     receive_batch: Receiver<ColumnarAnyBuffer>,
+    /// We join with the fetch thread if we stop receiving batches (i.e. receive_batch.recv()
+    /// returns an error) or `into_cursor` is called. `None` if the thread has already been joined.
+    /// In this case either an error has been reported to the user, or the cursor is stored in
+    /// `cursor`. 
     fetch_thread: Option<JoinHandle<Result<C, odbc_api::Error>>>,
     /// Only `Some`, if the cursor has been consumed succesfully and `fetch_thread` has been joined.
     /// Can only be `Some` if `fetch_thread` is `None`. If both `fetch_thread` and `cursor` are
@@ -246,7 +261,7 @@ where
         });
 
         let _ = send_buffer.send(make_buffer()?);
-        let buffer = Some(make_buffer()?);
+        let buffer = make_buffer()?;
 
         Ok(Self {
             buffer,
@@ -277,10 +292,10 @@ impl<C> OdbcBatchStream for ConcurrentBlockCursor<C> {
     fn next(&mut self) -> Result<Option<&ColumnarAnyBuffer>, odbc_api::Error> {
         match self.receive_batch.recv() {
             // We successfully fetched a batch from the database.
-            Ok(batch) => {
-                let _ = self.send_buffer.send(self.buffer.take().unwrap());
-                self.buffer = Some(batch);
-                Ok(self.buffer.as_ref())
+            Ok(mut batch) => {
+                swap(&mut self.buffer, &mut batch);
+                let _ = self.send_buffer.send(batch);
+                Ok(Some(&self.buffer))
             }
             // Fetch thread stopped sending batches. Either because we consumed the result set
             // completly or we hit an error.
