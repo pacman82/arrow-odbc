@@ -1858,6 +1858,33 @@ fn fetch_with_error_concurrently() {
 }
 
 #[test]
+fn fetch_row_groups_repeatedly_concurrently() {
+    let table_name = function_name!().rsplit_once(':').unwrap().1;
+    let cursor = cursor_over(table_name, "INTEGER", "(1),(NULL),(3)");
+    // Now that we have a cursor, we want to iterate over its rows and fill an arrow batch with it.
+
+    // Choose a batch size 1, so we get 3 batches.
+    let max_batch_size = 1;
+    let mut reader = ConcurrentOdbcReader::new(cursor, max_batch_size).unwrap();
+    // Batch for batch copy values from ODBC buffer into arrow batches
+    let record_batch = reader.next().unwrap().unwrap();
+    let array_any = record_batch.column(0).clone();
+    let array_vals_1 = array_any.as_any().downcast_ref::<Int32Array>().unwrap();
+    let record_batch = reader.next().unwrap().unwrap();
+    let array_any = record_batch.column(0).clone();
+    let array_vals_2 = array_any.as_any().downcast_ref::<Int32Array>().unwrap();
+    let record_batch = reader.next().unwrap().unwrap();
+    let array_any = record_batch.column(0).clone();
+    let array_vals_3 = array_any.as_any().downcast_ref::<Int32Array>().unwrap();
+
+    assert!(array_vals_1.is_valid(0));
+    assert_eq!([1], *array_vals_1.values());
+    assert!(array_vals_2.is_null(0));
+    assert!(array_vals_3.is_valid(0));
+    assert_eq!([3], *array_vals_3.values());
+}
+
+#[test]
 fn fetch_empty_cursor_concurrently_twice() {
     let table_name = function_name!().rsplit_once(':').unwrap().1;
     let cursor = empty_cursor(table_name, "INTEGER");
