@@ -7,7 +7,7 @@ use arrow::{
 };
 use odbc_api::{buffers::ColumnarAnyBuffer, BlockCursor, Cursor};
 
-use crate::{arrow_schema_from, BufferAllocationOptions, Error};
+use crate::{arrow_schema_from, BufferAllocationOptions, Error, ConcurrentOdbcReader};
 
 use super::{odbc_batch_stream::OdbcBatchStream, to_record_batch::ToRecordBatch};
 
@@ -151,6 +151,14 @@ impl<C: Cursor> OdbcReader<C> {
             converter,
             batch_stream,
         })
+    }
+
+    /// Consume this instance to create a similar ODBC reader which fetches batches asynchronously.
+    pub fn into_concurrent(self) -> Result<ConcurrentOdbcReader<C>, Error> where C: Send + 'static {
+        let cursor = self.into_cursor().expect("TODO: optimize unbind away");
+        let max_batch_size = 100; // Todo: use batch size from buffer length
+        let reader = ConcurrentOdbcReader::new(cursor, max_batch_size)?;
+        Ok(reader)
     }
 
     /// Destroy the ODBC arrow reader and yield the underlyinng cursor object.

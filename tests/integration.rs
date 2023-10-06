@@ -1940,10 +1940,9 @@ fn promote_sequential_to_concurrent_cursor() {
     let cursor = cursor_over(table_name, "INTEGER", "(42)");
     // Now that we have a cursor, we want to iterate over its rows and fill an arrow batch with it.
     let max_batch_size = 100;
-    let reader = OdbcReader::new(cursor, max_batch_size).unwrap();
 
-    let cursor = reader.into_cursor().unwrap();
-    let mut reader = ConcurrentOdbcReader::new(cursor, max_batch_size).unwrap();
+    let reader = OdbcReader::new(cursor, max_batch_size).unwrap();
+    let mut reader = reader.into_concurrent().unwrap();
 
     let record_batch = reader.next().unwrap().unwrap();
     let array_any = record_batch.column(0).clone();
