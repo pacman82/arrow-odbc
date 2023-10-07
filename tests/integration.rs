@@ -1829,7 +1829,6 @@ fn fetch_empty_cursor_concurrently() {
     assert!(record_batch.is_none())
 }
 
-
 /// Concurrent ODBC reader should forward errors from the fetch thread correctly to the main branch
 /// calling next.
 #[test]
@@ -1899,7 +1898,6 @@ fn fetch_empty_cursor_concurrently_twice() {
     assert!(record_batch.is_none())
 }
 
-
 #[test]
 fn read_multiple_result_sets_using_concurrent_cursor() {
     // Given a cursor returning two result sets
@@ -1942,7 +1940,7 @@ fn promote_sequential_to_concurrent_cursor() {
     let max_batch_size = 100;
 
     let reader = OdbcReader::new(cursor, max_batch_size).unwrap();
-    let mut reader = reader.into_concurrent().unwrap();
+    let mut reader = reader.into_concurrent(false).unwrap();
 
     let record_batch = reader.next().unwrap().unwrap();
     let array_any = record_batch.column(0).clone();
