@@ -252,26 +252,22 @@ where
                 // There has been another row group fetched by the cursor. We unbind the buffers so
                 // we can pass ownership of it to the application and bind a new buffer to the
                 // cursor in order to start fetching the next batch.
-                match block_cursor.unbind() {
-                    Ok((cursor, buffer)) => {
-                        if send_batch.send(buffer).is_err() {
-                            // Should the main thread stop receiving buffers, this thread should
-                            // also stop fetching batches.
-                            break Ok(cursor)
-                        }
-                        // Wait for the application thread to give us a buffer to fill.
-                        match receive_buffer.recv() {
-                            Err(_) => {
-                                // Application thread dropped sender and does not want more buffers
-                                // to be filled. Let's stop this thread and return the cursor
-                                break Ok(cursor)
-                            }
-                            Ok(next_buffer) => {
-                                block_cursor = cursor.bind_buffer(next_buffer).unwrap();
-                            }
-                        }
+                let (cursor, buffer) = block_cursor.unbind()?;
+                if send_batch.send(buffer).is_err() {
+                    // Should the main thread stop receiving buffers, this thread should
+                    // also stop fetching batches.
+                    break Ok(cursor)
+                }
+                // Wait for the application thread to give us a buffer to fill.
+                match receive_buffer.recv() {
+                    Err(_) => {
+                        // Application thread dropped sender and does not want more buffers
+                        // to be filled. Let's stop this thread and return the cursor
+                        break Ok(cursor)
                     }
-                    Err(odbc_error) => break Err(odbc_error)
+                    Ok(next_buffer) => {
+                        block_cursor = cursor.bind_buffer(next_buffer).unwrap();
+                    }
                 }
             }
         });
