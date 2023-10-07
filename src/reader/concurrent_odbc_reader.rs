@@ -12,7 +12,7 @@ use arrow::{
     error::ArrowError,
     record_batch::{RecordBatch, RecordBatchReader},
 };
-use odbc_api::{buffers::ColumnarAnyBuffer, Cursor};
+use odbc_api::{buffers::ColumnarAnyBuffer, BlockCursor, Cursor};
 
 use crate::{arrow_schema_from, BufferAllocationOptions, Error};
 
@@ -153,12 +153,30 @@ impl<C: Cursor + Send + 'static> ConcurrentOdbcReader<C> {
         buffer_allocation_options: BufferAllocationOptions,
     ) -> Result<Self, Error> {
         let converter = ToRecordBatch::new(&mut cursor, schema.clone(), buffer_allocation_options)?;
-        let batch_stream = ConcurrentBlockCursor::new(cursor, || {
+
+        let make_buffer = || {
             converter.allocate_buffer(
                 max_batch_size,
                 buffer_allocation_options.fallibale_allocations,
             )
-        })?;
+        };
+        let block_cursor = cursor.bind_buffer(make_buffer()?).unwrap();
+        let batch_stream = ConcurrentBlockCursor::new(block_cursor, make_buffer)?;
+
+        Ok(Self {
+            converter,
+            batch_stream,
+        })
+    }
+
+    pub(crate) fn from_block_cursor(
+        block_cursor: BlockCursor<C, ColumnarAnyBuffer>,
+        converter: ToRecordBatch,
+        fallibale_allocations: bool,
+    ) -> Result<Self, Error> {
+        let max_batch_size = 100; // Todo: use batch size from buffer length
+        let make_buffer = || converter.allocate_buffer(max_batch_size, fallibale_allocations);
+        let batch_stream = ConcurrentBlockCursor::new(block_cursor, make_buffer)?;
 
         Ok(Self {
             converter,
@@ -224,15 +242,22 @@ impl<C> ConcurrentBlockCursor<C>
 where
     C: Cursor + Send + 'static,
 {
+    /// Construct a new concurrent block cursor.
+    ///
+    /// # Parameters
+    ///
+    /// * `block_cursor`: Taking a BlockCursor instead of a Cursor allows for better resource
+    ///   stealing if constructing starting from a sequential Cursor, as we do not need to undbind
+    ///   and bind the cursor.
+    /// * `lazy_buffer`: Constructor for a buffer holding the fetched row group. We want to
+    ///   construct it lazy, so we can delay its allocation until after the fetch thread has started
+    ///   and we can start fetching the first row group concurrently as earlier.
     pub fn new(
-        cursor: C,
-        make_buffer: impl Fn() -> Result<ColumnarAnyBuffer, Error>,
+        block_cursor: BlockCursor<C, ColumnarAnyBuffer>,
+        lazy_buffer: impl FnOnce() -> Result<ColumnarAnyBuffer, Error>,
     ) -> Result<Self, Error> {
         let (send_buffer, receive_buffer) = sync_channel(1);
         let (send_batch, receive_batch) = sync_channel(1);
-
-        let buffer = make_buffer()?;
-        let block_cursor = cursor.bind_buffer(buffer).unwrap();
 
         let fetch_thread = thread::spawn(move || {
             let mut block_cursor = block_cursor;
@@ -247,7 +272,7 @@ where
                     Err(odbc_error) => {
                         drop(send_batch);
                         break Err(odbc_error);
-                    },
+                    }
                 }
                 // There has been another row group fetched by the cursor. We unbind the buffers so
                 // we can pass ownership of it to the application and bind a new buffer to the
@@ -256,14 +281,14 @@ where
                 if send_batch.send(buffer).is_err() {
                     // Should the main thread stop receiving buffers, this thread should
                     // also stop fetching batches.
-                    break Ok(cursor)
+                    break Ok(cursor);
                 }
                 // Wait for the application thread to give us a buffer to fill.
                 match receive_buffer.recv() {
                     Err(_) => {
-                        // Application thread dropped sender and does not want more buffers
-                        // to be filled. Let's stop this thread and return the cursor
-                        break Ok(cursor)
+                        // Application thread dropped sender and does not want more buffers to be
+                        // filled. Let's stop this thread and return the cursor
+                        break Ok(cursor);
                     }
                     Ok(next_buffer) => {
                         block_cursor = cursor.bind_buffer(next_buffer).unwrap();
@@ -272,8 +297,7 @@ where
             }
         });
 
-        let _ = send_buffer.send(make_buffer()?);
-        let buffer = make_buffer()?;
+        let buffer = lazy_buffer()?;
 
         Ok(Self {
             buffer,
