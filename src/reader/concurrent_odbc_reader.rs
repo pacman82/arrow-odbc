@@ -1,9 +1,10 @@
 use std::{
+    mem::swap,
     sync::{
         mpsc::{sync_channel, Receiver, SyncSender},
         Arc,
     },
-    thread::{self, JoinHandle}, mem::swap,
+    thread::{self, JoinHandle},
 };
 
 use arrow::{
@@ -33,7 +34,7 @@ use super::{
 /// ```no_run
 /// use arrow_odbc::{odbc_api::{Environment, ConnectionOptions}, ConcurrentOdbcReader};
 /// use std::sync::OnceLock;
-/// 
+///
 /// static ENV: OnceLock<Environment> = OnceLock::new();
 ///
 /// const CONNECTION_STRING: &str = "\
@@ -82,7 +83,7 @@ pub struct ConcurrentOdbcReader<C: Cursor> {
     batch_stream: ConcurrentBlockCursor<C>,
 }
 
-impl<C: Cursor + Send +'static> ConcurrentOdbcReader<C> {
+impl<C: Cursor + Send + 'static> ConcurrentOdbcReader<C> {
     /// This constructor infers the Arrow schema from the metadata of the cursor. If you want to set
     /// it explicitly use [`Self::with_arrow_schema`].
     ///
@@ -169,7 +170,7 @@ impl<C: Cursor + Send +'static> ConcurrentOdbcReader<C> {
     ///
     /// One application of this is to process more than one result set in case you executed a stored
     /// procedure.
-    /// 
+    ///
     /// Due to the concurrent fetching of row groups you can not know how many row groups have been
     /// extracted once the cursor is returned. Unless that is that the entire cursor has been
     /// consumed i.e. [`Self::next`] returned `None`.
@@ -211,7 +212,7 @@ pub struct ConcurrentBlockCursor<C> {
     /// We join with the fetch thread if we stop receiving batches (i.e. receive_batch.recv()
     /// returns an error) or `into_cursor` is called. `None` if the thread has already been joined.
     /// In this case either an error has been reported to the user, or the cursor is stored in
-    /// `cursor`. 
+    /// `cursor`.
     fetch_thread: Option<JoinHandle<Result<C, odbc_api::Error>>>,
     /// Only `Some`, if the cursor has been consumed succesfully and `fetch_thread` has been joined.
     /// Can only be `Some` if `fetch_thread` is `None`. If both `fetch_thread` and `cursor` are
@@ -224,40 +225,55 @@ where
     C: Cursor + Send + 'static,
 {
     pub fn new(
-        mut cursor: C,
+        cursor: C,
         make_buffer: impl Fn() -> Result<ColumnarAnyBuffer, Error>,
     ) -> Result<Self, Error> {
         let (send_buffer, receive_buffer) = sync_channel(1);
         let (send_batch, receive_batch) = sync_channel(1);
 
+        let buffer = make_buffer()?;
+        let block_cursor = cursor.bind_buffer(buffer).unwrap();
+
         let fetch_thread = thread::spawn(move || {
-            while let Ok(buffer) = receive_buffer.recv() {
-                let mut block_cursor = cursor.bind_buffer(buffer).unwrap();
+            let mut block_cursor = block_cursor;
+            loop {
                 match block_cursor.fetch_with_truncation_check(true) {
-                    Ok(Some(_batch)) => {
-                        match block_cursor.unbind() {
-                            Ok((unbound_cursor, buffer)) => {
-                                cursor = unbound_cursor;
-                                if send_batch.send(buffer).is_err() {
-                                    return Ok(cursor);
-                                }
-                            }
-                            // Error unbinding buffer from cursor
-                            Err(odbc_error) => return Err(odbc_error),
-                        }
-                    }
+                    Ok(Some(_batch)) => (),
                     Ok(None) => {
-                        return block_cursor
+                        break block_cursor
                             .unbind()
                             .map(|(undbound_cursor, _buffer)| undbound_cursor);
                     }
                     Err(odbc_error) => {
                         drop(send_batch);
-                        return Err(odbc_error);
+                        break Err(odbc_error);
+                    },
+                }
+                // There has been another row group fetched by the cursor. We unbind the buffers so
+                // we can pass ownership of it to the application and bind a new buffer to the
+                // cursor in order to start fetching the next batch.
+                match block_cursor.unbind() {
+                    Ok((cursor, buffer)) => {
+                        if send_batch.send(buffer).is_err() {
+                            // Should the main thread stop receiving buffers, this thread should
+                            // also stop fetching batches.
+                            break Ok(cursor)
+                        }
+                        // Wait for the application thread to give us a buffer to fill.
+                        match receive_buffer.recv() {
+                            Err(_) => {
+                                // Application thread dropped sender and does not want more buffers
+                                // to be filled. Let's stop this thread and return the cursor
+                                break Ok(cursor)
+                            }
+                            Ok(next_buffer) => {
+                                block_cursor = cursor.bind_buffer(next_buffer).unwrap();
+                            }
+                        }
                     }
+                    Err(odbc_error) => break Err(odbc_error)
                 }
             }
-            Ok(cursor)
         });
 
         let _ = send_buffer.send(make_buffer()?);
