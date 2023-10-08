@@ -169,12 +169,15 @@ impl<C: Cursor + Send + 'static> ConcurrentOdbcReader<C> {
         })
     }
 
+    /// The schema implied by `block_cursor` and `converter` must match. Invariant is hard to check
+    /// in type system, keep this constructor private to this crate. Users should use
+    /// [`crate::OdbcReader::into_concurrent`] instead.
     pub(crate) fn from_block_cursor(
         block_cursor: BlockCursor<C, ColumnarAnyBuffer>,
         converter: ToRecordBatch,
         fallibale_allocations: bool,
     ) -> Result<Self, Error> {
-        let max_batch_size = 100; // Todo: use batch size from buffer length
+        let max_batch_size = block_cursor.row_array_size();
         let make_buffer = || converter.allocate_buffer(max_batch_size, fallibale_allocations);
         let batch_stream = ConcurrentBlockCursor::new(block_cursor, make_buffer)?;
 
