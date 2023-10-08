@@ -33,8 +33,7 @@ use arrow_odbc::{
         Connection, ConnectionOptions, Cursor, CursorImpl, Environment, IntoParameter,
         StatementConnection,
     },
-    BufferAllocationOptions, ColumnFailure, ConcurrentOdbcReader, Error, OdbcReader, OdbcWriter,
-    WriterError,
+    BufferAllocationOptions, ColumnFailure, Error, OdbcReader, OdbcWriter, WriterError,
 };
 
 use stdext::function_name;
@@ -1802,7 +1801,10 @@ fn fetch_integer_concurrently() {
 
     // Batches will contain at most 100 entries.
     let max_batch_size = 100;
-    let mut reader = ConcurrentOdbcReader::new(cursor, max_batch_size).unwrap();
+    let mut reader = OdbcReader::new(cursor, max_batch_size)
+        .unwrap()
+        .into_concurrent()
+        .unwrap();
     // Batch for batch copy values from ODBC buffer into arrow batches
     let record_batch = reader.next().unwrap().unwrap();
 
@@ -1822,7 +1824,10 @@ fn fetch_empty_cursor_concurrently() {
 
     // Batches will contain at most 100 entries.
     let max_batch_size = 100;
-    let mut reader = ConcurrentOdbcReader::new(cursor, max_batch_size).unwrap();
+    let mut reader = OdbcReader::new(cursor, max_batch_size)
+        .unwrap()
+        .into_concurrent()
+        .unwrap();
     // Batch for batch copy values from ODBC buffer into arrow batches
     let record_batch = reader.next();
 
@@ -1839,7 +1844,7 @@ fn fetch_with_error_concurrently() {
 
     // Batches will contain at most 100 entries.
     let max_batch_size = 100;
-    let mut reader = ConcurrentOdbcReader::with(
+    let mut reader = OdbcReader::with(
         cursor,
         max_batch_size,
         None,
@@ -1849,6 +1854,8 @@ fn fetch_with_error_concurrently() {
             ..Default::default()
         },
     )
+    .unwrap()
+    .into_concurrent()
     .unwrap();
     // Batch for batch copy values from ODBC buffer into arrow batches
     let record_batch = reader.next().unwrap();
@@ -1864,7 +1871,10 @@ fn fetch_row_groups_repeatedly_concurrently() {
 
     // Choose a batch size 1, so we get 3 batches.
     let max_batch_size = 1;
-    let mut reader = ConcurrentOdbcReader::new(cursor, max_batch_size).unwrap();
+    let mut reader = OdbcReader::new(cursor, max_batch_size)
+        .unwrap()
+        .into_concurrent()
+        .unwrap();
     // Batch for batch copy values from ODBC buffer into arrow batches
     let record_batch = reader.next().unwrap().unwrap();
     let array_any = record_batch.column(0).clone();
@@ -1891,7 +1901,10 @@ fn fetch_empty_cursor_concurrently_twice() {
 
     // Batches will contain at most 100 entries.
     let max_batch_size = 100;
-    let mut reader = ConcurrentOdbcReader::new(cursor, max_batch_size).unwrap();
+    let mut reader = OdbcReader::new(cursor, max_batch_size)
+        .unwrap()
+        .into_concurrent()
+        .unwrap();
     let _ = reader.next();
     let record_batch = reader.next();
 
@@ -1910,11 +1923,17 @@ fn read_multiple_result_sets_using_concurrent_cursor() {
         .unwrap();
 
     // When
-    let mut reader = ConcurrentOdbcReader::new(cursor, 1).unwrap();
+    let mut reader = OdbcReader::new(cursor, 1)
+        .unwrap()
+        .into_concurrent()
+        .unwrap();
     let first = reader.next().unwrap().unwrap();
     let cursor = reader.into_cursor().unwrap();
     let cursor = cursor.more_results().unwrap().unwrap();
-    let mut reader = ConcurrentOdbcReader::new(cursor, 1).unwrap();
+    let mut reader = OdbcReader::new(cursor, 1)
+        .unwrap()
+        .into_concurrent()
+        .unwrap();
     let second = reader.next().unwrap().unwrap();
 
     // Then
@@ -1940,7 +1959,7 @@ fn promote_sequential_to_concurrent_cursor() {
     let max_batch_size = 100;
 
     let reader = OdbcReader::new(cursor, max_batch_size).unwrap();
-    let mut reader = reader.into_concurrent(false).unwrap();
+    let mut reader = reader.into_concurrent().unwrap();
 
     let record_batch = reader.next().unwrap().unwrap();
     let array_any = record_batch.column(0).clone();

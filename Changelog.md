@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.0.0
+
+* Update odbc-api `>= 0.56.1, < 3` ->  `>= 2.2, < 3`
+
 ## 1.3.0
 
 * Add `ConcurrentOdbcReader` to allow fetching ODBC row groups concurrently.
