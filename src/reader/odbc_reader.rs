@@ -68,6 +68,9 @@ pub struct OdbcReader<C: Cursor> {
     /// Fetches values from the ODBC datasource using columnar batches. Values are streamed batch
     /// by batch in order to avoid reallocation of the buffers used for tranistion.
     batch_stream: BlockCursor<C, ColumnarAnyBuffer>,
+    /// We remember if the user decided to use fallibale allocations or not in case we need to
+    /// allocate another buffer due to a state transition towards [`ConcurrentOdbcReader`].
+    fallibale_allocations: bool,
 }
 
 impl<C: Cursor> OdbcReader<C> {
@@ -150,13 +153,68 @@ impl<C: Cursor> OdbcReader<C> {
         Ok(Self {
             converter,
             batch_stream,
+            fallibale_allocations: buffer_allocation_options.fallibale_allocations
         })
     }
 
     /// Consume this instance to create a similar ODBC reader which fetches batches asynchronously.
+    /// 
+    /// Steals all resources from this [`OdbcReader`] instance, and allocates another buffer for
+    /// transiting data from the ODBC data source to the application. This way one buffer can be
+    /// written to by a dedicated system thread, while the other is read by the application. Use
+    /// this if you want to trade memory for speed.
+    /// 
+    /// # Example
+    ///
+    /// ```no_run
+    /// use arrow_odbc::{odbc_api::{Environment, ConnectionOptions}, OdbcReader};
+    /// use std::sync::OnceLock;
+    ///
+    /// // In order to fetch in a dedicated system thread we need a cursor with static lifetime,
+    /// // this implies a static ODBC environment.
+    /// static ENV: OnceLock<Environment> = OnceLock::new();
+    ///
+    /// const CONNECTION_STRING: &str = "\
+    ///     Driver={ODBC Driver 17 for SQL Server};\
+    ///     Server=localhost;\
+    ///     UID=SA;\
+    ///     PWD=My@Test@Password1;\
+    /// ";
+    ///
+    /// fn main() -> Result<(), anyhow::Error> {
+    ///
+    ///     let odbc_environment = ENV.get_or_init(|| {Environment::new().unwrap() });
+    ///     
+    ///     // Connect with database.
+    ///     let connection = odbc_environment.connect_with_connection_string(
+    ///         CONNECTION_STRING,
+    ///         ConnectionOptions::default()
+    ///     )?;
+    ///
+    ///     // This SQL statement does not require any arguments.
+    ///     let parameters = ();
+    ///
+    ///     // Execute query and create result set
+    ///     let cursor = connection
+    ///         // Using `into_cursor` instead of `execute` takes ownership of the connection and
+    ///         // allows for a cursor with static lifetime.
+    ///         .into_cursor("SELECT * FROM MyTable", parameters)?
+    ///         .expect("SELECT statement must produce a cursor");
+    ///
+    ///     // Construct ODBC reader ...
+    ///     let max_batch_size = 1000;
+    ///     let arrow_record_batches = OdbcReader::new(cursor, max_batch_size)
+    ///         // ... and make it concurrent
+    ///         .and_then(OdbcReader::into_concurrent)?;
+    ///
+    ///     for batch in arrow_record_batches {
+    ///         // ... process batch ...
+    ///     }
+    ///     Ok(())
+    /// }
+    /// ```
     pub fn into_concurrent(
         self,
-        fallibale_allocations: bool,
     ) -> Result<ConcurrentOdbcReader<C>, Error>
     where
         C: Send + 'static,
@@ -164,7 +222,7 @@ impl<C: Cursor> OdbcReader<C> {
         ConcurrentOdbcReader::from_block_cursor(
             self.batch_stream,
             self.converter,
-            fallibale_allocations,
+            self.fallibale_allocations,
         )
     }
 

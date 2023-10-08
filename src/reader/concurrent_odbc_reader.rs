@@ -1,9 +1,6 @@
 use std::{
     mem::swap,
-    sync::{
-        mpsc::{sync_channel, Receiver, SyncSender},
-        Arc,
-    },
+    sync::mpsc::{sync_channel, Receiver, SyncSender},
     thread::{self, JoinHandle},
 };
 
@@ -14,7 +11,7 @@ use arrow::{
 };
 use odbc_api::{buffers::ColumnarAnyBuffer, BlockCursor, Cursor};
 
-use crate::{arrow_schema_from, BufferAllocationOptions, Error};
+use crate::{BufferAllocationOptions, Error, OdbcReader};
 
 use super::{
     odbc_batch_stream::OdbcBatchStream, odbc_reader::next, to_record_batch::ToRecordBatch,
@@ -32,9 +29,11 @@ use super::{
 /// # Example
 ///
 /// ```no_run
-/// use arrow_odbc::{odbc_api::{Environment, ConnectionOptions}, ConcurrentOdbcReader};
+/// use arrow_odbc::{odbc_api::{Environment, ConnectionOptions}, OdbcReader};
 /// use std::sync::OnceLock;
 ///
+/// // In order to fetch in a dedicated system thread we need a cursor with static lifetime,
+/// // this implies a static ODBC environment.
 /// static ENV: OnceLock<Environment> = OnceLock::new();
 ///
 /// const CONNECTION_STRING: &str = "\
@@ -59,15 +58,16 @@ use super::{
 ///
 ///     // Execute query and create result set
 ///     let cursor = connection
+///         // Using `into_cursor` instead of `execute` takes ownership of the connection and
+///         // allows for a cursor with static lifetime.
 ///         .into_cursor("SELECT * FROM MyTable", parameters)?
 ///         .expect("SELECT statement must produce a cursor");
 ///
-///     // Each batch shall only consist of maximum 10.000 rows.
-///     let max_batch_size = 10_000;
-///
-///     // Read result set as arrow batches. Infer Arrow types automatically using the meta
-///     // information of `cursor`.
-///     let arrow_record_batches = ConcurrentOdbcReader::new(cursor, max_batch_size)?;
+///     // Construct ODBC reader ...
+///     let max_batch_size = 1000;
+///     let arrow_record_batches = OdbcReader::new(cursor, max_batch_size)
+///         // ... and make it concurrent
+///         .and_then(OdbcReader::into_concurrent)?;
 ///
 ///     for batch in arrow_record_batches {
 ///         // ... process batch ...
@@ -84,6 +84,7 @@ pub struct ConcurrentOdbcReader<C: Cursor> {
 }
 
 impl<C: Cursor + Send + 'static> ConcurrentOdbcReader<C> {
+    #[deprecated(since = "2.2.0", note = "use OdbcReader::into_concurrent instead")]
     /// This constructor infers the Arrow schema from the metadata of the cursor. If you want to set
     /// it explicitly use [`Self::with_arrow_schema`].
     ///
@@ -95,13 +96,11 @@ impl<C: Cursor + Send + 'static> ConcurrentOdbcReader<C> {
     ///   The type of these buffers will be inferred from the arrow schema. Not every arrow type is
     ///   supported though.
     /// * `max_batch_size`: Maximum batch size requested from the datasource.
-    pub fn new(mut cursor: C, max_batch_size: usize) -> Result<Self, Error> {
-        // Get number of columns from result set. We know it to contain at least one column,
-        // otherwise it would not have been created.
-        let schema = Arc::new(arrow_schema_from(&mut cursor)?);
-        Self::with_arrow_schema(cursor, max_batch_size, schema)
+    pub fn new(cursor: C, max_batch_size: usize) -> Result<Self, Error> {
+        OdbcReader::new(cursor, max_batch_size).and_then(OdbcReader::into_concurrent)
     }
 
+    #[deprecated(since = "2.2.0", note = "use OdbcReader::into_concurrent instead")]
     /// Construct a new [`crate::ConcurrentOdbcReader`] instance.
     ///
     /// # Parameters
@@ -119,14 +118,11 @@ impl<C: Cursor + Send + 'static> ConcurrentOdbcReader<C> {
         max_batch_size: usize,
         schema: SchemaRef,
     ) -> Result<Self, Error> {
-        Self::with(
-            cursor,
-            max_batch_size,
-            Some(schema),
-            BufferAllocationOptions::default(),
-        )
+        OdbcReader::with_arrow_schema(cursor, max_batch_size, schema)
+            .and_then(OdbcReader::into_concurrent)
     }
 
+    #[deprecated(since = "2.2.0", note = "use OdbcReader::into_concurrent instead")]
     /// Construct a new [`crate::ConcurrentOdbcReader`] instance. This method allows you full
     /// control over what options to explicitly specify, and what options you want to leave to this
     /// crate to automatically decide.
@@ -147,26 +143,13 @@ impl<C: Cursor + Send + 'static> ConcurrentOdbcReader<C> {
     ///    VARBINARY(max) columns, which otherwise might lead to errors, due to the ODBC driver
     ///    having a hard time specifying a good upper bound for the largest possible expected value.
     pub fn with(
-        mut cursor: C,
+        cursor: C,
         max_batch_size: usize,
         schema: Option<SchemaRef>,
         buffer_allocation_options: BufferAllocationOptions,
     ) -> Result<Self, Error> {
-        let converter = ToRecordBatch::new(&mut cursor, schema.clone(), buffer_allocation_options)?;
-
-        let make_buffer = || {
-            converter.allocate_buffer(
-                max_batch_size,
-                buffer_allocation_options.fallibale_allocations,
-            )
-        };
-        let block_cursor = cursor.bind_buffer(make_buffer()?).unwrap();
-        let batch_stream = ConcurrentBlockCursor::new(block_cursor, make_buffer)?;
-
-        Ok(Self {
-            converter,
-            batch_stream,
-        })
+        OdbcReader::with(cursor, max_batch_size, schema, buffer_allocation_options)
+            .and_then(OdbcReader::into_concurrent)
     }
 
     /// The schema implied by `block_cursor` and `converter` must match. Invariant is hard to check
