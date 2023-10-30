@@ -1,7 +1,7 @@
 use std::{convert::TryInto, sync::Arc};
 
 use arrow::{
-    array::{ArrayRef, BooleanBuilder, Decimal128Builder},
+    array::{ArrayRef, BooleanBuilder},
     datatypes::{
         DataType as ArrowDataType, Date32Type, Field, Float32Type, Float64Type, Int16Type,
         Int32Type, Int64Type, Int8Type, TimeUnit, TimestampMicrosecondType,
@@ -9,7 +9,6 @@ use arrow::{
     },
 };
 
-use atoi::FromRadix10Signed;
 use log::debug;
 use odbc_api::{
     buffers::{AnySlice, BufferDesc, Item},
@@ -19,13 +18,14 @@ use thiserror::Error;
 
 mod binary;
 mod concurrent_odbc_reader;
+mod decimal;
 mod map_odbc_to_arrow;
 mod odbc_batch_stream;
 mod odbc_reader;
 mod text;
 mod to_record_batch;
 
-use self::map_odbc_to_arrow::MapOdbcToArrow;
+use self::{decimal::Decimal, map_odbc_to_arrow::MapOdbcToArrow};
 
 use crate::date_time::{
     days_since_epoch, ms_since_epoch, ns_since_epoch, seconds_since_epoch, us_since_epoch,
@@ -79,53 +79,6 @@ impl ReadStrategy for NullableBoolean {
             builder.append_option(bit.copied().map(Bit::as_bool))
         }
         Ok(Arc::new(builder.finish()))
-    }
-}
-
-pub struct Decimal {
-    precision: u8,
-    scale: i8,
-}
-
-impl Decimal {
-    pub fn new(precision: u8, scale: i8) -> Self {
-        Self { precision, scale }
-    }
-}
-
-impl ReadStrategy for Decimal {
-    fn buffer_desc(&self) -> BufferDesc {
-        BufferDesc::Text {
-            // Must be able to hold num precision digits a sign and a decimal point
-            max_str_len: self.precision as usize + 2,
-        }
-    }
-
-    fn fill_arrow_array(&self, column_view: AnySlice) -> Result<ArrayRef, MappingError> {
-        let view = column_view.as_text_view().unwrap();
-        let mut builder = Decimal128Builder::new();
-
-        let mut buf_digits = Vec::new();
-
-        for opt in view.iter() {
-            if let Some(text) = opt {
-                buf_digits.clear();
-                buf_digits.extend(text.iter().filter(|&&c| c != b'.'));
-
-                let (num, _consumed) = i128::from_radix_10_signed(&buf_digits);
-
-                builder.append_value(num);
-            } else {
-                builder.append_null();
-            }
-        }
-
-        Ok(Arc::new(
-            builder
-                .finish()
-                .with_precision_and_scale(self.precision, self.scale)
-                .unwrap(),
-        ))
     }
 }
 
