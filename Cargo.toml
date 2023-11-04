@@ -1,6 +1,6 @@
 [package]
 name = "arrow-odbc"
-version = "2.1.0"
+version = "2.2.0"
 authors = ["Markus Klein"]
 edition = "2021"
 license = "MIT"
@@ -39,7 +39,7 @@ thiserror = "1.0.49"
 # features implying the use of UTF-16 for queries, connection strings and error messages. This
 # should work on any system
 [target.'cfg(target_os = "windows")'.dependencies]
-odbc-api = ">= 2.2.0, < 3"
+odbc-api = ">= 2.2, < 4"
 
 # On linux we assume use of a UTF-8 locale. So we set the narrow features implying that for queries,
 # connection strings and error messages the driver and driver manager supply utf8-strings. This
@@ -48,7 +48,7 @@ odbc-api = ">= 2.2.0, < 3"
 # importantly, UTF-8 is likely to be more battled tested on these platforms, while UTF-16 is "only"
 # required by the standard.
 [target.'cfg(not(target_os = "windows"))'.dependencies]
-odbc-api = { version = "2.2.0, < 3", features = ["narrow"] }
+odbc-api = { version = ">= 2.2, < 4", features = ["narrow"] }
 
 [dev-dependencies]
 anyhow = "1.0.75"
