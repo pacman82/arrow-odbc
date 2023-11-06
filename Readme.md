@@ -123,3 +123,26 @@ The mapping for insertion is not the optimal yet, but before spending a lot of w
 ## Supported Arrow types
 
 Appart from the afformentioned Arrow types `Uint8` is also supported if specifying the Arrow schema directly.
+
+## Build
+
+To build `arrow-odbc` and compile it as a part of your Rust project you need to link against an ODBC driver manager. On Windows this is already part of the system, so there is nothing to do. On Linux and MacOS it is recommended to install UnixODBC.
+
+### Ubuntu
+
+```shell
+sudo apt-get install unixodbc-dev
+```
+
+### Mac OS
+
+```shell
+brew install unixodbc
+```
+
+### Mac OS ARM
+
+On MacOS with ARM brew installs into a directory not found by cargo during linking. There are likely many ways to deal with this. Since the author does not have access to an ARM Mac, here only a collection of things that have worked for other users.
+
+* Installing unixODBC itself from source with make/configure instead of brew
+* Installing unixODBC with brew and creating a symlink for its binary directory `sudo ln -s /opt/homebrew/lib /Users/<your name>/lib`
