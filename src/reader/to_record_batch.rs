@@ -4,6 +4,7 @@ use arrow::{
     datatypes::{Schema, SchemaRef},
     record_batch::RecordBatch,
 };
+use log::info;
 use odbc_api::{buffers::ColumnarAnyBuffer, ResultSetMetadata};
 
 use crate::{arrow_schema_from, BufferAllocationOptions, ColumnFailure, Error};
@@ -49,6 +50,19 @@ impl ToRecordBatch {
             column_strategies,
             schema,
         })
+    }
+
+    /// Logs buffer description and sizes
+    pub fn log_buffer_size(&self) {
+        let mut total_bytes = 0;
+        for (read, field) in self.column_strategies.iter().zip(self.schema.fields()) {
+            let name = field.name();
+            let desc = read.buffer_desc();
+            let bytes_per_row = desc.bytes_per_row();
+            info!("Column '{name}'\nBytes used per row: {bytes_per_row}");
+            total_bytes += bytes_per_row;
+        }
+        info!("Total memory usage per row for single transit buffer: {total_bytes}");
     }
 
     pub fn allocate_buffer(

@@ -203,7 +203,7 @@ impl<C: Cursor> OdbcReader<C> {
         buffer_allocation_options: BufferAllocationOptions,
     ) -> Result<Self, Error> {
         let converter = ToRecordBatch::new(&mut cursor, schema.clone(), buffer_allocation_options)?;
-
+        converter.log_buffer_size();
         let row_set_buffer = converter.allocate_buffer(
             max_batch_size,
             buffer_allocation_options.fallibale_allocations,
