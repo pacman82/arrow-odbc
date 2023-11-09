@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.3.0
+
+* Log memory usage per row
+
 ## 2.2.0
 
 * Update odbc-api `>= 2.2, < 3` ->  `>= 2.2, < 4`
