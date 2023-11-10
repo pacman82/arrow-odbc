@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use arrow::{
     datatypes::SchemaRef,
     error::ArrowError,
@@ -7,7 +5,7 @@ use arrow::{
 };
 use odbc_api::{buffers::ColumnarAnyBuffer, BlockCursor, Cursor};
 
-use crate::{arrow_schema_from, BufferAllocationOptions, ConcurrentOdbcReader, Error};
+use crate::{BufferAllocationOptions, ConcurrentOdbcReader, Error};
 
 use super::{odbc_batch_stream::OdbcBatchStream, to_record_batch::ToRecordBatch};
 
@@ -74,6 +72,7 @@ pub struct OdbcReader<C: Cursor> {
 }
 
 impl<C: Cursor> OdbcReader<C> {
+    #[deprecated(since = "2.3.0", note = "use OdbcReaderBuilder instead")]
     /// Construct a new `OdbcReader` instance. This constructor infers the Arrow schema from the
     /// metadata of the cursor. If you want to set it explicitly use [`Self::with_arrow_schema`].
     ///
@@ -85,11 +84,8 @@ impl<C: Cursor> OdbcReader<C> {
     ///   The type of these buffers will be inferred from the arrow schema. Not every arrow type is
     ///   supported though.
     /// * `max_batch_size`: Maximum batch size requested from the datasource.
-    pub fn new(mut cursor: C, max_batch_size: usize) -> Result<Self, Error> {
-        // Get number of columns from result set. We know it to contain at least one column,
-        // otherwise it would not have been created.
-        let schema = Arc::new(arrow_schema_from(&mut cursor)?);
-        Self::with_arrow_schema(cursor, max_batch_size, schema)
+    pub fn new(cursor: C, max_batch_size: usize) -> Result<Self, Error> {
+        OdbcReaderBuilder::new().set_max_num_rows_per_batch(max_batch_size).build(cursor)
     }
 
     /// Construct a new `OdbcReader instance.
@@ -340,20 +336,17 @@ pub fn next(
 }
 
 /// Creates instances of [`OdbcReader`] based on [`odbc_api::Cursor`].
-pub struct OdbcReaderBuilder<C> {
-    /// We want to construct a reader for this cursor. We may also use the cursor to infer the
-    /// schema if the user did not supply one explicitly.
-    cursor: C,
+#[derive(Default, Clone)]
+pub struct OdbcReaderBuilder {
     /// `Some` implies the user has set this explicitly using
     /// [`OdbcReaderBuilder::set_max_num_rows_per_batch`]. `None` implies that we have to choose for
     /// the user.
     max_num_rows_per_batch: Option<usize>,
 }
 
-impl<C> OdbcReaderBuilder<C> {
-    pub fn new(cursor: C) -> Self {
+impl OdbcReaderBuilder {
+    pub fn new() -> Self {
         OdbcReaderBuilder {
-            cursor,
             max_num_rows_per_batch: None,
         }
     }
@@ -361,8 +354,9 @@ impl<C> OdbcReaderBuilder<C> {
     /// Limits the maximum amount of rows which are fetched in a single roundtrip to the datasource.
     /// Higher numbers lower the IO overhead and may speed up your runtime, but also require larger
     /// preallocated buffers and use more memory.
-    pub fn set_max_num_rows_per_batch(&mut self, max_num_rows_per_batch: usize) {
-        self.max_num_rows_per_batch = Some(max_num_rows_per_batch)
+    pub fn set_max_num_rows_per_batch(&mut self, max_num_rows_per_batch: usize) -> &mut Self {
+        self.max_num_rows_per_batch = Some(max_num_rows_per_batch);
+        self
     }
 
     /// No matter if the user explicitly specified a limit in row size, a memory limit, both or
@@ -380,17 +374,19 @@ impl<C> OdbcReaderBuilder<C> {
             .unwrap_or(DEFAULT_MAX_ROWS_PER_BATCH)
     }
 
-    pub fn build(mut self) -> Result<OdbcReader<C>, Error>
+    /// Constructs an [`OdbcReader`] which consumes the giver cursor. The cursor will also be used
+    /// to infer the Arrow schema if it has not been supplied explicitly.
+    pub fn build<C>(&self, mut cursor: C) -> Result<OdbcReader<C>, Error>
     where
         C: Cursor,
     {
         let fallibale_allocations = false;
         let converter =
-            ToRecordBatch::new(&mut self.cursor, None, BufferAllocationOptions::default())?;
+            ToRecordBatch::new(&mut cursor, None, BufferAllocationOptions::default())?;
         converter.log_buffer_size();
         let row_set_buffer =
             converter.allocate_buffer(self.buffer_size_in_rows(), fallibale_allocations)?;
-        let batch_stream = self.cursor.bind_buffer(row_set_buffer).unwrap();
+        let batch_stream = cursor.bind_buffer(row_set_buffer).unwrap();
 
         Ok(OdbcReader {
             converter,

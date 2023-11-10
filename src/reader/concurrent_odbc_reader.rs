@@ -14,7 +14,9 @@ use odbc_api::{buffers::ColumnarAnyBuffer, BlockCursor, Cursor};
 use crate::{BufferAllocationOptions, Error, OdbcReader};
 
 use super::{
-    odbc_batch_stream::OdbcBatchStream, odbc_reader::next, to_record_batch::ToRecordBatch,
+    odbc_batch_stream::OdbcBatchStream,
+    odbc_reader::{next, OdbcReaderBuilder},
+    to_record_batch::ToRecordBatch,
 };
 
 /// Arrow ODBC reader. Implements the [`arrow::record_batch::RecordBatchReader`] trait so it can be
@@ -97,7 +99,10 @@ impl<C: Cursor + Send + 'static> ConcurrentOdbcReader<C> {
     ///   supported though.
     /// * `max_batch_size`: Maximum batch size requested from the datasource.
     pub fn new(cursor: C, max_batch_size: usize) -> Result<Self, Error> {
-        OdbcReader::new(cursor, max_batch_size).and_then(OdbcReader::into_concurrent)
+        OdbcReaderBuilder::new()
+            .set_max_num_rows_per_batch(max_batch_size)
+            .build(cursor)
+            .and_then(OdbcReader::into_concurrent)
     }
 
     #[deprecated(since = "2.2.0", note = "use OdbcReader::into_concurrent instead")]
