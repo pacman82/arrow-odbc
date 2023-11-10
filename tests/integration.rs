@@ -126,14 +126,14 @@ fn fetch_8bit_unsigned_integer_explicit_schema() {
 
     // Now that we have a cursor, we want to iterate over its rows and fill an arrow batch with it.
 
-    // Batches will contain at most 100 entries.
-    let max_batch_size = 100;
-
     // Specify Uint8 manually, since inference of the arrow type from the sql type would yield a
     // signed 8 bit integer.
     let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::UInt8, false)]));
-
-    let mut reader = OdbcReader::with_arrow_schema(cursor, max_batch_size, schema).unwrap();
+    let mut reader = OdbcReaderBuilder::new()
+        .with_max_num_rows_per_batch(100)
+        .with_schema(schema)
+        .build(cursor)
+        .unwrap();
 
     // Batch for batch copy values from ODBC buffer into arrow batches
     let arrow_batch = reader.next().unwrap().unwrap();
@@ -164,11 +164,6 @@ fn fetch_decimal128_negative_scale_unsupported() {
     let sql = format!("SELECT a FROM {table_name}");
     let cursor = conn.execute(&sql, ()).unwrap().unwrap();
 
-    // Now that we have a cursor, we want to iterate over its rows and fill an arrow batch with it.
-
-    // Batches will contain at most 100 entries.
-    let max_batch_size = 100;
-
     // Specify Uint8 manually, since inference of the arrow type from the sql type would yield a
     // signed 8 bit integer.
     let schema = Arc::new(Schema::new(vec![Field::new(
@@ -176,8 +171,7 @@ fn fetch_decimal128_negative_scale_unsupported() {
         DataType::Decimal128(3, -2),
         false,
     )]));
-
-    let result = OdbcReader::with_arrow_schema(cursor, max_batch_size, schema);
+    let result = OdbcReaderBuilder::new().with_schema(schema).build(cursor);
 
     assert!(matches!(
         result,
@@ -206,16 +200,10 @@ fn unsupported_16bit_unsigned_integer() {
     let sql = format!("SELECT a FROM {table_name}");
     let cursor = conn.execute(&sql, ()).unwrap().unwrap();
 
-    // Now that we have a cursor, we want to iterate over its rows and fill an arrow batch with it.
-
-    // Batches will contain at most 100 entries.
-    let max_batch_size = 100;
-
     // Specify Uint16 manually, since inference of the arrow type from the sql type would yield a
     // signed 16 bit integer.
     let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::UInt16, false)]));
-
-    let result = OdbcReader::with_arrow_schema(cursor, max_batch_size, schema);
+    let result = OdbcReaderBuilder::new().with_schema(schema).build(cursor);
 
     assert!(matches!(
         result,
@@ -560,7 +548,7 @@ fn fetch_decimals() {
 
     // When fetching it in batches of five
     let mut reader = OdbcReaderBuilder::new()
-        .set_max_num_rows_per_batch(5)
+        .with_max_num_rows_per_batch(5)
         .build(cursor)
         .unwrap();
     let record_batch = reader.next().unwrap().unwrap();
@@ -599,7 +587,7 @@ fn fetch_varbinary_data() {
     // Now that we have a cursor, we want to iterate over its rows and fill an arrow batch with it.
     let mut reader = OdbcReaderBuilder::new()
         // Batches will contain at most 100 entries.
-        .set_max_num_rows_per_batch(100)
+        .with_max_num_rows_per_batch(100)
         // Instantiate reader with Arrow schema and ODBC cursor
         .build(cursor)
         .unwrap();
@@ -641,7 +629,7 @@ fn fetch_fixed_sized_binary_data() {
     // Now that we have a cursor, we want to iterate over its rows and fill an arrow batch with it.
     let mut reader = OdbcReaderBuilder::new()
         // Batches will contain at most 100 entries.
-        .set_max_num_rows_per_batch(100)
+        .with_max_num_rows_per_batch(100)
         // Instantiate reader with Arrow schema and ODBC cursor
         .build(cursor)
         .unwrap();
@@ -680,7 +668,7 @@ fn prepared_query() {
     // Now that we have a cursor, we want to iterate over its rows and fill an arrow batch with it.
     let mut reader = OdbcReaderBuilder::new()
         // Batches will contain at most 100 entries.
-        .set_max_num_rows_per_batch(100)
+        .with_max_num_rows_per_batch(100)
         // Instantiate reader with Arrow schema and ODBC cursor
         .build(cursor)
         .unwrap();
@@ -713,7 +701,7 @@ fn infer_schema() {
 
     // Now that we have a cursor, we want to iterate over its rows and fill an arrow batch with it.
     let reader = OdbcReaderBuilder::new()
-        .set_max_num_rows_per_batch(1)
+        .with_max_num_rows_per_batch(1)
         // Instantiate reader with Arrow schema and ODBC cursor
         .build(cursor)
         .unwrap();
@@ -767,7 +755,7 @@ fn should_allocate_enough_memory_for_wchar_column_bound_to_u8() {
 
     // Now that we have a cursor, we want to iterate over its rows and fill an arrow batch with it.
     let mut reader = OdbcReaderBuilder::new()
-        .set_max_num_rows_per_batch(1)
+        .with_max_num_rows_per_batch(1)
         // Instantiate reader with Arrow schema and ODBC cursor
         .build(cursor)
         .unwrap();
@@ -793,7 +781,7 @@ fn should_allocate_enough_memory_for_varchar_column_bound_to_u16() {
 
     // Now that we have a cursor, we want to iterate over its rows and fill an arrow batch with it.
     let mut reader = OdbcReaderBuilder::new()
-        .set_max_num_rows_per_batch(1)
+        .with_max_num_rows_per_batch(1)
         // Instantiate reader with Arrow schema and ODBC cursor
         .build(cursor)
         .unwrap();
@@ -939,7 +927,7 @@ fn read_multiple_result_sets() {
     // When
     // Now that we have a cursor, we want to iterate over its rows and fill an arrow batch with it.
     let mut reader = OdbcReaderBuilder::new()
-        .set_max_num_rows_per_batch(1)
+        .with_max_num_rows_per_batch(1)
         .build(cursor)
         .unwrap();
     let first = reader.next().unwrap().unwrap();
@@ -947,7 +935,7 @@ fn read_multiple_result_sets() {
     let cursor = cursor.more_results().unwrap().unwrap();
     // Now that we have a cursor, we want to iterate over its rows and fill an arrow batch with it.
     let mut reader = OdbcReaderBuilder::new()
-        .set_max_num_rows_per_batch(1)
+        .with_max_num_rows_per_batch(1)
         .build(cursor)
         .unwrap();
     let second = reader.next().unwrap().unwrap();
@@ -1829,7 +1817,7 @@ fn fetch_integer_concurrently() {
     let cursor = cursor_over(table_name, "INTEGER", "(1),(NULL),(3)");
     // Now that we have a cursor, we want to iterate over its rows and fill an arrow batch with it.
     let mut reader = OdbcReaderBuilder::new()
-        .set_max_num_rows_per_batch(100)
+        .with_max_num_rows_per_batch(100)
         .build(cursor)
         .unwrap();
     // Batch for batch copy values from ODBC buffer into arrow batches
@@ -1850,7 +1838,7 @@ fn fetch_empty_cursor_concurrently() {
 
     // Now that we have a cursor, we want to iterate over its rows and fill an arrow batch with it.
     let mut reader = OdbcReaderBuilder::new()
-        .set_max_num_rows_per_batch(100)
+        .with_max_num_rows_per_batch(100)
         .build(cursor)
         .unwrap();
     // Batch for batch copy values from ODBC buffer into arrow batches
@@ -1896,7 +1884,7 @@ fn fetch_row_groups_repeatedly_concurrently() {
 
     let mut reader = OdbcReaderBuilder::new()
         // Choose a batch size 1, so we get 3 batches.
-        .set_max_num_rows_per_batch(1)
+        .with_max_num_rows_per_batch(1)
         .build(cursor)
         .unwrap()
         .into_concurrent()
@@ -1927,7 +1915,7 @@ fn fetch_empty_cursor_concurrently_twice() {
 
     // Now that we have a cursor, we want to iterate over its rows and fill an arrow batch with it.
     let mut reader = OdbcReaderBuilder::new()
-        .set_max_num_rows_per_batch(100)
+        .with_max_num_rows_per_batch(100)
         .build(cursor)
         .unwrap()
         .into_concurrent()
@@ -1951,7 +1939,7 @@ fn read_multiple_result_sets_using_concurrent_cursor() {
 
     // When
     let mut reader = OdbcReaderBuilder::new()
-        .set_max_num_rows_per_batch(1)
+        .with_max_num_rows_per_batch(1)
         .build(cursor)
         .unwrap()
         .into_concurrent()
@@ -1960,7 +1948,7 @@ fn read_multiple_result_sets_using_concurrent_cursor() {
     let cursor = reader.into_cursor().unwrap();
     let cursor = cursor.more_results().unwrap().unwrap();
     let mut reader = OdbcReaderBuilder::new()
-        .set_max_num_rows_per_batch(1)
+        .with_max_num_rows_per_batch(1)
         .build(cursor)
         .unwrap()
         .into_concurrent()
@@ -1988,7 +1976,7 @@ fn promote_sequential_to_concurrent_cursor() {
     let cursor = cursor_over(table_name, "INTEGER", "(42)");
     // Now that we have a cursor, we want to iterate over its rows and fill an arrow batch with it.
     let mut reader = OdbcReaderBuilder::new()
-        .set_max_num_rows_per_batch(100)
+        .with_max_num_rows_per_batch(100)
         .build(cursor)
         .unwrap()
         .into_concurrent()
@@ -2068,7 +2056,7 @@ fn fetch_arrow_data(
     let cursor = cursor_over(table_name, column_type, literal);
     // Now that we have a cursor, we want to iterate over its rows and fill an arrow batch with it.
     let mut reader = OdbcReaderBuilder::new()
-        .set_max_num_rows_per_batch(100)
+        .with_max_num_rows_per_batch(100)
         .build(cursor)
         .unwrap()
         .into_concurrent()

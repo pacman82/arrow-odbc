@@ -85,9 +85,12 @@ impl<C: Cursor> OdbcReader<C> {
     ///   supported though.
     /// * `max_batch_size`: Maximum batch size requested from the datasource.
     pub fn new(cursor: C, max_batch_size: usize) -> Result<Self, Error> {
-        OdbcReaderBuilder::new().set_max_num_rows_per_batch(max_batch_size).build(cursor)
+        OdbcReaderBuilder::new()
+            .with_max_num_rows_per_batch(max_batch_size)
+            .build(cursor)
     }
 
+    #[deprecated(since = "2.3.0", note = "use OdbcReaderBuilder instead")]
     /// Construct a new `OdbcReader instance.
     ///
     /// # Parameters
@@ -339,23 +342,40 @@ pub fn next(
 #[derive(Default, Clone)]
 pub struct OdbcReaderBuilder {
     /// `Some` implies the user has set this explicitly using
-    /// [`OdbcReaderBuilder::set_max_num_rows_per_batch`]. `None` implies that we have to choose for
-    /// the user.
+    /// [`OdbcReaderBuilder::with_max_num_rows_per_batch`]. `None` implies that we have to choose
+    /// for the user.
     max_num_rows_per_batch: Option<usize>,
+    schema: Option<SchemaRef>,
 }
 
 impl OdbcReaderBuilder {
     pub fn new() -> Self {
         OdbcReaderBuilder {
             max_num_rows_per_batch: None,
+            schema: None,
         }
     }
 
     /// Limits the maximum amount of rows which are fetched in a single roundtrip to the datasource.
     /// Higher numbers lower the IO overhead and may speed up your runtime, but also require larger
     /// preallocated buffers and use more memory.
-    pub fn set_max_num_rows_per_batch(&mut self, max_num_rows_per_batch: usize) -> &mut Self {
+    pub fn with_max_num_rows_per_batch(&mut self, max_num_rows_per_batch: usize) -> &mut Self {
         self.max_num_rows_per_batch = Some(max_num_rows_per_batch);
+        self
+    }
+
+    /// Describes the types of the Arrow Arrays in the record batches. It is also used to determine
+    /// CData type requested from the data source. If this is not explicitly set the type is infered
+    /// from the schema information provided by the ODBC driver. A reason for setting this
+    /// explicitly could be that you have superior knowledge about your data compared to the ODBC
+    /// driver. E.g. a type for an unsigned byte (`u8`) is not part of the ODBC standard. Therfore
+    /// the driver might at best be able to tell you that this is an (`i8`). If you want to still
+    /// have `u8`s in the resulting array you need to specify the schema manually. Also many drivers
+    /// struggle with reporting nullability correctly and just report every column as nullable.
+    /// Explicitly specifying a schema can also compensate for such shortcomings if it turns out to
+    /// be relevant.
+    pub fn with_schema(&mut self, schema: SchemaRef) -> &mut Self {
+        self.schema = Some(schema);
         self
     }
 
@@ -376,13 +396,24 @@ impl OdbcReaderBuilder {
 
     /// Constructs an [`OdbcReader`] which consumes the giver cursor. The cursor will also be used
     /// to infer the Arrow schema if it has not been supplied explicitly.
+    /// 
+    /// # Parameters
+    ///
+    /// * `cursor`: ODBC cursor used to fetch batches from the data source. The constructor will
+    ///   bind buffers to this cursor in order to perform bulk fetches from the source. This is
+    ///   usually faster than fetching results row by row as it saves roundtrips to the database.
+    ///   The type of these buffers will be inferred from the arrow schema. Not every arrow type is
+    ///   supported though.
     pub fn build<C>(&self, mut cursor: C) -> Result<OdbcReader<C>, Error>
     where
         C: Cursor,
     {
         let fallibale_allocations = false;
-        let converter =
-            ToRecordBatch::new(&mut cursor, None, BufferAllocationOptions::default())?;
+        let converter = ToRecordBatch::new(
+            &mut cursor,
+            self.schema.clone(),
+            BufferAllocationOptions::default(),
+        )?;
         converter.log_buffer_size();
         let row_set_buffer =
             converter.allocate_buffer(self.buffer_size_in_rows(), fallibale_allocations)?;
