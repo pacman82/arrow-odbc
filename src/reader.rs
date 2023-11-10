@@ -35,7 +35,7 @@ pub use self::{
     binary::{Binary, FixedSizedBinary},
     concurrent_odbc_reader::ConcurrentOdbcReader,
     map_odbc_to_arrow::MappingError,
-    odbc_reader::OdbcReader,
+    odbc_reader::{OdbcReader, OdbcReaderBuilder},
     text::choose_text_strategy,
 };
 

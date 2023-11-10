@@ -33,7 +33,8 @@ use arrow_odbc::{
         Connection, ConnectionOptions, Cursor, CursorImpl, Environment, IntoParameter,
         StatementConnection,
     },
-    BufferAllocationOptions, ColumnFailure, Error, OdbcReader, OdbcWriter, WriterError,
+    BufferAllocationOptions, ColumnFailure, Error, OdbcReader, OdbcReaderBuilder, OdbcWriter,
+    WriterError,
 };
 
 use stdext::function_name;
@@ -949,6 +950,20 @@ fn read_multiple_result_sets() {
         .downcast_ref::<Int32Array>()
         .unwrap();
     assert_eq!(2, second_vals.value(0));
+}
+
+#[test]
+fn applies_row_limit_for_default_constructed_readers() {
+    // Given a cursor over a datascheme with a small per row memory footprint
+    let table_name = function_name!().rsplit_once(':').unwrap().1;
+    let cursor = cursor_over(table_name, "INTEGER", "(42)");
+
+    // When constructing a reader from that cursor without specifying an explicity memory or row
+    // limit
+    let reader = OdbcReaderBuilder::new(cursor).build().unwrap();
+
+    // Then the row limit is set to u16::MAX
+    assert_eq!(reader.max_rows_per_batch(), u16::MAX as usize)
 }
 
 #[test]
