@@ -339,6 +339,10 @@ pub fn next(
 }
 
 /// Creates instances of [`OdbcReader`] based on [`odbc_api::Cursor`].
+/// 
+/// Using a builder pattern instead of passing structs with all required arguments to the
+/// constructors of [`OdbcReader`] allows `arrow_odbc` to introduce new paramters to fine tune the
+/// creation and behavior of the readers without breaking the code of downstream applications.
 #[derive(Default, Clone)]
 pub struct OdbcReaderBuilder {
     /// `Some` implies the user has set this explicitly using
@@ -347,6 +351,7 @@ pub struct OdbcReaderBuilder {
     max_num_rows_per_batch: Option<usize>,
     schema: Option<SchemaRef>,
     max_text_size: Option<usize>,
+    max_binary_size: Option<usize>,
 }
 
 impl OdbcReaderBuilder {
@@ -355,6 +360,7 @@ impl OdbcReaderBuilder {
             max_num_rows_per_batch: None,
             schema: None,
             max_text_size: None,
+            max_binary_size: None
         }
     }
 
@@ -398,6 +404,21 @@ impl OdbcReaderBuilder {
         self
     }
 
+    /// An upper limit for the size of buffers bound to variadic binary columns of the data source.
+    /// This limit does not (directly) apply to the size of the created arrow buffers, but rather
+    /// applies to the buffers used for the data in transit. Use this option if you have e.g.
+    /// `VARBINARY(MAX)` fields in your database schema. In such a case without an upper limit, the
+    /// ODBC driver of your data source is asked for the maximum size of an element, and is likely
+    /// to answer with either `0` or a value which is way larger than any actual entry in the
+    /// column. If you can not adapt your database schema, this limit might be what you are looking
+    /// for. This is the maximum size in bytes of the binary column. If this method is not called no
+    /// upper limit is set and the maximum element size, reported by ODBC is used to determine
+    /// buffer sizes.
+    pub fn with_max_binary_size(&mut self, max_binary_size: usize) -> &mut Self {
+        self.max_binary_size = Some(max_binary_size);
+        self
+    }
+
     /// No matter if the user explicitly specified a limit in row size, a memory limit, both or
     /// neither. In order to construct a reader we need to decide on the buffer size in rows.
     fn buffer_size_in_rows(&self) -> usize {
@@ -429,7 +450,7 @@ impl OdbcReaderBuilder {
     {
         let buffer_allocation_options = BufferAllocationOptions {
             max_text_size: self.max_text_size,
-            max_binary_size: None,
+            max_binary_size: self.max_binary_size,
             fallibale_allocations: false,
         };
         let converter =

@@ -858,13 +858,10 @@ fn should_allow_to_fetch_from_varbinary_max() {
     let cursor = conn.execute(&sql, ()).unwrap().unwrap();
 
     // When
-    let max_batch_size = 100;
-    let schema = None;
-    let buffer_allocation_options = BufferAllocationOptions {
-        max_binary_size: Some(1024),
-        ..Default::default()
-    };
-    let result = OdbcReader::with(cursor, max_batch_size, schema, buffer_allocation_options);
+    let result = OdbcReaderBuilder::new()
+        .with_max_num_rows_per_batch(100)
+        .with_max_binary_size(1024)
+        .build(cursor);
 
     // Then
     // In particular we do **not** get either a zero sized column or out of memory error.
