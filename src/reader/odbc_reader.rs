@@ -136,11 +136,11 @@ impl<C: Cursor> OdbcReader<C> {
     ///    buffer types. This is useful support fetching data from e.g. VARCHAR(max) or
     ///    VARBINARY(max) columns, which otherwise might lead to errors, due to the ODBC driver
     ///    having a hard time specifying a good upper bound for the largest possible expected value.
-    /// 
+    ///
     /// # Example
-    /// 
+    ///
     /// You can use this constructor to specify an upper bound for variadic sized columns.
-    /// 
+    ///
     /// ```no_run
     /// use arrow_odbc::{
     ///     odbc_api::{Environment, ConnectionOptions},
@@ -213,17 +213,17 @@ impl<C: Cursor> OdbcReader<C> {
         Ok(Self {
             converter,
             batch_stream,
-            fallibale_allocations: buffer_allocation_options.fallibale_allocations
+            fallibale_allocations: buffer_allocation_options.fallibale_allocations,
         })
     }
 
     /// Consume this instance to create a similar ODBC reader which fetches batches asynchronously.
-    /// 
+    ///
     /// Steals all resources from this [`OdbcReader`] instance, and allocates another buffer for
     /// transiting data from the ODBC data source to the application. This way one buffer can be
     /// written to by a dedicated system thread, while the other is read by the application. Use
     /// this if you want to trade memory for speed.
-    /// 
+    ///
     /// # Example
     ///
     /// ```no_run
@@ -273,9 +273,7 @@ impl<C: Cursor> OdbcReader<C> {
     ///     Ok(())
     /// }
     /// ```
-    pub fn into_concurrent(
-        self,
-    ) -> Result<ConcurrentOdbcReader<C>, Error>
+    pub fn into_concurrent(self) -> Result<ConcurrentOdbcReader<C>, Error>
     where
         C: Send + 'static,
     {
@@ -293,6 +291,10 @@ impl<C: Cursor> OdbcReader<C> {
     pub fn into_cursor(self) -> Result<C, odbc_api::Error> {
         let (cursor, _buffer) = self.batch_stream.unbind()?;
         Ok(cursor)
+    }
+
+    pub fn max_rows_per_batch(&self) -> usize {
+        self.batch_stream.row_array_size()
     }
 }
 
@@ -334,5 +336,25 @@ pub fn next(
         // We had an error fetching the next batch from the database, let's report it as an
         // external error.
         Err(odbc_error) => Some(Err(ArrowError::ExternalError(Box::new(odbc_error)))),
+    }
+}
+
+pub struct OdbcReaderBuilder<C> {
+    cursor: C,
+}
+
+impl<C> OdbcReaderBuilder<C> {
+    pub fn new(cursor: C) -> Self {
+        OdbcReaderBuilder { cursor }
+    }
+
+    pub fn build(self) -> Result<OdbcReader<C>, Error> where C: Cursor {
+        const DEFAULT_MAX_ROWS_PER_BATCH: usize = u16::MAX as usize;
+        OdbcReader::with(
+            self.cursor,
+            DEFAULT_MAX_ROWS_PER_BATCH,
+            None,
+            BufferAllocationOptions::default(),
+        )
     }
 }
