@@ -100,7 +100,7 @@ impl<C: Cursor + Send + 'static> ConcurrentOdbcReader<C> {
     /// * `max_batch_size`: Maximum batch size requested from the datasource.
     pub fn new(cursor: C, max_batch_size: usize) -> Result<Self, Error> {
         OdbcReaderBuilder::new()
-            .set_max_num_rows_per_batch(max_batch_size)
+            .with_max_num_rows_per_batch(max_batch_size)
             .build(cursor)
             .and_then(OdbcReader::into_concurrent)
     }
@@ -123,7 +123,10 @@ impl<C: Cursor + Send + 'static> ConcurrentOdbcReader<C> {
         max_batch_size: usize,
         schema: SchemaRef,
     ) -> Result<Self, Error> {
-        OdbcReader::with_arrow_schema(cursor, max_batch_size, schema)
+        OdbcReaderBuilder::new()
+            .with_max_num_rows_per_batch(max_batch_size)
+            .with_schema(schema)
+            .build(cursor)
             .and_then(OdbcReader::into_concurrent)
     }
 
