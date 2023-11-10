@@ -963,7 +963,7 @@ fn applies_row_limit_for_default_constructed_readers() {
     let reader = OdbcReaderBuilder::new(cursor).build().unwrap();
 
     // Then the row limit is set to u16::MAX
-    assert_eq!(reader.max_rows_per_batch(), u16::MAX as usize)
+    assert_eq!(reader.max_rows_per_batch(), 65535)
 }
 
 #[test]
