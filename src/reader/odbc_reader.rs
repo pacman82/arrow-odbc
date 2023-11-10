@@ -346,6 +346,7 @@ pub struct OdbcReaderBuilder {
     /// for the user.
     max_num_rows_per_batch: Option<usize>,
     schema: Option<SchemaRef>,
+    max_text_size: Option<usize>,
 }
 
 impl OdbcReaderBuilder {
@@ -353,6 +354,7 @@ impl OdbcReaderBuilder {
         OdbcReaderBuilder {
             max_num_rows_per_batch: None,
             schema: None,
+            max_text_size: None,
         }
     }
 
@@ -379,6 +381,23 @@ impl OdbcReaderBuilder {
         self
     }
 
+    /// An upper limit for the size of buffers bound to variadic text columns of the data source.
+    /// This limit does not (directly) apply to the size of the created arrow buffers, but rather
+    /// applies to the buffers used for the data in transit. Use this option if you have e.g.
+    /// `VARCHAR(MAX)` fields in your database schema. In such a case without an upper limit, the
+    /// ODBC driver of your data source is asked for the maximum size of an element, and is likely
+    /// to answer with either `0` or a value which is way larger than any actual entry in the column
+    /// If you can not adapt your database schema, this limit might be what you are looking for. On
+    /// windows systems the size is double words (16Bit), as windows utilizes an UTF-16 encoding. So
+    /// this translates to roughly the size in letters. On non windows systems this is the size in
+    /// bytes and the datasource is assumed to utilize an UTF-8 encoding. If this method is not
+    /// called no upper limit is set and the maximum element size, reported by ODBC is used to
+    /// determine buffer sizes.
+    pub fn with_max_text_size(&mut self, max_text_size: usize) -> &mut Self {
+        self.max_text_size = Some(max_text_size);
+        self
+    }
+
     /// No matter if the user explicitly specified a limit in row size, a memory limit, both or
     /// neither. In order to construct a reader we need to decide on the buffer size in rows.
     fn buffer_size_in_rows(&self) -> usize {
@@ -396,7 +415,7 @@ impl OdbcReaderBuilder {
 
     /// Constructs an [`OdbcReader`] which consumes the giver cursor. The cursor will also be used
     /// to infer the Arrow schema if it has not been supplied explicitly.
-    /// 
+    ///
     /// # Parameters
     ///
     /// * `cursor`: ODBC cursor used to fetch batches from the data source. The constructor will
@@ -408,21 +427,24 @@ impl OdbcReaderBuilder {
     where
         C: Cursor,
     {
-        let fallibale_allocations = false;
-        let converter = ToRecordBatch::new(
-            &mut cursor,
-            self.schema.clone(),
-            BufferAllocationOptions::default(),
-        )?;
+        let buffer_allocation_options = BufferAllocationOptions {
+            max_text_size: self.max_text_size,
+            max_binary_size: None,
+            fallibale_allocations: false,
+        };
+        let converter =
+            ToRecordBatch::new(&mut cursor, self.schema.clone(), buffer_allocation_options)?;
         converter.log_buffer_size();
-        let row_set_buffer =
-            converter.allocate_buffer(self.buffer_size_in_rows(), fallibale_allocations)?;
+        let row_set_buffer = converter.allocate_buffer(
+            self.buffer_size_in_rows(),
+            buffer_allocation_options.fallibale_allocations,
+        )?;
         let batch_stream = cursor.bind_buffer(row_set_buffer).unwrap();
 
         Ok(OdbcReader {
             converter,
             batch_stream,
-            fallibale_allocations,
+            fallibale_allocations: buffer_allocation_options.fallibale_allocations,
         })
     }
 }
