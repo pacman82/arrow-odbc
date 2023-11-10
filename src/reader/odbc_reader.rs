@@ -339,6 +339,7 @@ pub fn next(
     }
 }
 
+/// Creates instances of [`OdbcReader`] based on [`odbc_api::Cursor`].
 pub struct OdbcReaderBuilder<C> {
     cursor: C,
 }
@@ -348,13 +349,29 @@ impl<C> OdbcReaderBuilder<C> {
         OdbcReaderBuilder { cursor }
     }
 
-    pub fn build(self) -> Result<OdbcReader<C>, Error> where C: Cursor {
+    pub fn build(mut self) -> Result<OdbcReader<C>, Error>
+    where
+        C: Cursor,
+    {
+        // In the abscence of an explicit row limit set by the user we choose u16 MAX (65535). This
+        // is a reasonable high value to allow for siginificantly reducing IO overhead as opposed to
+        // row by row fetching already. Likely for many database schemas a memory limitation will
+        // kick in before this limit. If not however it can still be dangerous to go beyond this
+        // number. Some drivers use a 16Bit integer to count rows and you can run into overflow
+        // errors if you use one of them. Once such issue occurred with SAP anywhere.
         const DEFAULT_MAX_ROWS_PER_BATCH: usize = u16::MAX as usize;
-        OdbcReader::with(
-            self.cursor,
-            DEFAULT_MAX_ROWS_PER_BATCH,
-            None,
-            BufferAllocationOptions::default(),
-        )
+        let fallibale_allocations = false;
+        let converter =
+            ToRecordBatch::new(&mut self.cursor, None, BufferAllocationOptions::default())?;
+        converter.log_buffer_size();
+        let row_set_buffer =
+            converter.allocate_buffer(DEFAULT_MAX_ROWS_PER_BATCH, fallibale_allocations)?;
+        let batch_stream = self.cursor.bind_buffer(row_set_buffer).unwrap();
+
+        Ok(OdbcReader {
+            converter,
+            batch_stream,
+            fallibale_allocations,
+        })
     }
 }
