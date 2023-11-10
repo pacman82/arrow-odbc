@@ -46,12 +46,12 @@ fn main() -> Result<(), anyhow::Error> {
         .execute("SELECT * FROM MyTable", parameters)?
         .expect("SELECT statement must produce a cursor");
 
-    // Each batch shall only consist of maximum 10.000 rows.
-    let max_batch_size = 10_000;
-
     // Read result set as arrow batches. Infer Arrow types automatically using the meta
     // information of `cursor`.
-    let arrow_record_batches = OdbcReader::new(cursor, max_batch_size)?;
+    let arrow_record_batches = OdbcReaderBuilder::new()
+        // Each batch shall only consist of maximum 100 rows.
+        .with_max_num_rows_per_batch(100)
+        .build(cursor)?;
 
     for batch in arrow_record_batches {
         // ... process batch ...
