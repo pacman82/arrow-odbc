@@ -810,13 +810,10 @@ fn should_allow_to_fetch_from_varchar_max() {
     let cursor = conn.execute(&sql, ()).unwrap().unwrap();
 
     // When
-    let max_batch_size = 100;
-    let schema = None;
-    let buffer_allocation_options = BufferAllocationOptions {
-        max_text_size: Some(1024),
-        ..Default::default()
-    };
-    let result = OdbcReader::with(cursor, max_batch_size, schema, buffer_allocation_options);
+    let result = OdbcReaderBuilder::new()
+        .with_max_num_rows_per_batch(100)
+        .with_max_text_size(1024)
+        .build(cursor);
 
     // Then
     // In particular we do **not** get either a zero sized column or out of memory error.
@@ -838,14 +835,11 @@ fn should_error_for_truncation() {
     let cursor = conn.execute(&sql, ()).unwrap().unwrap();
 
     // When fetching that value with a text limit of 5
-    let max_batch_size = 1;
-    let schema = None;
-    let buffer_allocation_options = BufferAllocationOptions {
-        max_text_size: Some(5),
-        ..Default::default()
-    };
-    let mut reader =
-        OdbcReader::with(cursor, max_batch_size, schema, buffer_allocation_options).unwrap();
+    let mut reader = OdbcReaderBuilder::new()
+        .with_max_num_rows_per_batch(1)
+        .with_max_text_size(5)
+        .build(cursor)
+        .unwrap();
     let result = reader.next().unwrap();
 
     // Then we get an error, rather than the truncation only occurring as a warning.
@@ -1853,23 +1847,16 @@ fn fetch_empty_cursor_concurrently() {
 fn fetch_with_error_concurrently() {
     let table_name = function_name!().rsplit_once(':').unwrap().1;
     let cursor = cursor_over(table_name, "VARCHAR(50)", "('Hello, World!')");
-    // Now that we have a cursor, we want to iterate over its rows and fill an arrow batch with it.
 
-    // Batches will contain at most 100 entries.
-    let max_batch_size = 100;
-    let mut reader = OdbcReader::with(
-        cursor,
-        max_batch_size,
-        None,
-        BufferAllocationOptions {
-            // We set text size too small to hold 'Hello, World!' so we get a truncation error.
-            max_text_size: Some(1),
-            ..Default::default()
-        },
-    )
-    .unwrap()
-    .into_concurrent()
-    .unwrap();
+    let mut reader = OdbcReaderBuilder::new()
+        .with_max_num_rows_per_batch(100)
+        // We set text size too small to hold 'Hello, World!' so we get a truncation error.
+        .with_max_text_size(1)
+        .build(cursor)
+        .unwrap()
+        .into_concurrent()
+        .unwrap();
+
     // Batch for batch copy values from ODBC buffer into arrow batches
     let record_batch = reader.next().unwrap();
 
