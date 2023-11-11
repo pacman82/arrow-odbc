@@ -3,7 +3,7 @@
 //! ## Usage
 //!
 //! ```no_run
-//! use arrow_odbc::{odbc_api::{Environment, ConnectionOptions}, OdbcReader};
+//! use arrow_odbc::{odbc_api::{Environment, ConnectionOptions}, OdbcReaderBuilder};
 //!
 //! const CONNECTION_STRING: &str = "\
 //!     Driver={ODBC Driver 17 for SQL Server};\
