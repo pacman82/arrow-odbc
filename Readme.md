@@ -49,8 +49,8 @@ fn main() -> Result<(), anyhow::Error> {
     // Read result set as arrow batches. Infer Arrow types automatically using the meta
     // information of `cursor`.
     let arrow_record_batches = OdbcReaderBuilder::new()
-        // Each batch shall only consist of maximum 100 rows.
-        .with_max_num_rows_per_batch(100)
+        // Use at most 256 MiB for transit buffer
+        .with_max_bytes_per_row(256 * 1024 * 1024)
         .build(cursor)?;
 
     for batch in arrow_record_batches {
