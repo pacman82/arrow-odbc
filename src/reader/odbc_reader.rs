@@ -424,9 +424,9 @@ impl OdbcReaderBuilder {
         self
     }
 
-    /// Set to `true` in order to trigger an [`ColumnFailure::TooLarge`] instead of a panic in case
-    /// the buffers can not be allocated due to their size. This might have a performance cost for
-    /// constructing the reader. `false` by default.
+    /// Set to `true` in order to trigger an [`crate::ColumnFailure::TooLarge`] instead of a panic
+    /// in case the buffers can not be allocated due to their size. This might have a performance
+    /// cost for constructing the reader. `false` by default.
     pub fn with_fallibale_allocations(&mut self, fallibale_allocations: bool) -> &mut Self {
         self.fallibale_allocations = fallibale_allocations;
         self
