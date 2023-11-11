@@ -957,6 +957,48 @@ fn applies_row_limit_for_default_constructed_readers() {
 }
 
 #[test]
+fn applies_memory_size_limit() {
+    // Given a cursor over a datascheme with a small per row memory footprint
+    let table_name = function_name!().rsplit_once(':').unwrap().1;
+    let cursor = cursor_over(table_name, "VARCHAR(512)", "('Hello')");
+
+    // When constructing a reader from that cursor without specifying an explicity memory or row
+    // limit
+    let reader = OdbcReaderBuilder::new()
+        // Limit buffer to 10 MiB
+        .with_max_bytes_per_batch(10 * 1024 * 1024)
+        .build(cursor)
+        .unwrap();
+
+    // Buffer now holds less than 65535 rows due to size limit
+    assert_eq!(reader.max_rows_per_batch(), 5095)
+}
+
+#[test]
+fn memory_size_limit_can_not_hold_a_single_row() {
+    // Given a cursor over a datascheme with a small per row memory footprint
+    let table_name = function_name!().rsplit_once(':').unwrap().1;
+    let cursor = cursor_over(table_name, "VARCHAR(512)", "('Hello')");
+
+    // When constructing a reader from that cursor without specifying an explicity memory or row
+    // limit
+    let result = OdbcReaderBuilder::new()
+        // Limit buffer to 1 Byte
+        .with_max_bytes_per_batch(1)
+        .build(cursor);
+
+    let message = result.map(|_| ()).unwrap_err().to_string();
+    assert_eq!(
+        message,
+        "The Odbc buffer is limited to a size of 1 bytes. Yet a single row does require up to \
+        2058. This means the buffer is not large enough to hold a single row of data. Please note \
+        that the buffers in ODBC must always be able to hold the largest possible value of \
+        variadic types. You should either set a higher upper bound for the buffer size, or limit \
+        the length of the variadic columns."
+    )
+}
+
+#[test]
 fn insert_does_not_support_list_type() {
     // Given a table and a db connection.
     let table_name = function_name!().rsplit_once(':').unwrap().1;

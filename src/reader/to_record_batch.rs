@@ -53,7 +53,7 @@ impl ToRecordBatch {
     }
 
     /// Logs buffer description and sizes
-    pub fn log_buffer_size(&self) {
+    pub fn row_size_in_bytes(&self) -> usize {
         let mut total_bytes = 0;
         for (read, field) in self.column_strategies.iter().zip(self.schema.fields()) {
             let name = field.name();
@@ -63,6 +63,7 @@ impl ToRecordBatch {
             total_bytes += bytes_per_row;
         }
         info!("Total memory usage per row for single transit buffer: {total_bytes}");
+        total_bytes
     }
 
     pub fn allocate_buffer(

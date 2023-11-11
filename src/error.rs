@@ -22,4 +22,17 @@ pub enum Error {
         // Cause of the error
         source: ColumnFailure,
     },
+    /// Failure during constructing an OdbcReader, if it turns out the buffer memory size limit is
+    /// too small.
+    #[error(
+        "The Odbc buffer is limited to a size of {max_bytes_per_batch} bytes. Yet a single row \
+        does require up to {bytes_per_row}. This means the buffer is not large enough to hold a \
+        single row of data. Please note that the buffers in ODBC must always be able to hold the \
+        largest possible value of variadic types. You should either set a higher upper bound for \
+        the buffer size, or limit the length of the variadic columns."
+    )]
+    OdbcBufferTooSmall{
+        max_bytes_per_batch: usize,
+        bytes_per_row: usize,
+    },
 }
