@@ -1,6 +1,6 @@
 [package]
 name = "arrow-odbc"
-version = "2.3.0"
+version = "3.0.0"
 authors = ["Markus Klein"]
 edition = "2021"
 license = "MIT"

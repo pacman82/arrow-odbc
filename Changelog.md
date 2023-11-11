@@ -1,5 +1,11 @@
 # Changelog
 
+## 3.0.0
+
+* Introduce `OdbcReaderBuilder` as the prefered way to create instances of `OdbcReader`.
+* Allow for limiting ODBC buffer sizes using a memory limit expressed in bytes using `OdbcReaderBuilder::max_bytes_per_batch`.
+* Add new variant `Error::OdbcBufferTooSmall`.
+
 ## 2.3.0
 
 * Log memory usage per row
