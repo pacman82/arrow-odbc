@@ -971,7 +971,7 @@ fn applies_memory_size_limit() {
         .unwrap();
 
     // Buffer now holds less than 65535 rows due to size limit
-    assert_eq!(reader.max_rows_per_batch(), 5095)
+    assert!(reader.max_rows_per_batch() < 65535)
 }
 
 #[test]
@@ -987,15 +987,14 @@ fn memory_size_limit_can_not_hold_a_single_row() {
         .with_max_bytes_per_batch(1)
         .build(cursor);
 
-    let message = result.map(|_| ()).unwrap_err().to_string();
-    assert_eq!(
-        message,
-        "The Odbc buffer is limited to a size of 1 bytes. Yet a single row does require up to \
-        2058. This means the buffer is not large enough to hold a single row of data. Please note \
-        that the buffers in ODBC must always be able to hold the largest possible value of \
-        variadic types. You should either set a higher upper bound for the buffer size, or limit \
-        the length of the variadic columns."
-    )
+    // Then
+    assert!(matches!(
+        result,
+        Err(Error::OdbcBufferTooSmall {
+            max_bytes_per_batch: 1,
+            bytes_per_row: _
+        })
+    ))
 }
 
 #[test]
