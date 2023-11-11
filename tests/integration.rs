@@ -33,8 +33,7 @@ use arrow_odbc::{
         Connection, ConnectionOptions, Cursor, CursorImpl, Environment, IntoParameter,
         StatementConnection,
     },
-    BufferAllocationOptions, ColumnFailure, Error, OdbcReader, OdbcReaderBuilder, OdbcWriter,
-    WriterError,
+    ColumnFailure, Error, OdbcReaderBuilder, OdbcWriter, WriterError,
 };
 
 use stdext::function_name;
@@ -880,13 +879,10 @@ fn fallibale_allocations() {
     let cursor = conn.execute(&sql, ()).unwrap().unwrap();
 
     // When
-    let max_batch_size = 100_000_000;
-    let schema = None;
-    let buffer_allocation_options = BufferAllocationOptions {
-        fallibale_allocations: true,
-        ..Default::default()
-    };
-    let result = OdbcReader::with(cursor, max_batch_size, schema, buffer_allocation_options);
+    let result = OdbcReaderBuilder::new()
+        .with_max_num_rows_per_batch(100_000_000)
+        .with_fallibale_allocations(true)
+        .build(cursor);
 
     // Then
     // In particular we do **not** get either a zero sized column or out of memory error.

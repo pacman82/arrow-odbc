@@ -156,8 +156,20 @@ impl<C: Cursor + Send + 'static> ConcurrentOdbcReader<C> {
         schema: Option<SchemaRef>,
         buffer_allocation_options: BufferAllocationOptions,
     ) -> Result<Self, Error> {
-        OdbcReader::with(cursor, max_batch_size, schema, buffer_allocation_options)
-            .and_then(OdbcReader::into_concurrent)
+        let mut builder = OdbcReaderBuilder::new();
+        builder
+            .with_max_num_rows_per_batch(max_batch_size)
+            .with_fallibale_allocations(buffer_allocation_options.fallibale_allocations);
+        if let Some(schema) = schema {
+            builder.with_schema(schema);
+        }
+        if let Some(max_text_size) = buffer_allocation_options.max_text_size {
+            builder.with_max_text_size(max_text_size);
+        }
+        if let Some(max_binary_size) = buffer_allocation_options.max_binary_size {
+            builder.with_max_binary_size(max_binary_size);
+        }
+        builder.build(cursor)?.into_concurrent()
     }
 
     /// The schema implied by `block_cursor` and `converter` must match. Invariant is hard to check

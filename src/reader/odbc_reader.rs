@@ -20,7 +20,7 @@ use super::{odbc_batch_stream::OdbcBatchStream, to_record_batch::ToRecordBatch};
 /// # Example
 ///
 /// ```no_run
-/// use arrow_odbc::{odbc_api::{Environment, ConnectionOptions}, OdbcReader};
+/// use arrow_odbc::{odbc_api::{Environment, ConnectionOptions}, OdbcReaderBuilder};
 ///
 /// const CONNECTION_STRING: &str = "\
 ///     Driver={ODBC Driver 17 for SQL Server};\
@@ -47,12 +47,12 @@ use super::{odbc_batch_stream::OdbcBatchStream, to_record_batch::ToRecordBatch};
 ///         .execute("SELECT * FROM MyTable", parameters)?
 ///         .expect("SELECT statement must produce a cursor");
 ///
-///     // Each batch shall only consist of maximum 10.000 rows.
-///     let max_batch_size = 10_000;
-///
 ///     // Read result set as arrow batches. Infer Arrow types automatically using the meta
 ///     // information of `cursor`.
-///     let arrow_record_batches = OdbcReader::new(cursor, max_batch_size)?;
+///     let arrow_record_batches = OdbcReaderBuilder::new()
+///         // Each batch shall only consist of maximum 10.000 rows.
+///         .with_max_num_rows_per_batch(10_000)
+///         .build(cursor)?;
 ///
 ///     for batch in arrow_record_batches {
 ///         // ... process batch ...
@@ -108,14 +108,13 @@ impl<C: Cursor> OdbcReader<C> {
         max_batch_size: usize,
         schema: SchemaRef,
     ) -> Result<Self, Error> {
-        Self::with(
-            cursor,
-            max_batch_size,
-            Some(schema),
-            BufferAllocationOptions::default(),
-        )
+        OdbcReaderBuilder::new()
+            .with_max_num_rows_per_batch(max_batch_size)
+            .with_schema(schema)
+            .build(cursor)
     }
 
+    #[deprecated(since = "2.3.0", note = "use OdbcReaderBuilder instead")]
     /// Construct a new [`crate::OdbcReader`] instance. This method allows you full control over
     /// what options to explicitly specify, and what options you want to leave to this crate to
     /// automatically decide.
@@ -196,24 +195,25 @@ impl<C: Cursor> OdbcReader<C> {
     /// }
     /// ```
     pub fn with(
-        mut cursor: C,
+        cursor: C,
         max_batch_size: usize,
         schema: Option<SchemaRef>,
         buffer_allocation_options: BufferAllocationOptions,
     ) -> Result<Self, Error> {
-        let converter = ToRecordBatch::new(&mut cursor, schema.clone(), buffer_allocation_options)?;
-        converter.log_buffer_size();
-        let row_set_buffer = converter.allocate_buffer(
-            max_batch_size,
-            buffer_allocation_options.fallibale_allocations,
-        )?;
-        let batch_stream = cursor.bind_buffer(row_set_buffer).unwrap();
-
-        Ok(Self {
-            converter,
-            batch_stream,
-            fallibale_allocations: buffer_allocation_options.fallibale_allocations,
-        })
+        let mut builder = OdbcReaderBuilder::new();
+        builder
+            .with_max_num_rows_per_batch(max_batch_size)
+            .with_fallibale_allocations(buffer_allocation_options.fallibale_allocations);
+        if let Some(schema) = schema {
+            builder.with_schema(schema);
+        }
+        if let Some(max_text_size) = buffer_allocation_options.max_text_size {
+            builder.with_max_text_size(max_text_size);
+        }
+        if let Some(max_binary_size) = buffer_allocation_options.max_binary_size {
+            builder.with_max_binary_size(max_binary_size);
+        }
+        builder.build(cursor)
     }
 
     /// Consume this instance to create a similar ODBC reader which fetches batches asynchronously.
@@ -226,7 +226,7 @@ impl<C: Cursor> OdbcReader<C> {
     /// # Example
     ///
     /// ```no_run
-    /// use arrow_odbc::{odbc_api::{Environment, ConnectionOptions}, OdbcReader};
+    /// use arrow_odbc::{odbc_api::{Environment, ConnectionOptions}, OdbcReaderBuilder};
     /// use std::sync::OnceLock;
     ///
     /// // In order to fetch in a dedicated system thread we need a cursor with static lifetime,
@@ -261,10 +261,10 @@ impl<C: Cursor> OdbcReader<C> {
     ///         .expect("SELECT statement must produce a cursor");
     ///
     ///     // Construct ODBC reader ...
-    ///     let max_batch_size = 1000;
-    ///     let arrow_record_batches = OdbcReader::new(cursor, max_batch_size)
+    ///     let arrow_record_batches = OdbcReaderBuilder::new()
+    ///         .build(cursor)?
     ///         // ... and make it concurrent
-    ///         .and_then(OdbcReader::into_concurrent)?;
+    ///         .into_concurrent()?;
     ///
     ///     for batch in arrow_record_batches {
     ///         // ... process batch ...
@@ -292,6 +292,9 @@ impl<C: Cursor> OdbcReader<C> {
         Ok(cursor)
     }
 
+    /// Size of the internal preallocated buffer bound to the cursor and filled by your ODBC driver
+    /// in rows. Each record batch will at most have this many rows. Only the last one may have
+    /// less.
     pub fn max_rows_per_batch(&self) -> usize {
         self.batch_stream.row_array_size()
     }
@@ -339,7 +342,7 @@ pub fn next(
 }
 
 /// Creates instances of [`OdbcReader`] based on [`odbc_api::Cursor`].
-/// 
+///
 /// Using a builder pattern instead of passing structs with all required arguments to the
 /// constructors of [`OdbcReader`] allows `arrow_odbc` to introduce new paramters to fine tune the
 /// creation and behavior of the readers without breaking the code of downstream applications.
@@ -352,6 +355,7 @@ pub struct OdbcReaderBuilder {
     schema: Option<SchemaRef>,
     max_text_size: Option<usize>,
     max_binary_size: Option<usize>,
+    fallibale_allocations: bool,
 }
 
 impl OdbcReaderBuilder {
@@ -360,7 +364,8 @@ impl OdbcReaderBuilder {
             max_num_rows_per_batch: None,
             schema: None,
             max_text_size: None,
-            max_binary_size: None
+            max_binary_size: None,
+            fallibale_allocations: false,
         }
     }
 
@@ -419,6 +424,14 @@ impl OdbcReaderBuilder {
         self
     }
 
+    /// Set to `true` in order to trigger an [`ColumnFailure::TooLarge`] instead of a panic in case
+    /// the buffers can not be allocated due to their size. This might have a performance cost for
+    /// constructing the reader. `false` by default.
+    pub fn with_fallibale_allocations(&mut self, fallibale_allocations: bool) -> &mut Self {
+        self.fallibale_allocations = fallibale_allocations;
+        self
+    }
+
     /// No matter if the user explicitly specified a limit in row size, a memory limit, both or
     /// neither. In order to construct a reader we need to decide on the buffer size in rows.
     fn buffer_size_in_rows(&self) -> usize {
@@ -451,21 +464,19 @@ impl OdbcReaderBuilder {
         let buffer_allocation_options = BufferAllocationOptions {
             max_text_size: self.max_text_size,
             max_binary_size: self.max_binary_size,
-            fallibale_allocations: false,
+            fallibale_allocations: self.fallibale_allocations,
         };
         let converter =
             ToRecordBatch::new(&mut cursor, self.schema.clone(), buffer_allocation_options)?;
         converter.log_buffer_size();
-        let row_set_buffer = converter.allocate_buffer(
-            self.buffer_size_in_rows(),
-            buffer_allocation_options.fallibale_allocations,
-        )?;
+        let row_set_buffer =
+            converter.allocate_buffer(self.buffer_size_in_rows(), self.fallibale_allocations)?;
         let batch_stream = cursor.bind_buffer(row_set_buffer).unwrap();
 
         Ok(OdbcReader {
             converter,
             batch_stream,
-            fallibale_allocations: buffer_allocation_options.fallibale_allocations,
+            fallibale_allocations: self.fallibale_allocations,
         })
     }
 }
