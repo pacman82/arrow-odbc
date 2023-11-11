@@ -31,7 +31,7 @@ use super::{
 /// # Example
 ///
 /// ```no_run
-/// use arrow_odbc::{odbc_api::{Environment, ConnectionOptions}, OdbcReader};
+/// use arrow_odbc::{odbc_api::{Environment, ConnectionOptions}, OdbcReaderBuilder};
 /// use std::sync::OnceLock;
 ///
 /// // In order to fetch in a dedicated system thread we need a cursor with static lifetime,
@@ -65,11 +65,8 @@ use super::{
 ///         .into_cursor("SELECT * FROM MyTable", parameters)?
 ///         .expect("SELECT statement must produce a cursor");
 ///
-///     // Construct ODBC reader ...
-///     let max_batch_size = 1000;
-///     let arrow_record_batches = OdbcReader::new(cursor, max_batch_size)
-///         // ... and make it concurrent
-///         .and_then(OdbcReader::into_concurrent)?;
+///     // Construct ODBC reader and make it concurrent
+///     let arrow_record_batches = OdbcReaderBuilder::new().build(cursor)?.into_concurrent()?;
 ///
 ///     for batch in arrow_record_batches {
 ///         // ... process batch ...
@@ -100,6 +97,7 @@ impl<C: Cursor + Send + 'static> ConcurrentOdbcReader<C> {
     /// * `max_batch_size`: Maximum batch size requested from the datasource.
     pub fn new(cursor: C, max_batch_size: usize) -> Result<Self, Error> {
         OdbcReaderBuilder::new()
+            .with_max_bytes_per_batch(usize::MAX)
             .with_max_num_rows_per_batch(max_batch_size)
             .build(cursor)
             .and_then(OdbcReader::into_concurrent)
@@ -124,6 +122,7 @@ impl<C: Cursor + Send + 'static> ConcurrentOdbcReader<C> {
         schema: SchemaRef,
     ) -> Result<Self, Error> {
         OdbcReaderBuilder::new()
+            .with_max_bytes_per_batch(usize::MAX)
             .with_max_num_rows_per_batch(max_batch_size)
             .with_schema(schema)
             .build(cursor)
@@ -159,6 +158,7 @@ impl<C: Cursor + Send + 'static> ConcurrentOdbcReader<C> {
         let mut builder = OdbcReaderBuilder::new();
         builder
             .with_max_num_rows_per_batch(max_batch_size)
+            .with_max_bytes_per_batch(usize::MAX)
             .with_fallibale_allocations(buffer_allocation_options.fallibale_allocations);
         if let Some(schema) = schema {
             builder.with_schema(schema);

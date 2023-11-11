@@ -88,6 +88,7 @@ impl<C: Cursor> OdbcReader<C> {
     /// * `max_batch_size`: Maximum batch size requested from the datasource.
     pub fn new(cursor: C, max_batch_size: usize) -> Result<Self, Error> {
         OdbcReaderBuilder::new()
+            .with_max_bytes_per_batch(usize::MAX)
             .with_max_num_rows_per_batch(max_batch_size)
             .build(cursor)
     }
@@ -111,6 +112,7 @@ impl<C: Cursor> OdbcReader<C> {
         schema: SchemaRef,
     ) -> Result<Self, Error> {
         OdbcReaderBuilder::new()
+            .with_max_bytes_per_batch(usize::MAX)
             .with_max_num_rows_per_batch(max_batch_size)
             .with_schema(schema)
             .build(cursor)
@@ -204,6 +206,7 @@ impl<C: Cursor> OdbcReader<C> {
     ) -> Result<Self, Error> {
         let mut builder = OdbcReaderBuilder::new();
         builder
+            .with_max_bytes_per_batch(usize::MAX)
             .with_max_num_rows_per_batch(max_batch_size)
             .with_fallibale_allocations(buffer_allocation_options.fallibale_allocations);
         if let Some(schema) = schema {
@@ -354,7 +357,7 @@ pub struct OdbcReaderBuilder {
     /// [`OdbcReaderBuilder::with_max_num_rows_per_batch`]. `None` implies that we have to choose
     /// for the user.
     max_num_rows_per_batch: usize,
-    max_bytes_per_batch: Option<usize>,
+    max_bytes_per_batch: usize,
     schema: Option<SchemaRef>,
     max_text_size: Option<usize>,
     max_binary_size: Option<usize>,
@@ -370,10 +373,11 @@ impl OdbcReaderBuilder {
         // number. Some drivers use a 16Bit integer to count rows and you can run into overflow
         // errors if you use one of them. Once such issue occurred with SAP anywhere.
         const DEFAULT_MAX_ROWS_PER_BATCH: usize = u16::MAX as usize;
+        const DEFAULT_MAX_BYTES_PER_BATCH: usize = 512 * 1024 * 1024;
 
         OdbcReaderBuilder {
             max_num_rows_per_batch: DEFAULT_MAX_ROWS_PER_BATCH,
-            max_bytes_per_batch: None,
+            max_bytes_per_batch: DEFAULT_MAX_BYTES_PER_BATCH,
             schema: None,
             max_text_size: None,
             max_binary_size: None,
@@ -396,9 +400,9 @@ impl OdbcReaderBuilder {
     /// transit buffer. This is useful if you do not know the database schema, or your code has to
     /// work with different ones, but you know the amount of memory in your machine. This limit is
     /// applied in addition to [`OdbcReaderBuilder::with_max_num_rows_per_batch`]. Whichever of
-    /// these leads to a smaller buffer is used.
+    /// these leads to a smaller buffer is used. This defaults to 512 MiB.
     pub fn with_max_bytes_per_batch(&mut self, max_bytes_per_batch: usize) -> &mut Self {
-        self.max_bytes_per_batch = Some(max_bytes_per_batch);
+        self.max_bytes_per_batch = max_bytes_per_batch;
         self
     }
 
@@ -460,18 +464,14 @@ impl OdbcReaderBuilder {
     /// No matter if the user explicitly specified a limit in row size, a memory limit, both or
     /// neither. In order to construct a reader we need to decide on the buffer size in rows.
     fn buffer_size_in_rows(&self, bytes_per_row: usize) -> Result<usize, Error> {
-        if let Some(max_bytes_per_batch) = self.max_bytes_per_batch {
-            let rows_per_batch = max_bytes_per_batch / bytes_per_row;
-            if rows_per_batch == 0 {
-                Err(Error::OdbcBufferTooSmall {
-                    max_bytes_per_batch,
-                    bytes_per_row,
-                })
-            } else {
-                Ok(min(self.max_num_rows_per_batch, rows_per_batch))
-            }
+        let rows_per_batch = self.max_bytes_per_batch / bytes_per_row;
+        if rows_per_batch == 0 {
+            Err(Error::OdbcBufferTooSmall {
+                max_bytes_per_batch: self.max_bytes_per_batch,
+                bytes_per_row,
+            })
         } else {
-            Ok(self.max_num_rows_per_batch)
+            Ok(min(self.max_num_rows_per_batch, rows_per_batch))
         }
     }
 

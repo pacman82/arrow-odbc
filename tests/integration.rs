@@ -880,6 +880,7 @@ fn fallibale_allocations() {
 
     // When
     let result = OdbcReaderBuilder::new()
+        .with_max_bytes_per_batch(usize::MAX)
         .with_max_num_rows_per_batch(100_000_000)
         .with_fallibale_allocations(true)
         .build(cursor);
