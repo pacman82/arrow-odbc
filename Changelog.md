@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.1.1
+
+* Prevent division by zero errors when using `OdbcReaderBuilder::buffer_size_in_rows` on empty schemas.
+
 ## 3.1.0
 
 * Update arrow `>= 29, < 49` -> `>= 29, < 50`
