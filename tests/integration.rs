@@ -944,6 +944,62 @@ fn read_multiple_result_sets() {
 }
 
 #[test]
+fn read_multiple_result_sets_with_second_no_schema() {
+    // Given a batch of three SQL statements, the second being result-free
+    let conn = ENV
+        .connect_with_connection_string(MSSQL, Default::default())
+        .unwrap();
+    let cursor = conn
+        .execute(
+            "SELECT 1 AS A; SELECT 1 AS A INTO #local_temp_table; SELECT A FROM #local_temp_table;",
+            (),
+        )
+        .unwrap()
+        .unwrap();
+
+    // When
+    // Now that we have a cursor, we want to iterate over its rows and fill an arrow batch with it.
+    let mut reader = OdbcReaderBuilder::new()
+        .with_max_num_rows_per_batch(1)
+        .build(cursor)
+        .unwrap();
+    let first = reader.next().unwrap().unwrap();
+    let cursor = reader.into_cursor().unwrap();
+    let cursor = cursor.more_results().unwrap().unwrap();
+    // Now that we have a cursor, we want to iterate over its rows and fill an arrow batch with it.
+    let reader = OdbcReaderBuilder::new()
+        .with_max_num_rows_per_batch(1)
+        .build(cursor)
+        .unwrap();
+    let second_schema = reader.schema();
+
+    let cursor = reader.into_cursor().unwrap();
+    let cursor = cursor.more_results().unwrap().unwrap();
+    // Now that we have a cursor, we want to iterate over its rows and fill an arrow batch with it.
+    let mut reader = OdbcReaderBuilder::new()
+        .with_max_num_rows_per_batch(1)
+        .build(cursor)
+        .unwrap();
+    let third = reader.next().unwrap().unwrap();
+
+    // Then
+    let first_vals = first
+        .column(0)
+        .as_any()
+        .downcast_ref::<Int32Array>()
+        .unwrap();
+    assert_eq!(1, first_vals.value(0));
+    let second_column_count = second_schema.fields().len();
+    assert_eq!(0, second_column_count);
+    let third_vals = third
+        .column(0)
+        .as_any()
+        .downcast_ref::<Int32Array>()
+        .unwrap();
+    assert_eq!(1, third_vals.value(0));
+}
+
+#[test]
 fn applies_row_limit_for_default_constructed_readers() {
     // Given a cursor over a datascheme with a small per row memory footprint
     let table_name = function_name!().rsplit_once(':').unwrap().1;

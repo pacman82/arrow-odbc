@@ -463,15 +463,16 @@ impl OdbcReaderBuilder {
 
     /// No matter if the user explicitly specified a limit in row size, a memory limit, both or
     /// neither. In order to construct a reader we need to decide on the buffer size in rows.
+    /// If a schema is empty, return something non-zero to be allocated.
     fn buffer_size_in_rows(&self, bytes_per_row: usize) -> Result<usize, Error> {
-        let rows_per_batch = self.max_bytes_per_batch / bytes_per_row;
-        if rows_per_batch == 0 {
-            Err(Error::OdbcBufferTooSmall {
+        let check_rows_per_batch = self.max_bytes_per_batch.checked_div(bytes_per_row);
+        match check_rows_per_batch {
+            Some(0) => Err(Error::OdbcBufferTooSmall {
                 max_bytes_per_batch: self.max_bytes_per_batch,
                 bytes_per_row,
-            })
-        } else {
-            Ok(min(self.max_num_rows_per_batch, rows_per_batch))
+            }),
+            Some(rows_per_batch) => Ok(min(self.max_num_rows_per_batch, rows_per_batch)),
+            None => Ok(self.max_num_rows_per_batch),
         }
     }
 
