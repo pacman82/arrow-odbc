@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.1.0
+
+* Update arrow `>= 29, < 49` -> `>= 29, < 50`
+
 ## 3.0.0
 
 * Introduce `OdbcReaderBuilder` as the prefered way to create instances of `OdbcReader`.
