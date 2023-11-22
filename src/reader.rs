@@ -1,4 +1,4 @@
-use std::{convert::TryInto, sync::Arc};
+use std::{convert::TryInto, sync::Arc, cmp::max};
 
 use arrow::{
     array::{ArrayRef, BooleanBuilder},
@@ -149,6 +149,9 @@ pub fn choose_column_strategy(
             let lazy_display_size = || {
                 let display_size = query_metadata.col_display_size(col_index)?;
                 debug!("Display size of column {}: {display_size}", col_index - 1);
+                // `0` is common to indicate "No upper bound". MySQL has also been spotted sending
+                // `-4` (`NO_TOTAL`) to indicate the same. We normalize both to `0`.
+                let display_size = max(0, display_size) as usize;
                 Ok(display_size)
             };
             // Use the SQL type first to determine buffer length.

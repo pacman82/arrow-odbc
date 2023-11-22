@@ -1,4 +1,4 @@
-use std::{char::decode_utf16, cmp::min, convert::TryInto, sync::Arc};
+use std::{char::decode_utf16, cmp::min, sync::Arc};
 
 use arrow::array::{ArrayRef, StringBuilder};
 use odbc_api::{
@@ -14,47 +14,31 @@ use super::{ColumnFailure, MappingError, ReadStrategy};
 /// are trying to adapt the buffer size to the maximum string length the column could contain.
 pub fn choose_text_strategy(
     sql_type: OdbcDataType,
-    lazy_display_size: impl FnMut() -> Result<isize, odbc_api::Error>,
+    lazy_display_size: impl FnMut() -> Result<usize, odbc_api::Error>,
     max_text_size: Option<usize>,
 ) -> Result<Box<dyn ReadStrategy>, ColumnFailure> {
-    let is_narrow = matches!(
-        sql_type,
-        OdbcDataType::LongVarchar { .. } | OdbcDataType::Varchar { .. } | OdbcDataType::Char { .. }
-    );
-    let is_wide = matches!(
-        sql_type,
-        OdbcDataType::WVarchar { .. } | OdbcDataType::WChar { .. }
-    );
-    let is_text = is_narrow || is_wide;
     let apply_buffer_limit = |len| match (len, max_text_size) {
         (0, None) => Err(ColumnFailure::ZeroSizedColumn { sql_type }),
         (0, Some(limit)) => Ok(limit),
         (len, None) => Ok(len),
         (len, Some(limit)) => Ok(min(len, limit)),
     };
-    let strategy = if is_text {
-        if cfg!(target_os = "windows") {
-            let hex_len = sql_type.utf16_len().unwrap();
-            let hex_len = apply_buffer_limit(hex_len)?;
-            wide_text_strategy(hex_len)
-        } else {
-            let octet_len = sql_type.utf8_len().unwrap();
-            let octet_len = apply_buffer_limit(octet_len)?;
-            narrow_text_strategy(octet_len)
-        }
-    } else {
-        let display_size: usize = sql_type
-            .display_size()
-            .map(|ds| Ok(ds as isize))
+    let strategy: Box<dyn ReadStrategy> = if cfg!(target_os = "windows") {
+        let hex_len = sql_type
+            .utf16_len()
+            .map(Ok)
             .unwrap_or_else(lazy_display_size)
-            .map_err(|source| ColumnFailure::UnknownStringLength { sql_type, source })?
-            .try_into()
-            .unwrap();
-
-        let display_size = apply_buffer_limit(display_size)?;
-
-        // We assume non text type colmuns to only consist of ASCII characters.
-        narrow_text_strategy(display_size)
+            .map_err(|source| ColumnFailure::UnknownStringLength { sql_type, source })?;
+        let hex_len = apply_buffer_limit(hex_len)?;
+        wide_text_strategy(hex_len)
+    } else {
+        let octet_len = sql_type
+            .utf8_len()
+            .map(Ok)
+            .unwrap_or_else(lazy_display_size)
+            .map_err(|source| ColumnFailure::UnknownStringLength { sql_type, source })?;
+        let octet_len = apply_buffer_limit(octet_len)?;
+        narrow_text_strategy(octet_len)
     };
 
     Ok(strategy)
