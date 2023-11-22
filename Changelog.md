@@ -1,5 +1,10 @@
 # Changelog
 
+## 3.1.2
+
+* An assumption has been removed, that unknown column types are always representable in ASCII. Now on Linux the system encoding is used which is assumed to be UTF-8 and on windows UTF-16. The same as for other text columns.
+* MySQL seems to report negative display sizes for JSON columns (-4). This is normally used to indicate no upper bound in other parts of the ODBC standard. Arrow ODBC will now return a `ColumnFailure::ZeroSizedColumn` in these scenarios, if no buffer limit has been specified.
+
 ## 3.1.1
 
 * Prevent division by zero errors when using `OdbcReaderBuilder::buffer_size_in_rows` on empty schemas.
