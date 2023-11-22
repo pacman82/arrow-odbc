@@ -51,10 +51,7 @@ use super::{odbc_batch_stream::OdbcBatchStream, to_record_batch::ToRecordBatch};
 ///
 ///     // Read result set as arrow batches. Infer Arrow types automatically using the meta
 ///     // information of `cursor`.
-///     let arrow_record_batches = OdbcReaderBuilder::new()
-///         // Each batch shall only consist of maximum 10.000 rows.
-///         .with_max_num_rows_per_batch(10_000)
-///         .build(cursor)?;
+///     let arrow_record_batches = OdbcReaderBuilder::new().build(cursor)?;
 ///
 ///     for batch in arrow_record_batches {
 ///         // ... process batch ...
