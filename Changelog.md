@@ -1,5 +1,9 @@
 # Changelog
 
+## 4.0.0 (next)
+
+* Update odbc-api `>= 2.2, < 4` ->  `>= 4, < 5`
+
 ## 3.1.2
 
 * An assumption has been removed, that unknown column types are always representable in ASCII. Now on Linux the system encoding is used which is assumed to be UTF-8 and on windows UTF-16. The same as for other text columns.

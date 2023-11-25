@@ -54,63 +54,70 @@ pub fn arrow_schema_from(resut_set_metadata: &mut impl ResultSetMetadata) -> Res
             column_description.data_type, column_description.nullability
         );
 
-        let field = Field::new(
-            name,
-            match column_description.data_type {
-                OdbcDataType::Numeric {
-                    precision: p @ 0..=38,
-                    scale,
-                }
-                | OdbcDataType::Decimal {
-                    precision: p @ 0..=38,
-                    scale,
-                } => ArrowDataType::Decimal128(p as u8, scale.try_into().unwrap()),
-                OdbcDataType::Integer => ArrowDataType::Int32,
-                OdbcDataType::SmallInt => ArrowDataType::Int16,
-                OdbcDataType::Real | OdbcDataType::Float { precision: 0..=24 } => {
-                    ArrowDataType::Float32
-                }
-                OdbcDataType::Float { precision: _ } | OdbcDataType::Double => {
-                    ArrowDataType::Float64
-                }
-                OdbcDataType::Date => ArrowDataType::Date32,
-                OdbcDataType::Timestamp { precision: 0 } => {
-                    ArrowDataType::Timestamp(TimeUnit::Second, None)
-                }
-                OdbcDataType::Timestamp { precision: 1..=3 } => {
-                    ArrowDataType::Timestamp(TimeUnit::Millisecond, None)
-                }
-                OdbcDataType::Timestamp { precision: 4..=6 } => {
-                    ArrowDataType::Timestamp(TimeUnit::Microsecond, None)
-                }
-                OdbcDataType::Timestamp { precision: _ } => {
-                    ArrowDataType::Timestamp(TimeUnit::Nanosecond, None)
-                }
-                OdbcDataType::BigInt => ArrowDataType::Int64,
-                OdbcDataType::TinyInt => ArrowDataType::Int8,
-                OdbcDataType::Bit => ArrowDataType::Boolean,
-                OdbcDataType::Binary { length } => {
-                    ArrowDataType::FixedSizeBinary(length.try_into().unwrap())
-                }
-                OdbcDataType::LongVarbinary { length: _ }
-                | OdbcDataType::Varbinary { length: _ } => ArrowDataType::Binary,
-                OdbcDataType::Unknown
-                | OdbcDataType::Time { precision: _ }
-                | OdbcDataType::Numeric { .. }
-                | OdbcDataType::Decimal { .. }
-                | OdbcDataType::Other {
-                    data_type: _,
-                    column_size: _,
-                    decimal_digits: _,
-                }
-                | OdbcDataType::WChar { length: _ }
-                | OdbcDataType::Char { length: _ }
-                | OdbcDataType::WVarchar { length: _ }
-                | OdbcDataType::LongVarchar { length: _ }
-                | OdbcDataType::Varchar { length: _ } => ArrowDataType::Utf8,
-            },
-            column_description.could_be_nullable(),
-        );
+        let data_type = match column_description.data_type {
+            OdbcDataType::Numeric {
+                precision: p @ 0..=38,
+                scale,
+            }
+            | OdbcDataType::Decimal {
+                precision: p @ 0..=38,
+                scale,
+            } => ArrowDataType::Decimal128(p as u8, scale.try_into().unwrap()),
+            OdbcDataType::Integer => ArrowDataType::Int32,
+            OdbcDataType::SmallInt => ArrowDataType::Int16,
+            OdbcDataType::Real | OdbcDataType::Float { precision: 0..=24 } => {
+                ArrowDataType::Float32
+            }
+            OdbcDataType::Float { precision: _ } | OdbcDataType::Double => ArrowDataType::Float64,
+            OdbcDataType::Date => ArrowDataType::Date32,
+            OdbcDataType::Timestamp { precision: 0 } => {
+                ArrowDataType::Timestamp(TimeUnit::Second, None)
+            }
+            OdbcDataType::Timestamp { precision: 1..=3 } => {
+                ArrowDataType::Timestamp(TimeUnit::Millisecond, None)
+            }
+            OdbcDataType::Timestamp { precision: 4..=6 } => {
+                ArrowDataType::Timestamp(TimeUnit::Microsecond, None)
+            }
+            OdbcDataType::Timestamp { precision: _ } => {
+                ArrowDataType::Timestamp(TimeUnit::Nanosecond, None)
+            }
+            OdbcDataType::BigInt => ArrowDataType::Int64,
+            OdbcDataType::TinyInt => ArrowDataType::Int8,
+            OdbcDataType::Bit => ArrowDataType::Boolean,
+            OdbcDataType::Binary { length } => {
+                let length = length
+                    .ok_or_else(|| Error::ColumnFailure {
+                        name: name.clone(),
+                        index: index as usize,
+                        source: ColumnFailure::ZeroSizedColumn {
+                            sql_type: OdbcDataType::Binary { length },
+                        },
+                    })?
+                    .get()
+                    .try_into()
+                    .unwrap();
+                ArrowDataType::FixedSizeBinary(length)
+            }
+            OdbcDataType::LongVarbinary { length: _ } | OdbcDataType::Varbinary { length: _ } => {
+                ArrowDataType::Binary
+            }
+            OdbcDataType::Unknown
+            | OdbcDataType::Time { precision: _ }
+            | OdbcDataType::Numeric { .. }
+            | OdbcDataType::Decimal { .. }
+            | OdbcDataType::Other {
+                data_type: _,
+                column_size: _,
+                decimal_digits: _,
+            }
+            | OdbcDataType::WChar { length: _ }
+            | OdbcDataType::Char { length: _ }
+            | OdbcDataType::WVarchar { length: _ }
+            | OdbcDataType::LongVarchar { length: _ }
+            | OdbcDataType::Varchar { length: _ } => ArrowDataType::Utf8,
+        };
+        let field = Field::new(name, data_type, column_description.could_be_nullable());
 
         fields.push(field)
     }

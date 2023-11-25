@@ -463,7 +463,7 @@ impl OdbcReaderBuilder {
     fn buffer_size_in_rows(&self, bytes_per_row: usize) -> Result<usize, Error> {
         // If schema is empty, return before division by zero error.
         if bytes_per_row == 0 {
-            return Ok(self.max_bytes_per_batch)
+            return Ok(self.max_bytes_per_batch);
         }
         let rows_per_batch = self.max_bytes_per_batch / bytes_per_row;
         if rows_per_batch == 0 {

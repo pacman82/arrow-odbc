@@ -1,4 +1,4 @@
-use std::{convert::TryInto, sync::Arc, cmp::max};
+use std::{convert::TryInto, sync::Arc};
 
 use arrow::{
     array::{ArrayRef, BooleanBuilder},
@@ -146,14 +146,7 @@ pub fn choose_column_strategy(
             // Use a zero based index here, because we use it everywhere else there we communicate
             // with users.
             debug!("Relational type of column {}: {sql_type:?}", col_index - 1);
-            let lazy_display_size = || {
-                let display_size = query_metadata.col_display_size(col_index)?;
-                debug!("Display size of column {}: {display_size}", col_index - 1);
-                // `0` is common to indicate "No upper bound". MySQL has also been spotted sending
-                // `-4` (`NO_TOTAL`) to indicate the same. We normalize both to `0`.
-                let display_size = max(0, display_size) as usize;
-                Ok(display_size)
-            };
+            let lazy_display_size = || query_metadata.col_display_size(col_index);
             // Use the SQL type first to determine buffer length.
             choose_text_strategy(
                 sql_type,
@@ -170,12 +163,12 @@ pub fn choose_column_strategy(
                 .map_err(ColumnFailure::FailedToDescribeColumn)?;
             let length = sql_type.column_size();
             let length = match (length, buffer_allocation_options.max_binary_size) {
-                (0, None) => return Err(ColumnFailure::ZeroSizedColumn { sql_type }),
-                (0, Some(limit)) => limit,
-                (len, None) => len,
-                (len, Some(limit)) => {
-                    if len < limit {
-                        len
+                (None, None) => return Err(ColumnFailure::ZeroSizedColumn { sql_type }),
+                (None, Some(limit)) => limit,
+                (Some(len), None) => len.get(),
+                (Some(len), Some(limit)) => {
+                    if len.get() < limit {
+                        len.get()
                     } else {
                         limit
                     }

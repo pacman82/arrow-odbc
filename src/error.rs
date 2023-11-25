@@ -31,7 +31,7 @@ pub enum Error {
         largest possible value of variadic types. You should either set a higher upper bound for \
         the buffer size, or limit the length of the variadic columns."
     )]
-    OdbcBufferTooSmall{
+    OdbcBufferTooSmall {
         max_bytes_per_batch: usize,
         bytes_per_row: usize,
     },

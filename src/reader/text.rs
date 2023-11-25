@@ -1,4 +1,4 @@
-use std::{char::decode_utf16, cmp::min, sync::Arc};
+use std::{char::decode_utf16, cmp::min, num::NonZeroUsize, sync::Arc};
 
 use arrow::array::{ArrayRef, StringBuilder};
 use odbc_api::{
@@ -14,30 +14,32 @@ use super::{ColumnFailure, MappingError, ReadStrategy};
 /// are trying to adapt the buffer size to the maximum string length the column could contain.
 pub fn choose_text_strategy(
     sql_type: OdbcDataType,
-    lazy_display_size: impl FnMut() -> Result<usize, odbc_api::Error>,
+    lazy_display_size: impl FnOnce() -> Result<Option<NonZeroUsize>, odbc_api::Error>,
     max_text_size: Option<usize>,
 ) -> Result<Box<dyn ReadStrategy>, ColumnFailure> {
     let apply_buffer_limit = |len| match (len, max_text_size) {
-        (0, None) => Err(ColumnFailure::ZeroSizedColumn { sql_type }),
-        (0, Some(limit)) => Ok(limit),
-        (len, None) => Ok(len),
-        (len, Some(limit)) => Ok(min(len, limit)),
+        (None, None) => Err(ColumnFailure::ZeroSizedColumn { sql_type }),
+        (None, Some(limit)) => Ok(limit),
+        (Some(len), None) => Ok(len),
+        (Some(len), Some(limit)) => Ok(min(len, limit)),
     };
     let strategy: Box<dyn ReadStrategy> = if cfg!(target_os = "windows") {
         let hex_len = sql_type
             .utf16_len()
             .map(Ok)
-            .unwrap_or_else(lazy_display_size)
+            .or_else(|| lazy_display_size().transpose())
+            .transpose()
             .map_err(|source| ColumnFailure::UnknownStringLength { sql_type, source })?;
-        let hex_len = apply_buffer_limit(hex_len)?;
+        let hex_len = apply_buffer_limit(hex_len.map(NonZeroUsize::get))?;
         wide_text_strategy(hex_len)
     } else {
         let octet_len = sql_type
             .utf8_len()
             .map(Ok)
-            .unwrap_or_else(lazy_display_size)
+            .or_else(|| lazy_display_size().transpose())
+            .transpose()
             .map_err(|source| ColumnFailure::UnknownStringLength { sql_type, source })?;
-        let octet_len = apply_buffer_limit(octet_len)?;
+        let octet_len = apply_buffer_limit(octet_len.map(NonZeroUsize::get))?;
         narrow_text_strategy(octet_len)
     };
 
