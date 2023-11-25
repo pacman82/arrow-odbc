@@ -1,6 +1,6 @@
 # Changelog
 
-## 4.0.0 (next)
+## 4.0.0
 
 * Update odbc-api `>= 2.2, < 4` ->  `>= 4, < 5`
 
