@@ -27,8 +27,11 @@ mod to_record_batch;
 
 use self::{decimal::Decimal, map_odbc_to_arrow::MapOdbcToArrow};
 
-use crate::date_time::{
-    days_since_epoch, ms_since_epoch, ns_since_epoch, seconds_since_epoch, us_since_epoch,
+use crate::{
+    date_time::{
+        days_since_epoch, ms_since_epoch, ns_since_epoch, seconds_since_epoch, us_since_epoch,
+    },
+    Quirks,
 };
 
 pub use self::{
@@ -120,6 +123,7 @@ pub fn choose_column_strategy(
     query_metadata: &mut impl ResultSetMetadata,
     col_index: u16,
     buffer_allocation_options: BufferAllocationOptions,
+    quirks: &Quirks,
 ) -> Result<Box<dyn ReadStrategy>, ColumnFailure> {
     let strat: Box<dyn ReadStrategy> = match field.data_type() {
         ArrowDataType::Boolean => {
@@ -152,6 +156,7 @@ pub fn choose_column_strategy(
                 sql_type,
                 lazy_display_size,
                 buffer_allocation_options.max_text_size,
+                quirks.indicators_returned_from_bulk_fetch_are_memory_garbage,
             )?
         }
         ArrowDataType::Decimal128(precision, scale @ 0..) => {
