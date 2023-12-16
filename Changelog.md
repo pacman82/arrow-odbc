@@ -1,8 +1,9 @@
 # Changelog
 
-## 4.0.1
+## 4.1.0
 
 * Update odbc-api `>= 4, < 5` ->  `>= 4.1, < 5`
+* Support for fetching text from IBM DB2. This has been difficult because of a bug in the IBM DB2 driver which causes it to return garbage memory instead of string lengths. A workaround can now be activated using `with_shims` on `OdbcReaderBuilder`.
 
 ## 4.0.0
 
