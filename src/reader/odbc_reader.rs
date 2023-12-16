@@ -22,7 +22,7 @@ use super::{odbc_batch_stream::OdbcBatchStream, to_record_batch::ToRecordBatch};
 /// # Example
 ///
 /// ```no_run
-/// use arrow_odbc::{odbc_api::{Environment, ConnectionOptions}, OdbcReaderBuilder};
+/// use arrow_odbc::{odbc_api::{Environment, ConnectionOptions, Quirks}, OdbcReaderBuilder};
 ///
 /// const CONNECTION_STRING: &str = "\
 ///     Driver={ODBC Driver 17 for SQL Server};\
@@ -40,6 +40,9 @@ use super::{odbc_batch_stream::OdbcBatchStream, to_record_batch::ToRecordBatch};
 ///         CONNECTION_STRING,
 ///         ConnectionOptions::default()
 ///     )?;
+/// 
+///     // Query knowledge about deviations of this driver from the ODBC standard
+///     let quirks = Quirks::from_dbms_name(connection.database_management_system_name())
 ///
 ///     // This SQL statement does not require any arguments.
 ///     let parameters = ();
@@ -51,7 +54,11 @@ use super::{odbc_batch_stream::OdbcBatchStream, to_record_batch::ToRecordBatch};
 ///
 ///     // Read result set as arrow batches. Infer Arrow types automatically using the meta
 ///     // information of `cursor`.
-///     let arrow_record_batches = OdbcReaderBuilder::new().build(cursor)?;
+///     let arrow_record_batches = OdbcReaderBuilder::new()
+///         // Pass knowledge about driver quirks, maybe there is a workaround implemented. Without
+///         // this we just assume the driver works as specified by ODBC.
+///         .with_shims(&quirks)
+///         .build(cursor)?;
 ///
 ///     for batch in arrow_record_batches {
 ///         // ... process batch ...
@@ -462,6 +469,9 @@ impl OdbcReaderBuilder {
 
     /// Shims are workarounds which can make arrow ODBC use different implementations in order to
     /// compensate for ODBC drivers which violate the ODBC specification.
+    /// 
+    /// This crate currently has a workaround drivers which return memory garbage instead of
+    /// indicators if bulk fetching variadic columns.
     pub fn with_shims(&mut self, quirks: Quirks) -> &mut Self {
         self.quirks = quirks;
         self
