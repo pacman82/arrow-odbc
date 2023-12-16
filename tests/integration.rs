@@ -33,7 +33,7 @@ use arrow_odbc::{
         Connection, ConnectionOptions, Cursor, CursorImpl, Environment, IntoParameter,
         StatementConnection,
     },
-    ColumnFailure, Error, OdbcReaderBuilder, OdbcWriter, WriterError,
+    ColumnFailure, Error, OdbcReaderBuilder, OdbcWriter, Quirks, WriterError,
 };
 
 use stdext::function_name;
@@ -293,6 +293,38 @@ fn fetch_varchar() {
         fetch_arrow_data(table_name, "VARCHAR(50)", "('Hello'),('Bonjour'),(NULL)").unwrap();
 
     let array_vals = array_any.as_any().downcast_ref::<StringArray>().unwrap();
+
+    // Assert that the correct values are found within the arrow batch
+    assert_eq!("Hello", array_vals.value(0));
+    assert_eq!("Bonjour", array_vals.value(1));
+    assert!(array_vals.is_null(2));
+}
+
+/// IBM DB2 ODBC driver reports memory garbage instead of indicators. We want to activate a
+/// workaround which utilizes the terminating zeroes instead of indicators to determine string
+/// length and NULL.
+/// Ideally this test would run against a DB2 database. Yet the test setup proves to be a lot of
+/// effort. Instead this test verifies that the workaround also works with Microsoft SQL Server.
+#[test]
+fn fetch_varchar_using_terminating_zeroes_to_indicate_string_length() {
+    let table_name = function_name!().rsplit_once(':').unwrap().1;
+    let cursor = cursor_over(table_name, "VARCHAR(50)", "('Hello'),('Bonjour'),(NULL)");
+
+    let mut quirks = Quirks::new();
+    quirks.indicators_returned_from_bulk_fetch_are_memory_garbage = true;
+    let mut reader = OdbcReaderBuilder::new()
+        .with_max_num_rows_per_batch(3)
+        .with_shims(quirks)
+        .build(cursor)
+        .unwrap()
+        .into_concurrent()
+        .unwrap();
+    let record_batch = reader.next().unwrap().unwrap();
+    let array_vals = record_batch
+        .column(0)
+        .as_any()
+        .downcast_ref::<StringArray>()
+        .unwrap();
 
     // Assert that the correct values are found within the arrow batch
     assert_eq!("Hello", array_vals.value(0));
