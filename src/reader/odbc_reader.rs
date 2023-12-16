@@ -42,7 +42,7 @@ use super::{odbc_batch_stream::OdbcBatchStream, to_record_batch::ToRecordBatch};
 ///     )?;
 /// 
 ///     // Query knowledge about deviations of this driver from the ODBC standard
-///     let quirks = Quirks::from_dbms_name(connection.database_management_system_name())
+///     let quirks = Quirks::from_dbms_name(&connection.database_management_system_name()?);
 ///
 ///     // This SQL statement does not require any arguments.
 ///     let parameters = ();
@@ -57,7 +57,7 @@ use super::{odbc_batch_stream::OdbcBatchStream, to_record_batch::ToRecordBatch};
 ///     let arrow_record_batches = OdbcReaderBuilder::new()
 ///         // Pass knowledge about driver quirks, maybe there is a workaround implemented. Without
 ///         // this we just assume the driver works as specified by ODBC.
-///         .with_shims(&quirks)
+///         .with_shims(quirks)
 ///         .build(cursor)?;
 ///
 ///     for batch in arrow_record_batches {
