@@ -30,10 +30,10 @@ use arrow_odbc::{
     odbc_api::{
         buffers::TextRowSet,
         sys::{AttrConnectionPooling, AttrCpMatch},
-        Connection, ConnectionOptions, Cursor, CursorImpl, Environment, IntoParameter,
+        Connection, ConnectionOptions, Cursor, CursorImpl, Environment, IntoParameter, Quirks,
         StatementConnection,
     },
-    ColumnFailure, Error, OdbcReaderBuilder, OdbcWriter, Quirks, WriterError,
+    ColumnFailure, Error, OdbcReaderBuilder, OdbcWriter, WriterError,
 };
 
 use stdext::function_name;

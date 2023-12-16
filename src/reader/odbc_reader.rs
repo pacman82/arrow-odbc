@@ -5,9 +5,9 @@ use arrow::{
     error::ArrowError,
     record_batch::{RecordBatch, RecordBatchReader},
 };
-use odbc_api::{buffers::ColumnarAnyBuffer, BlockCursor, Cursor};
+use odbc_api::{buffers::ColumnarAnyBuffer, BlockCursor, Cursor, Quirks};
 
-use crate::{BufferAllocationOptions, ConcurrentOdbcReader, Error, Quirks};
+use crate::{BufferAllocationOptions, ConcurrentOdbcReader, Error};
 
 use super::{odbc_batch_stream::OdbcBatchStream, to_record_batch::ToRecordBatch};
 
