@@ -5,9 +5,9 @@ use arrow::{
     record_batch::RecordBatch,
 };
 use log::info;
-use odbc_api::{buffers::ColumnarAnyBuffer, ResultSetMetadata};
+use odbc_api::{buffers::ColumnarAnyBuffer, ResultSetMetadata, Quirks};
 
-use crate::{arrow_schema_from, BufferAllocationOptions, ColumnFailure, Error, Quirks};
+use crate::{arrow_schema_from, BufferAllocationOptions, ColumnFailure, Error};
 
 use super::{choose_column_strategy, MappingError, ReadStrategy};
 
