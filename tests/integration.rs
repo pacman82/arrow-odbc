@@ -334,7 +334,7 @@ fn fetch_varchar_using_terminating_zeroes_to_indicate_string_length() {
     #[cfg(target_os="windows")]
     assert!(array_vals.is_null(2));
     #[cfg(not(target_os="windows"))]
-    assert_eq!("", arrays.value(0));
+    assert_eq!("", array_vals.value(0));
 }
 
 /// A corner case which has not been accounted for in the first workaround for the indicator
