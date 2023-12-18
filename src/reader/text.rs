@@ -172,8 +172,11 @@ impl ReadStrategy for NarrowUseTerminatingZero {
             let str = c_str
                 .to_str()
                 .expect("ODBC driver had been expected to return valid utf8, but did not.");
-            let option = (!str.is_empty()).then_some(str);
-            builder.append_option(option);
+            // We always assume the string to be non NULL. Original implementation had mapped empty
+            // strings to NULL, but this of course does not play well with schemas which have
+            // mandatory values. Better to accept that here empty strings and NULL are
+            // indistinguishable, and empty strings are the representation that always work.
+            builder.append_option(Some(str));
         }
         Ok(Arc::new(builder.finish()))
     }
