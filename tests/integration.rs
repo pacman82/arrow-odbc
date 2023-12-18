@@ -329,7 +329,12 @@ fn fetch_varchar_using_terminating_zeroes_to_indicate_string_length() {
     // Assert that the correct values are found within the arrow batch
     assert_eq!("Hello", array_vals.value(0));
     assert_eq!("Bonjour", array_vals.value(1));
+
+    // This workaround is currently only active for UTF-8. Which in turn is only active on Linux
+    #[cfg(target_os="windows")]
     assert!(array_vals.is_null(2));
+    #[cfg(not(target_os="windows"))]
+    assert_eq!("", arrays.value(0));
 }
 
 /// A corner case which has not been accounted for in the first workaround for the indicator
