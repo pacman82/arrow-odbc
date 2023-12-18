@@ -332,6 +332,36 @@ fn fetch_varchar_using_terminating_zeroes_to_indicate_string_length() {
     assert!(array_vals.is_null(2));
 }
 
+/// A corner case which has not been accounted for in the first workaround for the indicator
+/// garbage returned by DB2. Due to the invalid indicators, in DB2 an empty string and a NULL are
+/// indistiguishable. The first iteration had been to map empty strings to NULL, yet, of course,
+/// this does not work well for mandatory columns. Therfore, we now use empty strings and never
+/// map them to NULL.
+#[test]
+fn fetch_empty_string_from_non_null_varchar_using_terminating_zeroes_to_indicate_string_length() {
+    let table_name = function_name!().rsplit_once(':').unwrap().1;
+    let cursor = cursor_over(table_name, "VARCHAR(50)", "('')");
+
+    let mut quirks = Quirks::new();
+    quirks.indicators_returned_from_bulk_fetch_are_memory_garbage = true;
+    let mut reader = OdbcReaderBuilder::new()
+        .with_max_num_rows_per_batch(1)
+        .with_shims(quirks)
+        .build(cursor)
+        .unwrap()
+        .into_concurrent()
+        .unwrap();
+    let record_batch = reader.next().unwrap().unwrap();
+    let array_vals = record_batch
+        .column(0)
+        .as_any()
+        .downcast_ref::<StringArray>()
+        .unwrap();
+
+    // Assert that value is an empty string
+    assert_eq!("", array_vals.value(0));
+}
+
 /// Fill a record batch of Strings from a nvarchar source column
 #[test]
 fn fetch_nvarchar() {
