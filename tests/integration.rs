@@ -341,7 +341,7 @@ fn fetch_varchar_using_terminating_zeroes_to_indicate_string_length() {
     // mapped to NULL, due to the fact, that the schema might be a mandatory column. The
     // representation is ambigious, because we need to ignore the indicator buffer.
     #[cfg(not(target_os = "windows"))]
-    assert_eq!("", array_vals.value(0));
+    assert_eq!("", array_vals.value(2));
 }
 
 /// A corner case which has not been accounted for in the first workaround for the indicator
