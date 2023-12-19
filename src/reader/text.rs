@@ -1,6 +1,7 @@
 use std::{char::decode_utf16, cmp::min, ffi::CStr, num::NonZeroUsize, sync::Arc};
 
 use arrow::array::{ArrayRef, StringBuilder};
+use log::warn;
 use odbc_api::{
     buffers::{AnySlice, BufferDesc},
     DataType as OdbcDataType,
@@ -59,6 +60,11 @@ fn narrow_text_strategy(
     assume_indicators_are_memory_garbage: bool,
 ) -> Box<dyn ReadStrategy> {
     if assume_indicators_are_memory_garbage {
+        warn!(
+            "Ignoring indicators, because we expect the ODBC driver of your database to return \
+            garbage memory. We can not distiguish between empty strings and NULL. Everything is \
+            empty."
+        );
         Box::new(NarrowUseTerminatingZero::new(octet_len))
     } else {
         Box::new(NarrowText::new(octet_len))

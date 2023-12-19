@@ -308,7 +308,11 @@ fn fetch_varchar() {
 #[test]
 fn fetch_varchar_using_terminating_zeroes_to_indicate_string_length() {
     let table_name = function_name!().rsplit_once(':').unwrap().1;
-    let cursor = cursor_over(table_name, "VARCHAR(50)", "('Hello'),('Bonjour'),(NULL)");
+    let cursor = cursor_over(
+        table_name,
+        "VARCHAR(50)",
+        "('Hello'),('Bonjour'),(NULL)",
+    );
 
     let mut quirks = Quirks::new();
     quirks.indicators_returned_from_bulk_fetch_are_memory_garbage = true;
@@ -331,9 +335,12 @@ fn fetch_varchar_using_terminating_zeroes_to_indicate_string_length() {
     assert_eq!("Bonjour", array_vals.value(1));
 
     // This workaround is currently only active for UTF-8. Which in turn is only active on Linux
-    #[cfg(target_os="windows")]
+    #[cfg(target_os = "windows")]
     assert!(array_vals.is_null(2));
-    #[cfg(not(target_os="windows"))]
+    // Due to the ambiguity between empty and NULL we map everything to empty. This can not be
+    // mapped to NULL, due to the fact, that the schema might be a mandatory column. The
+    // representation is ambigious, because we need to ignore the indicator buffer.
+    #[cfg(not(target_os = "windows"))]
     assert_eq!("", array_vals.value(0));
 }
 
@@ -345,7 +352,7 @@ fn fetch_varchar_using_terminating_zeroes_to_indicate_string_length() {
 #[test]
 fn fetch_empty_string_from_non_null_varchar_using_terminating_zeroes_to_indicate_string_length() {
     let table_name = function_name!().rsplit_once(':').unwrap().1;
-    let cursor = cursor_over(table_name, "VARCHAR(50)", "('')");
+    let cursor = cursor_over(table_name, "VARCHAR(50) NOT NULL", "('')");
 
     let mut quirks = Quirks::new();
     quirks.indicators_returned_from_bulk_fetch_are_memory_garbage = true;
