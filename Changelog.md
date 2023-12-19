@@ -1,5 +1,9 @@
 # Changelog
 
+## 4.1.1
+
+* In order to work with mandatory columns workaround for IBM DB2 returning memory garbage now no longer maps empty strings to zero.
+
 ## 4.1.0
 
 * Update odbc-api `>= 4, < 5` ->  `>= 4.1, < 5`
