@@ -47,7 +47,7 @@ pub fn arrow_schema_from(resut_set_metadata: &mut impl ResultSetMetadata) -> Res
             })?;
         let name = column_description
             .name_to_string()
-            .expect("Column name must be representable in utf8");
+            .map_err(|source| Error::EncodingInvalid { source })?;
         debug!(
             "ODBC driver reported for column {index}. Relational type: {:?}; Nullability: {:?}; \
             Name: '{name}';",

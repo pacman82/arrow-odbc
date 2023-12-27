@@ -1,5 +1,9 @@
 # Changelog
 
+## 5.0.0
+
+* Introduced new `Error` variant `EncodingInvalid`, which is returned in case a column name can not be interpreted as UTF-16 on windows platforms or UTF-8 on non-windows platforms.
+
 ## 4.1.1
 
 * In order to work with mandatory columns workaround for IBM DB2 returning memory garbage now no longer maps empty strings to zero.

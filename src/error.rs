@@ -35,4 +35,26 @@ pub enum Error {
         max_bytes_per_batch: usize,
         bytes_per_row: usize,
     },
+    /// We use UTF-16 encoding on windows by default. Since UTF-8 locals on windows system can not
+    /// be expected to be the default. Since we use wide methods the ODBC standard demands the
+    /// encoding to be UTF-16.
+    #[cfg(target_os = "windows")]
+    #[error(
+        "Expected the database to return UTF-16, yet what came back was not valid UTF-16. Precise \
+        encoding error: {source}. This is likely a bug in your ODBC driver not supporting wide \
+        method calls correctly."
+    )]
+    EncodingInvalid { source: std::char::DecodeUtf16Error },
+    /// We expect UTF-8 to be the default on non-windows platforms. Yet still some systems are
+    /// configured different.
+    #[cfg(not(target_os = "windows"))]
+    #[error(
+        "Expected the database to return UTF-8, yet what came back was not valid UTF-8. According \
+        to the ODBC standard the encoding is specified by your system locale. So you may want to \
+        check your environment and whether it specifies to use an UTF-8 charset. However it is \
+        worth noting that drivers take some liberty with the interpretation. Your connection \
+        string and other configurations specific to your database may also influence client side \
+        encoding. Precise encoding error: {source}".
+    )]
+    EncodingInvalid { source: std::string::FromUtf8Error },
 }
