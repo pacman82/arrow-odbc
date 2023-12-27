@@ -54,7 +54,7 @@ pub enum Error {
         check your environment and whether it specifies to use an UTF-8 charset. However it is \
         worth noting that drivers take some liberty with the interpretation. Your connection \
         string and other configurations specific to your database may also influence client side \
-        encoding. Precise encoding error: {source}".
+        encoding. Precise encoding error: {source}"
     )]
     EncodingInvalid { source: std::string::FromUtf8Error },
 }
