@@ -129,9 +129,6 @@ pub enum WriterError {
         source: odbc_api::Error,
         sql: String,
     },
-    #[deprecated(note = "Use Variant UnsupportedArrowDataType instead")]
-    #[error("Inserting arrays with timestamp information is currently not supported.")]
-    TimeZonesNotSupported,
 }
 
 /// Inserts batches from an [`arrow::record_batch::RecordBatchReader`] into a database.

@@ -12,7 +12,7 @@ use arrow::{
 use log::debug;
 use odbc_api::{
     buffers::{AnySlice, BufferDesc, Item},
-    Bit, DataType as OdbcDataType, ResultSetMetadata, Quirks,
+    Bit, DataType as OdbcDataType, Quirks, ResultSetMetadata,
 };
 use thiserror::Error;
 

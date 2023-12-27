@@ -40,7 +40,7 @@ use super::{odbc_batch_stream::OdbcBatchStream, to_record_batch::ToRecordBatch};
 ///         CONNECTION_STRING,
 ///         ConnectionOptions::default()
 ///     )?;
-/// 
+///
 ///     // Query knowledge about deviations of this driver from the ODBC standard
 ///     let quirks = Quirks::from_dbms_name(&connection.database_management_system_name()?);
 ///
@@ -78,153 +78,6 @@ pub struct OdbcReader<C: Cursor> {
 }
 
 impl<C: Cursor> OdbcReader<C> {
-    #[deprecated(since = "2.3.0", note = "use OdbcReaderBuilder instead")]
-    /// Construct a new `OdbcReader` instance. This constructor infers the Arrow schema from the
-    /// metadata of the cursor. If you want to set it explicitly use [`Self::with_arrow_schema`].
-    ///
-    /// # Parameters
-    ///
-    /// * `cursor`: ODBC cursor used to fetch batches from the data source. The constructor will
-    ///   bind buffers to this cursor in order to perform bulk fetches from the source. This is
-    ///   usually faster than fetching results row by row as it saves roundtrips to the database.
-    ///   The type of these buffers will be inferred from the arrow schema. Not every arrow type is
-    ///   supported though.
-    /// * `max_batch_size`: Maximum batch size requested from the datasource.
-    pub fn new(cursor: C, max_batch_size: usize) -> Result<Self, Error> {
-        OdbcReaderBuilder::new()
-            .with_max_bytes_per_batch(usize::MAX)
-            .with_max_num_rows_per_batch(max_batch_size)
-            .build(cursor)
-    }
-
-    #[deprecated(since = "2.3.0", note = "use OdbcReaderBuilder instead")]
-    /// Construct a new `OdbcReader instance.
-    ///
-    /// # Parameters
-    ///
-    /// * `cursor`: ODBC cursor used to fetch batches from the data source. The constructor will
-    ///   bind buffers to this cursor in order to perform bulk fetches from the source. This is
-    ///   usually faster than fetching results row by row as it saves roundtrips to the database.
-    ///   The type of these buffers will be inferred from the arrow schema. Not every arrow type is
-    ///   supported though.
-    /// * `max_batch_size`: Maximum batch size requested from the datasource.
-    /// * `schema`: Arrow schema. Describes the type of the Arrow Arrays in the record batches, but
-    ///    is also used to determine CData type requested from the data source.
-    pub fn with_arrow_schema(
-        cursor: C,
-        max_batch_size: usize,
-        schema: SchemaRef,
-    ) -> Result<Self, Error> {
-        OdbcReaderBuilder::new()
-            .with_max_bytes_per_batch(usize::MAX)
-            .with_max_num_rows_per_batch(max_batch_size)
-            .with_schema(schema)
-            .build(cursor)
-    }
-
-    #[deprecated(since = "2.3.0", note = "use OdbcReaderBuilder instead")]
-    /// Construct a new [`crate::OdbcReader`] instance. This method allows you full control over
-    /// what options to explicitly specify, and what options you want to leave to this crate to
-    /// automatically decide.
-    ///
-    /// # Parameters
-    ///
-    /// * `cursor`: ODBC cursor used to fetch batches from the data source. The constructor will
-    ///   bind buffers to this cursor in order to perform bulk fetches from the source. This is
-    ///   usually faster than fetching results row by row as it saves roundtrips to the database.
-    ///   The type of these buffers will be inferred from the arrow schema. Not every arrow type is
-    ///   supported though.
-    /// * `max_batch_size`: Maximum batch size requested from the datasource.
-    /// * `schema`: Arrow schema. Describes the type of the Arrow Arrays in the record batches, but
-    ///    is also used to determine CData type requested from the data source. Set to `None` to
-    ///    infer schema from the data source.
-    /// * `buffer_allocation_options`: Allows you to specify upper limits for binary and / or text
-    ///    buffer types. This is useful support fetching data from e.g. VARCHAR(max) or
-    ///    VARBINARY(max) columns, which otherwise might lead to errors, due to the ODBC driver
-    ///    having a hard time specifying a good upper bound for the largest possible expected value.
-    ///
-    /// # Example
-    ///
-    /// You can use this constructor to specify an upper bound for variadic sized columns.
-    ///
-    /// ```no_run
-    /// use arrow_odbc::{
-    ///     odbc_api::{Environment, ConnectionOptions},
-    ///     OdbcReader,
-    ///     BufferAllocationOptions
-    /// };
-    ///
-    /// const CONNECTION_STRING: &str = "\
-    ///     Driver={ODBC Driver 17 for SQL Server};\
-    ///     Server=localhost;\
-    ///     UID=SA;\
-    ///     PWD=My@Test@Password1;\
-    /// ";
-    ///
-    /// fn main() -> Result<(), anyhow::Error> {
-    ///
-    ///     let odbc_environment = Environment::new()?;
-    ///     
-    ///     // Connect with database.
-    ///     let connection = odbc_environment.connect_with_connection_string(
-    ///         CONNECTION_STRING,
-    ///         ConnectionOptions::default()
-    ///     )?;
-    ///
-    ///     // This SQL statement does not require any arguments.
-    ///     let parameters = ();
-    ///
-    ///     // Execute query and create result set
-    ///     let cursor = connection
-    ///         .execute("SELECT * FROM MyTable", parameters)?
-    ///         .expect("SELECT statement must produce a cursor");
-    ///
-    ///     // Each batch shall only consist of maximum 10.000 rows.
-    ///     let max_batch_size = 10_000;
-    ///
-    ///     // Read result set as arrow batches. Infer Arrow types automatically using the meta
-    ///     // information of `cursor`.
-    ///     let arrow_record_batches = OdbcReader::with(
-    ///         cursor,
-    ///         max_batch_size,
-    ///         None,
-    ///         BufferAllocationOptions {
-    ///             // Limit max text size of variadic fields in case the database schema
-    ///             // information states something ridicoulisly large.
-    ///             max_text_size: Some(4096),
-    ///             ..BufferAllocationOptions::default()
-    ///         }
-    ///     )?;
-    ///
-    ///     for batch in arrow_record_batches {
-    ///         // ... process batch ...
-    ///     }
-    ///     Ok(())
-    /// }
-    /// ```
-    pub fn with(
-        cursor: C,
-        max_batch_size: usize,
-        schema: Option<SchemaRef>,
-        buffer_allocation_options: BufferAllocationOptions,
-    ) -> Result<Self, Error> {
-        let mut builder = OdbcReaderBuilder::new();
-        builder
-            .with_max_bytes_per_batch(usize::MAX)
-            .with_max_num_rows_per_batch(max_batch_size)
-            .with_fallibale_allocations(buffer_allocation_options.fallibale_allocations);
-        if let Some(schema) = schema {
-            builder.with_schema(schema);
-        }
-        if let Some(max_text_size) = buffer_allocation_options.max_text_size {
-            builder.with_max_text_size(max_text_size);
-        }
-        if let Some(max_binary_size) = buffer_allocation_options.max_binary_size {
-            builder.with_max_binary_size(max_binary_size);
-        }
-        builder.build(cursor)
-    }
-
     /// Consume this instance to create a similar ODBC reader which fetches batches asynchronously.
     ///
     /// Steals all resources from this [`OdbcReader`] instance, and allocates another buffer for
@@ -469,7 +322,7 @@ impl OdbcReaderBuilder {
 
     /// Shims are workarounds which can make arrow ODBC use different implementations in order to
     /// compensate for ODBC drivers which violate the ODBC specification.
-    /// 
+    ///
     /// This crate currently has a workaround drivers which return memory garbage instead of
     /// indicators if bulk fetching variadic columns.
     pub fn with_shims(&mut self, quirks: Quirks) -> &mut Self {

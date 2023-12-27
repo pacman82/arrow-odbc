@@ -308,11 +308,7 @@ fn fetch_varchar() {
 #[test]
 fn fetch_varchar_using_terminating_zeroes_to_indicate_string_length() {
     let table_name = function_name!().rsplit_once(':').unwrap().1;
-    let cursor = cursor_over(
-        table_name,
-        "VARCHAR(50)",
-        "('Hello'),('Bonjour'),(NULL)",
-    );
+    let cursor = cursor_over(table_name, "VARCHAR(50)", "('Hello'),('Bonjour'),(NULL)");
 
     let mut quirks = Quirks::new();
     quirks.indicators_returned_from_bulk_fetch_are_memory_garbage = true;

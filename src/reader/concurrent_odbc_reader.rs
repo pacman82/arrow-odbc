@@ -11,12 +11,10 @@ use arrow::{
 };
 use odbc_api::{buffers::ColumnarAnyBuffer, BlockCursor, Cursor};
 
-use crate::{BufferAllocationOptions, Error, OdbcReader};
+use crate::Error;
 
 use super::{
-    odbc_batch_stream::OdbcBatchStream,
-    odbc_reader::{next, OdbcReaderBuilder},
-    to_record_batch::ToRecordBatch,
+    odbc_batch_stream::OdbcBatchStream, odbc_reader::next, to_record_batch::ToRecordBatch,
 };
 
 /// Arrow ODBC reader. Implements the [`arrow::record_batch::RecordBatchReader`] trait so it can be
@@ -83,95 +81,6 @@ pub struct ConcurrentOdbcReader<C: Cursor> {
 }
 
 impl<C: Cursor + Send + 'static> ConcurrentOdbcReader<C> {
-    #[deprecated(since = "2.2.0", note = "use OdbcReader::into_concurrent instead")]
-    /// This constructor infers the Arrow schema from the metadata of the cursor. If you want to set
-    /// it explicitly use [`Self::with_arrow_schema`].
-    ///
-    /// # Parameters
-    ///
-    /// * `cursor`: ODBC cursor used to fetch batches from the data source. The constructor will
-    ///   bind buffers to this cursor in order to perform bulk fetches from the source. This is
-    ///   usually faster than fetching results row by row as it saves roundtrips to the database.
-    ///   The type of these buffers will be inferred from the arrow schema. Not every arrow type is
-    ///   supported though.
-    /// * `max_batch_size`: Maximum batch size requested from the datasource.
-    pub fn new(cursor: C, max_batch_size: usize) -> Result<Self, Error> {
-        OdbcReaderBuilder::new()
-            .with_max_bytes_per_batch(usize::MAX)
-            .with_max_num_rows_per_batch(max_batch_size)
-            .build(cursor)
-            .and_then(OdbcReader::into_concurrent)
-    }
-
-    #[deprecated(since = "2.2.0", note = "use OdbcReader::into_concurrent instead")]
-    /// Construct a new [`crate::ConcurrentOdbcReader`] instance.
-    ///
-    /// # Parameters
-    ///
-    /// * `cursor`: ODBC cursor used to fetch batches from the data source. The constructor will
-    ///   bind buffers to this cursor in order to perform bulk fetches from the source. This is
-    ///   usually faster than fetching results row by row as it saves roundtrips to the database.
-    ///   The type of these buffers will be inferred from the arrow schema. Not every arrow type is
-    ///   supported though.
-    /// * `max_batch_size`: Maximum batch size requested from the datasource.
-    /// * `schema`: Arrow schema. Describes the type of the Arrow Arrays in the record batches, but
-    ///    is also used to determine CData type requested from the data source.
-    pub fn with_arrow_schema(
-        cursor: C,
-        max_batch_size: usize,
-        schema: SchemaRef,
-    ) -> Result<Self, Error> {
-        OdbcReaderBuilder::new()
-            .with_max_bytes_per_batch(usize::MAX)
-            .with_max_num_rows_per_batch(max_batch_size)
-            .with_schema(schema)
-            .build(cursor)
-            .and_then(OdbcReader::into_concurrent)
-    }
-
-    #[deprecated(since = "2.2.0", note = "use OdbcReader::into_concurrent instead")]
-    /// Construct a new [`crate::ConcurrentOdbcReader`] instance. This method allows you full
-    /// control over what options to explicitly specify, and what options you want to leave to this
-    /// crate to automatically decide.
-    ///
-    /// # Parameters
-    ///
-    /// * `cursor`: ODBC cursor used to fetch batches from the data source. The constructor will
-    ///   bind buffers to this cursor in order to perform bulk fetches from the source. This is
-    ///   usually faster than fetching results row by row as it saves roundtrips to the database.
-    ///   The type of these buffers will be inferred from the arrow schema. Not every arrow type is
-    ///   supported though.
-    /// * `max_batch_size`: Maximum batch size requested from the datasource.
-    /// * `schema`: Arrow schema. Describes the type of the Arrow Arrays in the record batches, but
-    ///    is also used to determine CData type requested from the data source. Set to `None` to
-    ///    infer schema from the data source.
-    /// * `buffer_allocation_options`: Allows you to specify upper limits for binary and / or text
-    ///    buffer types. This is useful support fetching data from e.g. VARCHAR(max) or
-    ///    VARBINARY(max) columns, which otherwise might lead to errors, due to the ODBC driver
-    ///    having a hard time specifying a good upper bound for the largest possible expected value.
-    pub fn with(
-        cursor: C,
-        max_batch_size: usize,
-        schema: Option<SchemaRef>,
-        buffer_allocation_options: BufferAllocationOptions,
-    ) -> Result<Self, Error> {
-        let mut builder = OdbcReaderBuilder::new();
-        builder
-            .with_max_num_rows_per_batch(max_batch_size)
-            .with_max_bytes_per_batch(usize::MAX)
-            .with_fallibale_allocations(buffer_allocation_options.fallibale_allocations);
-        if let Some(schema) = schema {
-            builder.with_schema(schema);
-        }
-        if let Some(max_text_size) = buffer_allocation_options.max_text_size {
-            builder.with_max_text_size(max_text_size);
-        }
-        if let Some(max_binary_size) = buffer_allocation_options.max_binary_size {
-            builder.with_max_binary_size(max_binary_size);
-        }
-        builder.build(cursor)?.into_concurrent()
-    }
-
     /// The schema implied by `block_cursor` and `converter` must match. Invariant is hard to check
     /// in type system, keep this constructor private to this crate. Users should use
     /// [`crate::OdbcReader::into_concurrent`] instead.
