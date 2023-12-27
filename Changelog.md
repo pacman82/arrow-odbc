@@ -2,6 +2,7 @@
 
 ## 5.0.0
 
+* Fixes a panic which occurred if database returned column names with invalid encodings.
 * Introduces new `Error` variant `EncodingInvalid`, which is returned in case a column name can not be interpreted as UTF-16 on windows platforms or UTF-8 on non-windows platforms.
 * Removes deprecated `WriteError::TimeZoneNotSupported`, `OdbcConcurrentReader::new`, `OdbcConcurrentReader::with_arrow_schema`, `OdbcConcurrentReader::with`, `OdbcReader::new`, `OdbcReader::with_arrow_schema`, `OdbcReader::with`.
 
