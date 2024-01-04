@@ -114,7 +114,9 @@ where
     type Item = Result<RecordBatch, ArrowError>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        next(&mut self.batch_stream, &mut self.converter)
+        next(&mut self.batch_stream, |odbc_buffer| {
+            self.converter.buffer_to_record_batch(odbc_buffer)
+        })
     }
 }
 

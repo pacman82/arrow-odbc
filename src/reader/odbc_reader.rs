@@ -9,7 +9,7 @@ use odbc_api::{buffers::ColumnarAnyBuffer, BlockCursor, Cursor, Quirks};
 
 use crate::{BufferAllocationOptions, ConcurrentOdbcReader, Error};
 
-use super::{odbc_batch_stream::OdbcBatchStream, to_record_batch::ToRecordBatch};
+use super::{odbc_batch_stream::OdbcBatchStream, to_record_batch::ToRecordBatch, MappingError};
 
 /// Arrow ODBC reader. Implements the [`arrow::record_batch::RecordBatchReader`] trait so it can be
 /// used to fill Arrow arrays from an ODBC data source.
@@ -169,7 +169,9 @@ where
     type Item = Result<RecordBatch, ArrowError>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        next(&mut self.batch_stream, &mut self.converter)
+        next(&mut self.batch_stream, |odbc_buffer| {
+            self.converter.buffer_to_record_batch(odbc_buffer)
+        })
     }
 }
 
@@ -184,14 +186,13 @@ where
 
 pub fn next(
     batch_stream: &mut impl OdbcBatchStream,
-    converter: &mut ToRecordBatch,
+    mut buffer_to_record_batch: impl FnMut(&ColumnarAnyBuffer) -> Result<RecordBatch, MappingError>,
 ) -> Option<Result<RecordBatch, ArrowError>> {
     match batch_stream.next() {
         // We successfully fetched a batch from the database. Try to copy it into a record batch
         // and forward errors if any.
         Ok(Some(batch)) => {
-            let result_record_batch = converter
-                .buffer_to_record_batch(batch)
+            let result_record_batch = buffer_to_record_batch(batch)
                 .map_err(|mapping_error| ArrowError::ExternalError(Box::new(mapping_error)));
             Some(result_record_batch)
         }
