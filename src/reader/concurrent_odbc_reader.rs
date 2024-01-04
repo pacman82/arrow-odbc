@@ -238,8 +238,6 @@ where
 }
 
 impl<C> OdbcBatchStream for ConcurrentBlockCursor<C> {
-    type Cursor = C;
-
     fn next(&mut self) -> Result<Option<&ColumnarAnyBuffer>, odbc_api::Error> {
         match self.receive_batch.recv() {
             // We successfully fetched a batch from the database.
