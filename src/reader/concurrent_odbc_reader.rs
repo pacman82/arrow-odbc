@@ -9,7 +9,7 @@ use crate::Error;
 
 use super::{
     concurrent_odbc_block_cursor::ConcurrentBlockCursor, odbc_reader::next,
-    to_record_batch::ToRecordBatch, MappingError,
+    to_record_batch::ToRecordBatch, concurrent_converter::ConcurrentConverter,
 };
 
 /// Arrow ODBC reader. Implements the [`arrow::record_batch::RecordBatchReader`] trait so it can be
@@ -127,26 +127,5 @@ where
 {
     fn schema(&self) -> SchemaRef {
         self.converter.schema().clone()
-    }
-}
-
-struct ConcurrentConverter {
-    converter: ToRecordBatch,
-}
-
-impl ConcurrentConverter {
-    pub fn new(converter: ToRecordBatch) -> Self {
-        Self { converter }
-    }
-
-    pub fn schema(&self) -> SchemaRef {
-        self.converter.schema().clone()
-    }
-
-    pub fn buffer_to_record_batch(
-        &self,
-        odbc_buffer: &ColumnarAnyBuffer,
-    ) -> Result<RecordBatch, MappingError> {
-        self.converter.buffer_to_record_batch(odbc_buffer)
     }
 }
