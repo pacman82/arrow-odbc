@@ -8,8 +8,8 @@ use odbc_api::{buffers::ColumnarAnyBuffer, BlockCursor, Cursor};
 use crate::Error;
 
 use super::{
-    concurrent_odbc_block_cursor::ConcurrentBlockCursor, odbc_reader::next,
-    to_record_batch::ToRecordBatch,
+    concurrent_converter::ConcurrentConverter, concurrent_odbc_block_cursor::ConcurrentBlockCursor,
+    odbc_reader::next, to_record_batch::ToRecordBatch,
 };
 
 /// Arrow ODBC reader. Implements the [`arrow::record_batch::RecordBatchReader`] trait so it can be
@@ -69,7 +69,7 @@ use super::{
 /// ```
 pub struct ConcurrentOdbcReader<C: Cursor> {
     /// Converts the content of ODBC buffers into Arrow record batches
-    converter: ToRecordBatch,
+    converter: ConcurrentConverter,
     /// Fetches values from the ODBC datasource using columnar batches. Values are streamed batch
     /// by batch in order to avoid reallocation of the buffers used for tranistion.
     batch_stream: ConcurrentBlockCursor<C>,
@@ -87,6 +87,7 @@ impl<C: Cursor + Send + 'static> ConcurrentOdbcReader<C> {
         let max_batch_size = block_cursor.row_array_size();
         let make_buffer = || converter.allocate_buffer(max_batch_size, fallibale_allocations);
         let batch_stream = ConcurrentBlockCursor::new(block_cursor, make_buffer)?;
+        let converter = ConcurrentConverter { converter };
 
         Ok(Self {
             converter,
@@ -114,7 +115,7 @@ where
     type Item = Result<RecordBatch, ArrowError>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        next(&mut self.batch_stream, &mut self.converter)
+        next(&mut self.batch_stream, &mut self.converter.converter)
     }
 }
 
@@ -123,6 +124,6 @@ where
     C: Cursor,
 {
     fn schema(&self) -> SchemaRef {
-        self.converter.schema().clone()
+        self.converter.converter.schema().clone()
     }
 }
