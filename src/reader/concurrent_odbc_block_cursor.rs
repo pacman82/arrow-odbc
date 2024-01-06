@@ -38,9 +38,7 @@ where
     /// * `block_cursor`: Taking a BlockCursor instead of a Cursor allows for better resource
     ///   stealing if constructing starting from a sequential Cursor, as we do not need to undbind
     ///   and bind the cursor.
-    pub fn new(
-        block_cursor: BlockCursor<C, ColumnarAnyBuffer>,
-    ) -> Result<Self, Error> {
+    pub fn new(block_cursor: BlockCursor<C, ColumnarAnyBuffer>) -> Result<Self, Error> {
         let (send_buffer, receive_buffer) = sync_channel(1);
         let (send_batch, receive_batch) = sync_channel(1);
 
@@ -107,9 +105,9 @@ where
 impl<C> ConcurrentBlockCursor<C> {
     /// Fetches values from the ODBC datasource into buffer. Values are streamed batch by batch in
     /// order to avoid reallocation of the buffers used for tranistion.
-    /// 
+    ///
     /// # Return
-    /// 
+    ///
     /// * `true`: Fetched a batch from the data source. The contents of that batch are now in
     ///   `buffer`.
     /// * `false`: No batch could be fetched. The result set is consumed completly.

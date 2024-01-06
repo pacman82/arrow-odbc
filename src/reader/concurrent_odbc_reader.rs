@@ -72,7 +72,12 @@ pub struct ConcurrentOdbcReader<C: Cursor> {
     /// the Cursor. This is the buffer which is unbound and read by the application to fill the
     /// arrow arrays. After being read we will reuse the buffer and bind it to the cursor in order
     /// to safe allocations.
-    buffer: ColumnarAnyBuffer,
+    ///
+    /// If the application is currently blocked by waiting for the next batch from the data source
+    /// this is `Some`. During times there conversion from ODBC to Arrow is happening one Buffer
+    /// will be bound to the Cursor, the other will be owned by the conversion thread. So this is
+    /// `None`, since no buffer is remaining of the two which there are in total.
+    buffer: Option<ColumnarAnyBuffer>,
     /// Converts the content of ODBC buffers into Arrow record batches
     converter: ConcurrentConverter,
     /// Fetches values from the ODBC datasource using columnar batches. Values are streamed batch
@@ -94,9 +99,9 @@ impl<C: Cursor + Send + 'static> ConcurrentOdbcReader<C> {
         // Note that we delay buffer allocation until after the fetch thread has started and we
         // start fetching the first row group concurrently as early, not waiting for the buffer
         // allocation to go through.
-        let buffer = converter.allocate_buffer(max_batch_size, fallibale_allocations)?;
+        let buffer = Some(converter.allocate_buffer(max_batch_size, fallibale_allocations)?);
         let converter = ConcurrentConverter::new(converter);
-        
+
         Ok(Self {
             buffer,
             converter,
@@ -124,13 +129,13 @@ where
     type Item = Result<RecordBatch, ArrowError>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        match self.batch_stream.fetch_into(&mut self.buffer) {
+        match self.batch_stream.fetch_into(self.buffer.as_mut().unwrap()) {
             // We successfully fetched a batch from the database. Try to copy it into a record batch
             // and forward errors if any.
             Ok(true) => {
                 let result_record_batch = self
                     .converter
-                    .buffer_to_record_batch(&self.buffer)
+                    .buffer_to_record_batch(self.buffer.as_mut().unwrap())
                     .map_err(|mapping_error| ArrowError::ExternalError(Box::new(mapping_error)));
                 Some(result_record_batch)
             }
