@@ -9,8 +9,6 @@ use odbc_api::{buffers::ColumnarAnyBuffer, BlockCursor, Cursor};
 use crate::Error;
 
 pub struct ConcurrentBlockCursor<C> {
-    /// We currently only borrow these buffers to the converter, so we take ownership of them here.
-    buffer: ColumnarAnyBuffer,
     /// In order to avoid reallocating buffers over and over again, we use this channel to send the
     /// buffers back to the fetch thread after we copied their contents into arrow arrays.
     send_buffer: SyncSender<ColumnarAnyBuffer>,
@@ -40,12 +38,8 @@ where
     /// * `block_cursor`: Taking a BlockCursor instead of a Cursor allows for better resource
     ///   stealing if constructing starting from a sequential Cursor, as we do not need to undbind
     ///   and bind the cursor.
-    /// * `lazy_buffer`: Constructor for a buffer holding the fetched row group. We want to
-    ///   construct it lazy, so we can delay its allocation until after the fetch thread has started
-    ///   and we can start fetching the first row group concurrently as earlier.
     pub fn new(
         block_cursor: BlockCursor<C, ColumnarAnyBuffer>,
-        lazy_buffer: impl FnOnce() -> Result<ColumnarAnyBuffer, Error>,
     ) -> Result<Self, Error> {
         let (send_buffer, receive_buffer) = sync_channel(1);
         let (send_batch, receive_batch) = sync_channel(1);
@@ -88,10 +82,7 @@ where
             }
         });
 
-        let buffer = lazy_buffer()?;
-
         Ok(Self {
-            buffer,
             send_buffer,
             receive_batch,
             fetch_thread: Some(fetch_thread),
@@ -114,15 +105,21 @@ where
 }
 
 impl<C> ConcurrentBlockCursor<C> {
-    /// Fetches values from the ODBC datasource using columnar batches. Values are streamed batch by
-    /// batch in order to avoid reallocation of the buffers used for tranistion.
-    pub fn next(&mut self) -> Result<Option<&ColumnarAnyBuffer>, odbc_api::Error> {
+    /// Fetches values from the ODBC datasource into buffer. Values are streamed batch by batch in
+    /// order to avoid reallocation of the buffers used for tranistion.
+    /// 
+    /// # Return
+    /// 
+    /// * `true`: Fetched a batch from the data source. The contents of that batch are now in
+    ///   `buffer`.
+    /// * `false`: No batch could be fetched. The result set is consumed completly.
+    pub fn fetch_into(&mut self, buffer: &mut ColumnarAnyBuffer) -> Result<bool, odbc_api::Error> {
         match self.receive_batch.recv() {
             // We successfully fetched a batch from the database.
             Ok(mut batch) => {
-                swap(&mut self.buffer, &mut batch);
+                swap(buffer, &mut batch);
                 let _ = self.send_buffer.send(batch);
-                Ok(Some(&self.buffer))
+                Ok(true)
             }
             // Fetch thread stopped sending batches. Either because we consumed the result set
             // completly or we hit an error.
@@ -132,11 +129,11 @@ impl<C> ConcurrentBlockCursor<C> {
                     // will raise it.
                     self.cursor = Some(join_handle.join().unwrap()?);
                     // We ran out of batches in the result set. End the stream.
-                    Ok(None)
+                    Ok(false)
                 } else {
                     // This only happen if `next` is called after it returned either a `None` or
                     // `Err` once. Let us just answer with `None`.
-                    Ok(None)
+                    Ok(false)
                 }
             }
         }

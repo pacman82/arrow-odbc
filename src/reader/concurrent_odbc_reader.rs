@@ -68,6 +68,11 @@ use super::{
 /// }
 /// ```
 pub struct ConcurrentOdbcReader<C: Cursor> {
+    /// We fill the buffers using ODBC concurrently. The buffer currently being filled is bound to
+    /// the Cursor. This is the buffer which is unbound and read by the application to fill the
+    /// arrow arrays. After being read we will reuse the buffer and bind it to the cursor in order
+    /// to safe allocations.
+    buffer: ColumnarAnyBuffer,
     /// Converts the content of ODBC buffers into Arrow record batches
     converter: ConcurrentConverter,
     /// Fetches values from the ODBC datasource using columnar batches. Values are streamed batch
@@ -85,11 +90,15 @@ impl<C: Cursor + Send + 'static> ConcurrentOdbcReader<C> {
         fallibale_allocations: bool,
     ) -> Result<Self, Error> {
         let max_batch_size = block_cursor.row_array_size();
-        let make_buffer = || converter.allocate_buffer(max_batch_size, fallibale_allocations);
-        let batch_stream = ConcurrentBlockCursor::new(block_cursor, make_buffer)?;
+        let batch_stream = ConcurrentBlockCursor::new(block_cursor)?;
+        // Note that we delay buffer allocation until after the fetch thread has started and we
+        // start fetching the first row group concurrently as early, not waiting for the buffer
+        // allocation to go through.
+        let buffer = converter.allocate_buffer(max_batch_size, fallibale_allocations)?;
         let converter = ConcurrentConverter::new(converter);
-
+        
         Ok(Self {
+            buffer,
             converter,
             batch_stream,
         })
@@ -115,18 +124,18 @@ where
     type Item = Result<RecordBatch, ArrowError>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        match self.batch_stream.next() {
+        match self.batch_stream.fetch_into(&mut self.buffer) {
             // We successfully fetched a batch from the database. Try to copy it into a record batch
             // and forward errors if any.
-            Ok(Some(batch)) => {
+            Ok(true) => {
                 let result_record_batch = self
                     .converter
-                    .buffer_to_record_batch(batch)
+                    .buffer_to_record_batch(&self.buffer)
                     .map_err(|mapping_error| ArrowError::ExternalError(Box::new(mapping_error)));
                 Some(result_record_batch)
             }
             // We ran out of batches in the result set. End the iterator.
-            Ok(None) => None,
+            Ok(false) => None,
             // We had an error fetching the next batch from the database, let's report it as an
             // external error.
             Err(odbc_error) => Some(Err(ArrowError::ExternalError(Box::new(odbc_error)))),
