@@ -8,8 +8,6 @@ use odbc_api::{buffers::ColumnarAnyBuffer, BlockCursor, Cursor};
 
 use crate::Error;
 
-use super::odbc_batch_stream::OdbcBatchStream;
-
 pub struct ConcurrentBlockCursor<C> {
     /// We currently only borrow these buffers to the converter, so we take ownership of them here.
     buffer: ColumnarAnyBuffer,
@@ -115,8 +113,10 @@ where
     }
 }
 
-impl<C> OdbcBatchStream for ConcurrentBlockCursor<C> {
-    fn next(&mut self) -> Result<Option<&ColumnarAnyBuffer>, odbc_api::Error> {
+impl<C> ConcurrentBlockCursor<C> {
+    /// Fetches values from the ODBC datasource using columnar batches. Values are streamed batch by
+    /// batch in order to avoid reallocation of the buffers used for tranistion.
+    pub fn next(&mut self) -> Result<Option<&ColumnarAnyBuffer>, odbc_api::Error> {
         match self.receive_batch.recv() {
             // We successfully fetched a batch from the database.
             Ok(mut batch) => {

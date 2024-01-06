@@ -22,7 +22,6 @@ mod concurrent_odbc_block_cursor;
 mod concurrent_odbc_reader;
 mod decimal;
 mod map_odbc_to_arrow;
-mod odbc_batch_stream;
 mod odbc_reader;
 mod text;
 mod to_record_batch;

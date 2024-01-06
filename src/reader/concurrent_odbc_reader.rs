@@ -8,8 +8,8 @@ use odbc_api::{buffers::ColumnarAnyBuffer, BlockCursor, Cursor};
 use crate::Error;
 
 use super::{
-    concurrent_odbc_block_cursor::ConcurrentBlockCursor,
-    to_record_batch::ToRecordBatch, concurrent_converter::ConcurrentConverter, odbc_batch_stream::OdbcBatchStream,
+    concurrent_converter::ConcurrentConverter, concurrent_odbc_block_cursor::ConcurrentBlockCursor,
+    to_record_batch::ToRecordBatch,
 };
 
 /// Arrow ODBC reader. Implements the [`arrow::record_batch::RecordBatchReader`] trait so it can be
@@ -119,7 +119,9 @@ where
             // We successfully fetched a batch from the database. Try to copy it into a record batch
             // and forward errors if any.
             Ok(Some(batch)) => {
-                let result_record_batch = self.converter.buffer_to_record_batch(batch)
+                let result_record_batch = self
+                    .converter
+                    .buffer_to_record_batch(batch)
                     .map_err(|mapping_error| ArrowError::ExternalError(Box::new(mapping_error)));
                 Some(result_record_batch)
             }

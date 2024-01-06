@@ -9,7 +9,7 @@ use odbc_api::{buffers::ColumnarAnyBuffer, BlockCursor, Cursor, Quirks};
 
 use crate::{BufferAllocationOptions, ConcurrentOdbcReader, Error};
 
-use super::{odbc_batch_stream::OdbcBatchStream, to_record_batch::ToRecordBatch};
+use super::to_record_batch::ToRecordBatch;
 
 /// Arrow ODBC reader. Implements the [`arrow::record_batch::RecordBatchReader`] trait so it can be
 /// used to fill Arrow arrays from an ODBC data source.
@@ -169,7 +169,7 @@ where
     type Item = Result<RecordBatch, ArrowError>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        match self.batch_stream.next() {
+        match self.batch_stream.fetch_with_truncation_check(true) {
             // We successfully fetched a batch from the database. Try to copy it into a record batch
             // and forward errors if any.
             Ok(Some(batch)) => {
