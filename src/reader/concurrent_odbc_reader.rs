@@ -8,8 +8,8 @@ use odbc_api::{buffers::ColumnarAnyBuffer, BlockCursor, Cursor};
 use crate::Error;
 
 use super::{
-    concurrent_odbc_block_cursor::ConcurrentBlockCursor, odbc_reader::next,
-    to_record_batch::ToRecordBatch, concurrent_converter::ConcurrentConverter,
+    concurrent_odbc_block_cursor::ConcurrentBlockCursor,
+    to_record_batch::ToRecordBatch, concurrent_converter::ConcurrentConverter, odbc_batch_stream::OdbcBatchStream,
 };
 
 /// Arrow ODBC reader. Implements the [`arrow::record_batch::RecordBatchReader`] trait so it can be
@@ -115,9 +115,20 @@ where
     type Item = Result<RecordBatch, ArrowError>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        next(&mut self.batch_stream, |odbc_buffer| {
-            self.converter.buffer_to_record_batch(odbc_buffer)
-        })
+        match self.batch_stream.next() {
+            // We successfully fetched a batch from the database. Try to copy it into a record batch
+            // and forward errors if any.
+            Ok(Some(batch)) => {
+                let result_record_batch = self.converter.buffer_to_record_batch(batch)
+                    .map_err(|mapping_error| ArrowError::ExternalError(Box::new(mapping_error)));
+                Some(result_record_batch)
+            }
+            // We ran out of batches in the result set. End the iterator.
+            Ok(None) => None,
+            // We had an error fetching the next batch from the database, let's report it as an
+            // external error.
+            Err(odbc_error) => Some(Err(ArrowError::ExternalError(Box::new(odbc_error)))),
+        }
     }
 }
 
