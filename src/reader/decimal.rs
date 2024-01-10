@@ -55,7 +55,7 @@ fn decimal_text_to_int(text: &[u8], buf_digits: &mut Vec<u8>) -> i128 {
     // robust, as it would also filter out seperators of thousands as well as the decimal point,
     // even if it is not actually a decimal point, but a comma (`,`). We still rely on all trailing
     // zeroes being present though.
-    buf_digits.extend(text.iter().filter(|&&c| c.is_ascii_digit()));
+    buf_digits.extend(text.iter().filter(|&&c| c.is_ascii_digit() || c == b'-'));
     let (num, _consumed) = i128::from_radix_10_signed(buf_digits);
     num
 }
@@ -74,5 +74,12 @@ mod tests {
         let mut buf_digits = Vec::new();
         let actual = decimal_text_to_int(b"10,00000", &mut buf_digits);
         assert_eq!(1000000, actual);
+    }
+
+    #[test]
+    fn negative_decimal() {
+        let mut buf_digits = Vec::new();
+        let actual = decimal_text_to_int(b"-10", &mut buf_digits);
+        assert_eq!(-10, actual);
     }
 }

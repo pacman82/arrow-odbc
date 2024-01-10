@@ -632,6 +632,29 @@ fn fetch_decimals() {
     assert_eq!("678.90", array_vals.value_as_string(1));
 }
 
+/// Fill a record batch of Decimals
+#[test]
+fn fetch_negative_decimal() {
+    // Given a cursor over a table with one decimal column
+    let table_name = function_name!().rsplit_once(':').unwrap().1;
+    let cursor = cursor_over(table_name, "DECIMAL(5,2) NOT NULL", "(-123.45)");
+
+    // When fetching it in batches of five
+    let mut reader = OdbcReaderBuilder::new()
+        .with_max_num_rows_per_batch(5)
+        .build(cursor)
+        .unwrap();
+    let record_batch = reader.next().unwrap().unwrap();
+
+    // Then the elements in the first column of the first batch must match the decimals in the
+    // database.
+    let column = record_batch.column(0).clone();
+    let array_vals = column.as_any().downcast_ref::<Decimal128Array>().unwrap();
+
+    // Assert that the correct values are found within the arrow batch
+    assert_eq!("-123.45", array_vals.value_as_string(0));
+}
+
 /// Fetch variable sized binary data binary data
 #[test]
 fn fetch_varbinary_data() {

@@ -1,5 +1,9 @@
 # Changelog
 
+## 5.0.2
+
+* Fixes a bug introduced in 5.0.1, causing negative decimals not to be parsed correctly and to be returned as non-negative values.
+
 ## 5.0.1
 
 * Decimal parsing logic is now more robust and also works if the decimal point is not an actual point but a `,`.
