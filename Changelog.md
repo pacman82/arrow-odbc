@@ -1,5 +1,9 @@
 # Changelog
 
+## 5.0.1
+
+* Decimal parsing logic is now more robust and also works if the decimal point is not an actual point but a `,`.
+
 ## 5.0.0
 
 * Fixes a panic which occurred if database returned column names with invalid encodings.
