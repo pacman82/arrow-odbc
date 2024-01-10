@@ -7,10 +7,7 @@ use odbc_api::{buffers::ColumnarAnyBuffer, BlockCursor, Cursor};
 
 use crate::Error;
 
-use super::{
-    concurrent_converter::ConcurrentConverter, concurrent_odbc_block_cursor::ConcurrentBlockCursor,
-    to_record_batch::ToRecordBatch,
-};
+use super::{concurrent_odbc_block_cursor::ConcurrentBlockCursor, to_record_batch::ToRecordBatch};
 
 /// Arrow ODBC reader. Implements the [`arrow::record_batch::RecordBatchReader`] trait so it can be
 /// used to fill Arrow arrays from an ODBC data source. Similar to [`crate::OdbcReader`], yet
@@ -74,7 +71,7 @@ pub struct ConcurrentOdbcReader<C: Cursor> {
     /// to safe allocations.
     buffer: ColumnarAnyBuffer,
     /// Converts the content of ODBC buffers into Arrow record batches
-    converter: ConcurrentConverter,
+    converter: ToRecordBatch,
     /// Fetches values from the ODBC datasource using columnar batches. Values are streamed batch
     /// by batch in order to avoid reallocation of the buffers used for tranistion.
     batch_stream: ConcurrentBlockCursor<C>,
@@ -95,8 +92,7 @@ impl<C: Cursor + Send + 'static> ConcurrentOdbcReader<C> {
         // start fetching the first row group concurrently as early, not waiting for the buffer
         // allocation to go through.
         let buffer = converter.allocate_buffer(max_batch_size, fallibale_allocations)?;
-        let converter = ConcurrentConverter::new(converter);
-        
+
         Ok(Self {
             buffer,
             converter,
