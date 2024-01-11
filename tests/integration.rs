@@ -632,7 +632,7 @@ fn fetch_decimals() {
     assert_eq!("678.90", array_vals.value_as_string(1));
 }
 
-/// Fill a record batch of Decimals
+/// Ensure we do not drop sign in Decimal parsing
 #[test]
 fn fetch_negative_decimal() {
     // Given a cursor over a table with one decimal column
