@@ -1,5 +1,9 @@
 # Changelog
 
+## 6.0.0
+
+* Update odbc-api `>= 4, < 5` ->  `>= 5, < 6`
+
 ## 5.0.3
 
 * Decimal parsing is now more robust. It does no longer require the text representation to have all trailing zeroes explicit in order to figure out the correct scale of the decimal. E.g. for a decimal with scale 5 a text representation of `10` would have been interpreted as `000.1` for scale five. Decimal parsing relied on databases making all trailing zeroes explicit e.g. `10.00000`. Oracle however does not do this, so parsing has been adopted to be more robust.
