@@ -1,5 +1,9 @@
 # Changelog
 
+## 6.1.0
+
+* Update arrow `>= 29, < 50` -> `>= 29, < 51`
+
 ## 6.0.0
 
 * Update odbc-api `>= 4, < 5` ->  `>= 5, < 6`
