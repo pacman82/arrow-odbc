@@ -58,5 +58,5 @@ stdext = "0.3.1"
 float_eq = "1.0.1"
 
 
-[target.'cfg(not(target_os = "windows"))'.features]
+[features]
 iodbc = ["odbc-api/iodbc"]
