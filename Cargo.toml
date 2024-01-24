@@ -30,15 +30,15 @@ readme = "Readme.md"
 
 [dependencies]
 arrow = { version = ">= 29, < 51", default-features = false }
-chrono = "0.4.31"
+chrono = "0.4.32"
 log = "0.4.20"
-thiserror = "1.0.49"
+thiserror = "1.0.56"
 
 # On windows we can not assume the default locale to be UTF-8, so we compile odbc-api with default
 # features implying the use of UTF-16 for queries, connection strings and error messages. This
 # should work on any system
 [target.'cfg(target_os = "windows")'.dependencies]
-odbc-api = ">= 5, < 6"
+odbc-api = ">= 5.1, < 6"
 
 # On linux we assume use of a UTF-8 locale. So we set the narrow features implying that for queries,
 # connection strings and error messages the driver and driver manager supply utf8-strings. This
@@ -47,10 +47,10 @@ odbc-api = ">= 5, < 6"
 # importantly, UTF-8 is likely to be more battled tested on these platforms, while UTF-16 is "only"
 # required by the standard.
 [target.'cfg(not(target_os = "windows"))'.dependencies]
-odbc-api = { version = ">= 5, < 6", features = ["narrow"] }
+odbc-api = { version = ">= 5.1, < 6", features = ["narrow"] }
 
 [dev-dependencies]
-anyhow = "1.0.75"
+anyhow = "1.0.79"
 # Used to share one ODBC environment in tests
 lazy_static = "1.4.0"
 # Function name macro is used to ensure unique table names in test

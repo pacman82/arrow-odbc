@@ -3,11 +3,11 @@ use arrow::{
     error::ArrowError,
     record_batch::{RecordBatch, RecordBatchReader},
 };
-use odbc_api::{buffers::ColumnarAnyBuffer, BlockCursor, Cursor};
+use odbc_api::{buffers::ColumnarAnyBuffer, BlockCursor, ConcurrentBlockCursor, Cursor};
 
 use crate::Error;
 
-use super::{concurrent_odbc_block_cursor::ConcurrentBlockCursor, to_record_batch::ToRecordBatch};
+use super::to_record_batch::ToRecordBatch;
 
 /// Arrow ODBC reader. Implements the [`arrow::record_batch::RecordBatchReader`] trait so it can be
 /// used to fill Arrow arrays from an ODBC data source. Similar to [`crate::OdbcReader`], yet
@@ -87,7 +87,8 @@ impl<C: Cursor + Send + 'static> ConcurrentOdbcReader<C> {
         fallibale_allocations: bool,
     ) -> Result<Self, Error> {
         let max_batch_size = block_cursor.row_array_size();
-        let batch_stream = ConcurrentBlockCursor::new(block_cursor)?;
+        let batch_stream = ConcurrentBlockCursor::from_block_cursor(block_cursor)
+            .expect("from_block_cursor is infalliable");
         // Note that we delay buffer allocation until after the fetch thread has started and we
         // start fetching the first row group concurrently as early, not waiting for the buffer
         // allocation to go through.
