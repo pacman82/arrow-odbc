@@ -62,7 +62,7 @@ fn narrow_text_strategy(
     if assume_indicators_are_memory_garbage {
         warn!(
             "Ignoring indicators, because we expect the ODBC driver of your database to return \
-            garbage memory. We can not distiguish between empty strings and NULL. Everything is \
+            garbage memory. We can not distinguish between empty strings and NULL. Everything is \
             empty."
         );
         Box::new(NarrowUseTerminatingZero::new(octet_len))
