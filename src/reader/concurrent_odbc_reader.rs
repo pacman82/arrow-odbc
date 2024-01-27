@@ -87,8 +87,7 @@ impl<C: Cursor + Send + 'static> ConcurrentOdbcReader<C> {
         fallibale_allocations: bool,
     ) -> Result<Self, Error> {
         let max_batch_size = block_cursor.row_array_size();
-        let batch_stream = ConcurrentBlockCursor::from_block_cursor(block_cursor)
-            .expect("from_block_cursor is infalliable");
+        let batch_stream = ConcurrentBlockCursor::from_block_cursor(block_cursor);
         // Note that we delay buffer allocation until after the fetch thread has started and we
         // start fetching the first row group concurrently as early, not waiting for the buffer
         // allocation to go through.

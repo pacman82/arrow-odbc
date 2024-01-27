@@ -1,8 +1,8 @@
 # Changelog
 
-## Next
+## 7.0.0
 
-* Update odbc-api `>= 5, < 6` ->  `>= 5.1, < 6`
+* Update odbc-api `>= 5, < 6` ->  `>= 6, < 7`
 
 ## 6.1.0
 
