@@ -1,7 +1,10 @@
 use std::sync::Arc;
 
 use arrow::array::{ArrayRef, Decimal128Builder};
-use odbc_api::{buffers::{AnySlice, BufferDesc}, decimal_text_to_i128};
+use odbc_api::{
+    buffers::{AnySlice, BufferDesc},
+    decimal_text_to_i128,
+};
 
 use super::{MappingError, ReadStrategy};
 

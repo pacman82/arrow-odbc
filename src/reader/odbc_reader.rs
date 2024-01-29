@@ -5,11 +5,11 @@ use arrow::{
     error::ArrowError,
     record_batch::{RecordBatch, RecordBatchReader},
 };
-use odbc_api::{buffers::ColumnarAnyBuffer, BlockCursor, Cursor, Quirks};
+use odbc_api::{buffers::ColumnarAnyBuffer, BlockCursor, Cursor};
 
 use crate::{BufferAllocationOptions, ConcurrentOdbcReader, Error};
 
-use super::to_record_batch::ToRecordBatch;
+use super::{to_record_batch::ToRecordBatch, Quirks};
 
 /// Arrow ODBC reader. Implements the [`arrow::record_batch::RecordBatchReader`] trait so it can be
 /// used to fill Arrow arrays from an ODBC data source.
@@ -22,7 +22,7 @@ use super::to_record_batch::ToRecordBatch;
 /// # Example
 ///
 /// ```no_run
-/// use arrow_odbc::{odbc_api::{Environment, ConnectionOptions, Quirks}, OdbcReaderBuilder};
+/// use arrow_odbc::{odbc_api::{Environment, ConnectionOptions}, OdbcReaderBuilder};
 ///
 /// const CONNECTION_STRING: &str = "\
 ///     Driver={ODBC Driver 17 for SQL Server};\
@@ -41,9 +41,6 @@ use super::to_record_batch::ToRecordBatch;
 ///         ConnectionOptions::default()
 ///     )?;
 ///
-///     // Query knowledge about deviations of this driver from the ODBC standard
-///     let quirks = Quirks::from_dbms_name(&connection.database_management_system_name()?);
-///
 ///     // This SQL statement does not require any arguments.
 ///     let parameters = ();
 ///
@@ -55,9 +52,6 @@ use super::to_record_batch::ToRecordBatch;
 ///     // Read result set as arrow batches. Infer Arrow types automatically using the meta
 ///     // information of `cursor`.
 ///     let arrow_record_batches = OdbcReaderBuilder::new()
-///         // Pass knowledge about driver quirks, maybe there is a workaround implemented. Without
-///         // this we just assume the driver works as specified by ODBC.
-///         .with_shims(quirks)
 ///         .build(cursor)?;
 ///
 ///     for batch in arrow_record_batches {

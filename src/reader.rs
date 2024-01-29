@@ -12,7 +12,7 @@ use arrow::{
 use log::debug;
 use odbc_api::{
     buffers::{AnySlice, BufferDesc, Item},
-    Bit, DataType as OdbcDataType, Quirks, ResultSetMetadata,
+    Bit, DataType as OdbcDataType, ResultSetMetadata,
 };
 use thiserror::Error;
 
@@ -24,8 +24,11 @@ mod odbc_reader;
 mod text;
 mod to_record_batch;
 
-use crate::date_time::{
-    days_since_epoch, ms_since_epoch, ns_since_epoch, seconds_since_epoch, us_since_epoch,
+use crate::{
+    date_time::{
+        days_since_epoch, ms_since_epoch, ns_since_epoch, seconds_since_epoch, us_since_epoch,
+    },
+    Quirks,
 };
 
 pub use self::{

@@ -1,5 +1,9 @@
 # Changelog
 
+## 8.0.0
+
+* Replate `odbc_api::Quirks` with `arrow_odbc::Quirks`.
+
 ## 7.0.0
 
 * Update odbc-api `>= 5, < 6` ->  `>= 6, < 7`
