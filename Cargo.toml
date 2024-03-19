@@ -30,9 +30,9 @@ readme = "Readme.md"
 
 [dependencies]
 arrow = { version = ">= 29, < 52", default-features = false }
-chrono = "0.4.32"
-log = "0.4.20"
-thiserror = "1.0.56"
+chrono = "0.4.35"
+log = "0.4.21"
+thiserror = "1.0.58"
 
 # On windows we can not assume the default locale to be UTF-8, so we compile odbc-api with default
 # features implying the use of UTF-16 for queries, connection strings and error messages. This
@@ -50,11 +50,11 @@ odbc-api = ">= 6, < 7"
 odbc-api = { version = ">= 6, < 7", features = ["narrow"] }
 
 [dev-dependencies]
-anyhow = "1.0.79"
+anyhow = "1.0.81"
 # Used to share one ODBC environment in tests
 lazy_static = "1.4.0"
 # Function name macro is used to ensure unique table names in test
-stdext = "0.3.1"
+stdext = "0.3.2"
 float_eq = "1.0.1"
 
 [features]

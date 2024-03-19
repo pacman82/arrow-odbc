@@ -6,7 +6,7 @@ use arrow::{
         ArrowPrimitiveType, Time32MillisecondType, Time64MicrosecondType, Time64NanosecondType,
     },
 };
-use chrono::{Datelike, NaiveDate, NaiveDateTime, Timelike};
+use chrono::{DateTime, Datelike, NaiveDate, Timelike};
 use odbc_api::{
     buffers::{AnySliceMut, BufferDesc, TextColumnSliceMut},
     sys::{Date, Time, Timestamp},
@@ -28,7 +28,7 @@ pub fn seconds_since_epoch(from: &Timestamp) -> i64 {
         .unwrap()
         .and_hms_opt(from.hour as u32, from.minute as u32, from.second as u32)
         .unwrap();
-    ndt.timestamp()
+    ndt.and_utc().timestamp()
 }
 
 pub fn ms_since_epoch(from: &Timestamp) -> i64 {
@@ -41,7 +41,7 @@ pub fn ms_since_epoch(from: &Timestamp) -> i64 {
             from.fraction,
         )
         .unwrap();
-    ndt.timestamp_millis()
+    ndt.and_utc().timestamp_millis()
 }
 
 pub fn us_since_epoch(from: &Timestamp) -> i64 {
@@ -54,7 +54,7 @@ pub fn us_since_epoch(from: &Timestamp) -> i64 {
             from.fraction,
         )
         .unwrap();
-    ndt.timestamp_micros()
+    ndt.and_utc().timestamp_micros()
 }
 
 pub fn ns_since_epoch(from: &Timestamp) -> Result<i64, MappingError> {
@@ -70,19 +70,20 @@ pub fn ns_since_epoch(from: &Timestamp) -> Result<i64, MappingError> {
 
     // The dates that can be represented as nanoseconds are between 1677-09-21T00:12:44.0 and
     // 2262-04-11T23:47:16.854775804
-    ndt.timestamp_nanos_opt()
+    ndt.and_utc()
+        .timestamp_nanos_opt()
         .ok_or(MappingError::OutOfRangeTimestampNs { value: ndt })
 }
 
 pub fn epoch_to_timestamp<const UNIT_FACTOR: i64>(from: i64) -> Timestamp {
-    let ndt = NaiveDateTime::from_timestamp_opt(
+    let ndt = DateTime::from_timestamp(
         from / UNIT_FACTOR,
         ((from % UNIT_FACTOR) * (1_000_000_000 / UNIT_FACTOR))
             .try_into()
             .unwrap(),
     )
     .unwrap();
-    let date = ndt.date();
+    let date = ndt.date_naive();
     let time = ndt.time();
     Timestamp {
         year: date.year().try_into().unwrap(),
