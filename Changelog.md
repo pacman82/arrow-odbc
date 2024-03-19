@@ -1,8 +1,12 @@
 # Changelog
 
+## 8.1.0
+
+* Update arrow `>= 29, < 51` -> `>= 29, < 52`
+
 ## 8.0.0
 
-* Replate `odbc_api::Quirks` with `arrow_odbc::Quirks`.
+* Replace `odbc_api::Quirks` with `arrow_odbc::Quirks`.
 
 ## 7.0.0
 
