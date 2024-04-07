@@ -1,5 +1,9 @@
 # Changelog
 
+## 8.2.0
+
+* `ConcurrentOdbcReader` is now `Send`.
+
 ## 8.1.0
 
 * Update arrow `>= 29, < 51` -> `>= 29, < 52`

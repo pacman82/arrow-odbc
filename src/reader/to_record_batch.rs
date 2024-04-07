@@ -17,7 +17,7 @@ use super::{choose_column_strategy, MappingError, Quirks, ReadStrategy};
 pub struct ToRecordBatch {
     /// Must contain one item for each field in [`Self::schema`]. Encapsulates all the column type
     /// specific decisions which go into filling an Arrow array from an ODBC data source.
-    column_strategies: Vec<Box<dyn ReadStrategy>>,
+    column_strategies: Vec<Box<dyn ReadStrategy + Send>>,
     /// Arrow schema describing the arrays we want to fill from the Odbc data source.
     schema: SchemaRef,
 }
@@ -36,7 +36,7 @@ impl ToRecordBatch {
             Arc::new(arrow_schema_from(cursor)?)
         };
 
-        let column_strategies: Vec<Box<dyn ReadStrategy>> = schema
+        let column_strategies: Vec<Box<dyn ReadStrategy + Send>> = schema
             .fields()
             .iter()
             .enumerate()

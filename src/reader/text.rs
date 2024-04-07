@@ -18,14 +18,14 @@ pub fn choose_text_strategy(
     lazy_display_size: impl FnOnce() -> Result<Option<NonZeroUsize>, odbc_api::Error>,
     max_text_size: Option<usize>,
     assume_indicators_are_memory_garbage: bool,
-) -> Result<Box<dyn ReadStrategy>, ColumnFailure> {
+) -> Result<Box<dyn ReadStrategy + Send>, ColumnFailure> {
     let apply_buffer_limit = |len| match (len, max_text_size) {
         (None, None) => Err(ColumnFailure::ZeroSizedColumn { sql_type }),
         (None, Some(limit)) => Ok(limit),
         (Some(len), None) => Ok(len),
         (Some(len), Some(limit)) => Ok(min(len, limit)),
     };
-    let strategy: Box<dyn ReadStrategy> = if cfg!(target_os = "windows") {
+    let strategy: Box<dyn ReadStrategy + Send> = if cfg!(target_os = "windows") {
         let hex_len = sql_type
             .utf16_len()
             .map(Ok)
@@ -51,14 +51,14 @@ pub fn choose_text_strategy(
     Ok(strategy)
 }
 
-fn wide_text_strategy(u16_len: usize) -> Box<dyn ReadStrategy> {
+fn wide_text_strategy(u16_len: usize) -> Box<dyn ReadStrategy + Send> {
     Box::new(WideText::new(u16_len))
 }
 
 fn narrow_text_strategy(
     octet_len: usize,
     assume_indicators_are_memory_garbage: bool,
-) -> Box<dyn ReadStrategy> {
+) -> Box<dyn ReadStrategy + Send> {
     if assume_indicators_are_memory_garbage {
         warn!(
             "Ignoring indicators, because we expect the ODBC driver of your database to return \

@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{sync::Arc, thread};
 
 use arrow::{
     array::{
@@ -2154,6 +2154,30 @@ fn promote_sequential_to_concurrent_cursor() {
         .unwrap();
 
     let record_batch = reader.next().unwrap().unwrap();
+    let array_any = record_batch.column(0).clone();
+    let array_vals = array_any.as_any().downcast_ref::<Int32Array>().unwrap();
+    assert_eq!([42], *array_vals.values());
+}
+
+#[test]
+fn concurrent_reader_is_send() {
+    // Given a conucurrent_reader
+    let table_name = function_name!().rsplit_once(':').unwrap().1;
+    let cursor = cursor_over(table_name, "INTEGER", "(42)");
+    let mut concurrent_reader = OdbcReaderBuilder::new()
+        .with_max_num_rows_per_batch(100)
+        .build(cursor)
+        .unwrap()
+        .into_concurrent()
+        .unwrap();
+
+    // When send to another thread. compile time error otherwise, most important implicit assertion
+    // of this test.
+    let record_batch = thread::spawn(move || concurrent_reader.next().unwrap().unwrap())
+        .join()
+        .unwrap();
+
+    // Then
     let array_any = record_batch.column(0).clone();
     let array_vals = array_any.as_any().downcast_ref::<Int32Array>().unwrap();
     assert_eq!([42], *array_vals.values());

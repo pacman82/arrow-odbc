@@ -122,8 +122,8 @@ pub fn choose_column_strategy(
     col_index: u16,
     buffer_allocation_options: BufferAllocationOptions,
     quirks: &Quirks,
-) -> Result<Box<dyn ReadStrategy>, ColumnFailure> {
-    let strat: Box<dyn ReadStrategy> = match field.data_type() {
+) -> Result<Box<dyn ReadStrategy + Send>, ColumnFailure> {
+    let strat: Box<dyn ReadStrategy + Send> = match field.data_type() {
         ArrowDataType::Boolean => {
             if field.is_nullable() {
                 Box::new(NullableBoolean)

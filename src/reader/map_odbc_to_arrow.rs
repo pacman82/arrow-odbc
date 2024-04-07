@@ -18,30 +18,30 @@ pub trait MapOdbcToArrow {
     /// element of an arrow array.
     fn map_with<U>(
         nullable: bool,
-        odbc_to_arrow: impl Fn(&U) -> Result<Self::ArrowElement, MappingError> + 'static,
-    ) -> Box<dyn ReadStrategy>
+        odbc_to_arrow: impl Fn(&U) -> Result<Self::ArrowElement, MappingError> + 'static + Send,
+    ) -> Box<dyn ReadStrategy + Send>
     where
-        U: Item + 'static;
+        U: Item + 'static + Send;
 
     /// Should the arrow array element be identical to an item in the ODBC buffer no mapping is
     /// needed. We still need to account for nullability.
-    fn identical(nullable: bool) -> Box<dyn ReadStrategy>
+    fn identical(nullable: bool) -> Box<dyn ReadStrategy + Send>
     where
         Self::ArrowElement: Item;
 }
 
 impl<T> MapOdbcToArrow for T
 where
-    T: ArrowPrimitiveType,
+    T: ArrowPrimitiveType + Send,
 {
     type ArrowElement = T::Native;
 
     fn map_with<U>(
         nullable: bool,
-        odbc_to_arrow: impl Fn(&U) -> Result<Self::ArrowElement, MappingError> + 'static,
-    ) -> Box<dyn ReadStrategy>
+        odbc_to_arrow: impl Fn(&U) -> Result<Self::ArrowElement, MappingError> + 'static + Send,
+    ) -> Box<dyn ReadStrategy + Send>
     where
-        U: Item + 'static,
+        U: Item + 'static + Send,
     {
         if nullable {
             Box::new(NullableStrategy::<Self, U, _>::new(odbc_to_arrow))
@@ -50,7 +50,7 @@ where
         }
     }
 
-    fn identical(nullable: bool) -> Box<dyn ReadStrategy>
+    fn identical(nullable: bool) -> Box<dyn ReadStrategy + Send>
     where
         Self::ArrowElement: Item,
     {
@@ -76,7 +76,7 @@ impl<T> NonNullDirectStrategy<T> {
 
 impl<T> ReadStrategy for NonNullDirectStrategy<T>
 where
-    T: ArrowPrimitiveType,
+    T: ArrowPrimitiveType + Send,
     T::Native: Item,
 {
     fn buffer_desc(&self) -> BufferDesc {
@@ -105,7 +105,7 @@ impl<T> NullableDirectStrategy<T> {
 
 impl<T> ReadStrategy for NullableDirectStrategy<T>
 where
-    T: ArrowPrimitiveType,
+    T: ArrowPrimitiveType + Send,
     T::Native: Item,
 {
     fn buffer_desc(&self) -> BufferDesc {
@@ -140,9 +140,9 @@ impl<P, O, F> NonNullableStrategy<P, O, F> {
 
 impl<P, O, F> ReadStrategy for NonNullableStrategy<P, O, F>
 where
-    P: ArrowPrimitiveType,
-    O: Item,
-    F: Fn(&O) -> Result<P::Native, MappingError>,
+    P: ArrowPrimitiveType + Send,
+    O: Item + Send,
+    F: Fn(&O) -> Result<P::Native, MappingError> + Send,
 {
     fn buffer_desc(&self) -> BufferDesc {
         O::buffer_desc(false)
@@ -176,9 +176,9 @@ impl<P, O, F> NullableStrategy<P, O, F> {
 
 impl<P, O, F> ReadStrategy for NullableStrategy<P, O, F>
 where
-    P: ArrowPrimitiveType,
-    O: Item,
-    F: Fn(&O) -> Result<P::Native, MappingError>,
+    P: ArrowPrimitiveType + Send,
+    O: Item + Send,
+    F: Fn(&O) -> Result<P::Native, MappingError> + Send,
 {
     fn buffer_desc(&self) -> BufferDesc {
         O::buffer_desc(true)
