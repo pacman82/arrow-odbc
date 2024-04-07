@@ -24,10 +24,14 @@ jobs:
         uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
-          default: true
+          profile: minimal
           override: true
+      # selecting a toolchain either by action or manual `rustup` calls should happen
+      # before the plugin, as the cache uses the current rustc version as its cache key
+      - name: Rust build cache
+        uses: Swatinem/rust-cache@v2
       - name: Build
-        run: cargo build --release
+        run: cargo build
       - name: Install ODBC Drivers
         run: |
           curl https://packages.microsoft.com/keys/microsoft.asc | apt-key add -
@@ -39,4 +43,4 @@ jobs:
       - name: Print odbcinst.ini
         run: cat /etc/odbcinst.ini
       - name: Test
-        run: cargo test --release
+        run: cargo test
