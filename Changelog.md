@@ -1,5 +1,9 @@
 # Changelog
 
+## 8.3.0
+
+* Update odbc-api `>= 6, < 7` -> `>= 6, < 8`
+
 ## 8.2.0
 
 * `ConcurrentOdbcReader` is now `Send`.
