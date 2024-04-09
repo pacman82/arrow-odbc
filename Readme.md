@@ -19,7 +19,11 @@ This repository contains the code of the `arrow-odbc` Rust crate. The repository
 ## Usage
 
 ```rust
-use arrow_odbc::{odbc_api::{Environment, ConnectionOptions}, OdbcReaderBuilder};
+use arrow_odbc::OdbcReaderBuilder;
+// You can use the reexport of odbc_api to make sure the version used by arrow_odbc is in sync with
+// the version directly used by your application.
+use arrow_odbc::odbc_api as odbc_api;
+use odbc_api::{Environment, ConnectionOptions};
 
 const CONNECTION_STRING: &str = "\
     Driver={ODBC Driver 17 for SQL Server};\
@@ -50,7 +54,7 @@ fn main() -> Result<(), anyhow::Error> {
     // information of `cursor`.
     let arrow_record_batches = OdbcReaderBuilder::new()
         // Use at most 256 MiB for transit buffer
-        .with_max_bytes_per_row(256 * 1024 * 1024)
+        .with_max_bytes_per_batch(256 * 1024 * 1024)
         .build(cursor)?;
 
     for batch in arrow_record_batches {
