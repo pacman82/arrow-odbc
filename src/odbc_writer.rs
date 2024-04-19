@@ -88,6 +88,7 @@ fn quote_column_name(column_name: &str) -> Cow<'_, str> {
     }
 }
 
+/// Check if this character is allowed in an unquoted column name
 fn valid_in_column_name(c: char) -> bool {
     // See:
     // <https://stackoverflow.com/questions/4200351/what-characters-are-valid-in-an-sql-server-database-name>
@@ -99,8 +100,9 @@ fn valid_in_column_name(c: char) -> bool {
 ///
 /// **Note:**
 ///
-/// If table or column names are derived from user input, be sure to sanatize the input in order to
-/// prevent SQL injection attacks.
+/// If the column name contains any character which would make it not a valid qualifier for transact
+/// SQL it will be wrapped in double quotes (`"`) within the insert schema. Valid names consist of
+/// alpha numeric characters, `@`, `$`, `#` and `_`.
 ///
 /// # Example
 ///
@@ -274,8 +276,9 @@ impl<'env> OdbcWriter<StatementConnection<'env>> {
     ///
     /// **Note:**
     ///
-    /// If table or column names are derived from user input, be sure to sanatize the input in order
-    /// to prevent SQL injection attacks.
+    /// If the column name contains any character which would make it not a valid qualifier for transact
+    /// SQL it will be wrapped in double quotes (`"`) within the insert schema. Valid names consist of
+    /// alpha numeric characters, `@`, `$`, `#` and `_`.
     pub fn from_connection(
         connection: Connection<'env>,
         schema: &Schema,
@@ -296,8 +299,9 @@ impl<'o> OdbcWriter<StatementImpl<'o>> {
     ///
     /// **Note:**
     ///
-    /// If table or column names are derived from user input, be sure to sanatize the input in order
-    /// to prevent SQL injection attacks.
+    /// If the column name contains any character which would make it not a valid qualifier for transact
+    /// SQL it will be wrapped in double quotes (`"`) within the insert schema. Valid names consist of
+    /// alpha numeric characters, `@`, `$`, `#` and `_`.
     pub fn with_connection(
         connection: &'o Connection<'o>,
         schema: &Schema,

@@ -1,5 +1,9 @@
 # Changelog
 
+## 9.0.0
+
+* Then generating the insert statement on behalf of the user quote column names which are not valid transact SQL qualifiers using double quotes (`"`)
+
 ## 8.3.0
 
 * Update odbc-api `>= 6, < 7` -> `>= 6, < 8`

@@ -1,6 +1,6 @@
 [package]
 name = "arrow-odbc"
-version = "8.3.0"
+version = "9.0.0"
 authors = ["Markus Klein"]
 edition = "2021"
 license = "MIT"
@@ -30,7 +30,7 @@ readme = "Readme.md"
 
 [dependencies]
 arrow = { version = ">= 29, < 52", default-features = false }
-chrono = "0.4.35"
+chrono = "0.4.38"
 log = "0.4.21"
 thiserror = "1.0.58"
 
@@ -50,11 +50,11 @@ odbc-api = ">= 6, < 8"
 odbc-api = { version = ">= 6, < 8", features = ["narrow"] }
 
 [dev-dependencies]
-anyhow = "1.0.81"
+anyhow = "1.0.82"
 # Used to share one ODBC environment in tests
 lazy_static = "1.4.0"
 # Function name macro is used to ensure unique table names in test
-stdext = "0.3.2"
+stdext = "0.3.3"
 float_eq = "1.0.1"
 
 [features]
