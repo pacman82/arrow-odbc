@@ -1,4 +1,4 @@
-use std::cmp::min;
+use std::{borrow::Cow, cmp::min};
 
 use thiserror::Error;
 
@@ -63,6 +63,10 @@ pub fn insert_into_table(
 /// `INSERT INTO <table> (<column_names 0>, <column_names 1>, ...) VALUES (?, ?, ...)`
 fn insert_statement_text(table: &str, column_names: &[&'_ str]) -> String {
     // Generate statement text from table name and headline
+    let column_names = column_names
+        .iter()
+        .map(|cn| quote_column_name(cn))
+        .collect::<Vec<_>>();
     let columns = column_names.join(", ");
     let values = column_names
         .iter()
@@ -73,6 +77,15 @@ fn insert_statement_text(table: &str, column_names: &[&'_ str]) -> String {
     // allowing the command, because it expects now multiple statements.
     // See: <https://github.com/pacman82/arrow-odbc/issues/63>
     format!("INSERT INTO {table} ({columns}) VALUES ({values})")
+}
+
+/// Wraps column name in quotes, if need be
+fn quote_column_name(column_name: &str) -> Cow<'_, str> {
+    if column_name.contains([' ', ',', ';']) {
+        Cow::Owned(format!("\"{column_name}\""))
+    } else {
+        Cow::Borrowed(column_name)
+    }
 }
 
 /// Creates an SQL insert statement from an arrow schema. The resulting statement will have one

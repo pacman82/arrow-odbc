@@ -1988,6 +1988,37 @@ fn insert_large_text() {
     assert_eq!(expected, actual);
 }
 
+#[test]
+fn sanatize_column_names() {
+    // Given a table with a column name containing a space ...
+    let table_name = function_name!().rsplit_once(':').unwrap().1;
+    let conn = ENV
+        .connect_with_connection_string(MSSQL, Default::default())
+        .unwrap();
+    let drop_table = &format!("DROP TABLE IF EXISTS {table_name}");
+    let create_table = format!("CREATE TABLE {table_name} (id int IDENTITY(1,1),\"column name with spaces\" INTEGER);");
+    conn.execute(drop_table, ()).unwrap();
+    conn.execute(&create_table, ()).unwrap();
+    let array = Int32Array::from(vec![Some(42)]);
+
+    // When inserting from a reader which features a schema with an unescaped column name
+    let schema = Arc::new(Schema::new(vec![Field::new(
+        "column name with spaces",
+        DataType::Int32,
+        true,
+    )]));
+    let batch = RecordBatch::try_new(schema.clone(), vec![Arc::new(array)]).unwrap();
+    let mut reader = StubBatchReader::new(schema, vec![batch]);
+    let result = insert_into_table(&conn, &mut reader, table_name, 1);
+
+    // Then the insert does not throw an error, but inserts correctly using the sanatized column
+    // name.
+    assert!(result.is_ok());
+    let actual = table_to_string(&conn, table_name, &["\"column name with spaces\""]);
+    let expected = "42";
+    assert_eq!(expected, actual);
+}
+
 /// Fill a record batch with non nullable Integer 32 Bit directly from the datasource
 #[test]
 fn fetch_integer_concurrently() {
