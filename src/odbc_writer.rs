@@ -81,11 +81,17 @@ fn insert_statement_text(table: &str, column_names: &[&'_ str]) -> String {
 
 /// Wraps column name in quotes, if need be
 fn quote_column_name(column_name: &str) -> Cow<'_, str> {
-    if column_name.contains([' ', ',', ';']) {
+    if column_name.contains(|c| !valid_in_column_name(c)) {
         Cow::Owned(format!("\"{column_name}\""))
     } else {
         Cow::Borrowed(column_name)
     }
+}
+
+fn valid_in_column_name(c: char) -> bool {
+    // See:
+    // <https://stackoverflow.com/questions/4200351/what-characters-are-valid-in-an-sql-server-database-name>
+    c.is_alphanumeric() || c == '@' || c == '$' || c == '#' || c == '_'
 }
 
 /// Creates an SQL insert statement from an arrow schema. The resulting statement will have one
