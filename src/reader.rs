@@ -1,4 +1,4 @@
-use std::{convert::TryInto, sync::Arc};
+use std::{cmp::max, convert::TryInto, sync::Arc};
 
 use arrow::{
     array::{ArrayRef, BooleanBuilder},
@@ -169,13 +169,7 @@ pub fn choose_column_strategy(
                 (None, None) => return Err(ColumnFailure::ZeroSizedColumn { sql_type }),
                 (None, Some(limit)) => limit,
                 (Some(len), None) => len.get(),
-                (Some(len), Some(limit)) => {
-                    if len.get() < limit {
-                        len.get()
-                    } else {
-                        limit
-                    }
-                }
+                (Some(len), Some(limit)) => max(len.get(), limit)
             };
             Box::new(Binary::new(length))
         }

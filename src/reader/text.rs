@@ -1,4 +1,4 @@
-use std::{char::decode_utf16, cmp::min, ffi::CStr, num::NonZeroUsize, sync::Arc};
+use std::{char::decode_utf16, cmp::{max}, ffi::CStr, num::NonZeroUsize, sync::Arc};
 
 use arrow::array::{ArrayRef, StringBuilder};
 use log::warn;
@@ -23,7 +23,7 @@ pub fn choose_text_strategy(
         (None, None) => Err(ColumnFailure::ZeroSizedColumn { sql_type }),
         (None, Some(limit)) => Ok(limit),
         (Some(len), None) => Ok(len),
-        (Some(len), Some(limit)) => Ok(min(len, limit)),
+        (Some(len), Some(limit)) => Ok(max(len, limit)),
     };
     let strategy: Box<dyn ReadStrategy + Send> = if cfg!(target_os = "windows") {
         let hex_len = sql_type
