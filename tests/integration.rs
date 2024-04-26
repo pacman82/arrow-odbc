@@ -1996,7 +1996,9 @@ fn sanatize_column_names() {
         .connect_with_connection_string(MSSQL, Default::default())
         .unwrap();
     let drop_table = &format!("DROP TABLE IF EXISTS {table_name}");
-    let create_table = format!("CREATE TABLE {table_name} (id int IDENTITY(1,1),\"column name with spaces\" INTEGER);");
+    let create_table = format!(
+        "CREATE TABLE {table_name} (id int IDENTITY(1,1),\"column name with spaces\" INTEGER);"
+    );
     conn.execute(drop_table, ()).unwrap();
     conn.execute(&create_table, ()).unwrap();
     let array = Int32Array::from(vec![Some(42)]);

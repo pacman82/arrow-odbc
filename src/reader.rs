@@ -169,7 +169,7 @@ pub fn choose_column_strategy(
                 (None, None) => return Err(ColumnFailure::ZeroSizedColumn { sql_type }),
                 (None, Some(limit)) => limit,
                 (Some(len), None) => len.get(),
-                (Some(len), Some(limit)) => max(len.get(), limit)
+                (Some(len), Some(limit)) => max(len.get(), limit),
             };
             Box::new(Binary::new(length))
         }

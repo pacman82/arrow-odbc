@@ -1,4 +1,4 @@
-use std::{char::decode_utf16, cmp::{max}, ffi::CStr, num::NonZeroUsize, sync::Arc};
+use std::{char::decode_utf16, cmp::max, ffi::CStr, num::NonZeroUsize, sync::Arc};
 
 use arrow::array::{ArrayRef, StringBuilder};
 use log::warn;
