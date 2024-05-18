@@ -154,7 +154,6 @@ pub fn choose_column_strategy(
                 sql_type,
                 lazy_display_size,
                 buffer_allocation_options.max_text_size,
-                quirks.indicators_returned_from_bulk_fetch_are_memory_garbage,
             )?
         }
         ArrowDataType::Decimal128(precision, scale @ 0..) => {

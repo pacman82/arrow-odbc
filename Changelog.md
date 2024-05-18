@@ -1,5 +1,9 @@
 # Changelog
 
+## 10.0.0
+
+* Removed quirk `indicators_returned_from_bulk_fetch_are_memory_garbage`. Turns out the issue with IBM DB/2 drivers which triggered this can better be solved using a version of their ODBC driver which ends in `o` and is compiled with a 64Bit size for `SQLLEN`.
+
 ## 9.0.0
 
 * Then generating the insert statement on behalf of the user quote column names which are not valid transact SQL qualifiers using double quotes (`"`)
