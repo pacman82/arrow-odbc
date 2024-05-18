@@ -9,7 +9,7 @@ use odbc_api::{buffers::ColumnarAnyBuffer, BlockCursor, Cursor};
 
 use crate::{BufferAllocationOptions, ConcurrentOdbcReader, Error};
 
-use super::{to_record_batch::ToRecordBatch, Quirks};
+use super::to_record_batch::ToRecordBatch;
 
 /// Arrow ODBC reader. Implements the [`arrow::record_batch::RecordBatchReader`] trait so it can be
 /// used to fill Arrow arrays from an ODBC data source.
@@ -207,7 +207,6 @@ pub struct OdbcReaderBuilder {
     max_text_size: Option<usize>,
     max_binary_size: Option<usize>,
     fallibale_allocations: bool,
-    quirks: Quirks,
 }
 
 impl OdbcReaderBuilder {
@@ -228,7 +227,6 @@ impl OdbcReaderBuilder {
             max_text_size: None,
             max_binary_size: None,
             fallibale_allocations: false,
-            quirks: Quirks::new(),
         }
     }
 
@@ -308,16 +306,6 @@ impl OdbcReaderBuilder {
         self
     }
 
-    /// Shims are workarounds which can make arrow ODBC use different implementations in order to
-    /// compensate for ODBC drivers which violate the ODBC specification.
-    ///
-    /// This crate currently has a workaround drivers which return memory garbage instead of
-    /// indicators if bulk fetching variadic columns.
-    pub fn with_shims(&mut self, quirks: Quirks) -> &mut Self {
-        self.quirks = quirks;
-        self
-    }
-
     /// No matter if the user explicitly specified a limit in row size, a memory limit, both or
     /// neither. In order to construct a reader we need to decide on the buffer size in rows.
     fn buffer_size_in_rows(&self, bytes_per_row: usize) -> Result<usize, Error> {
@@ -355,12 +343,8 @@ impl OdbcReaderBuilder {
             max_binary_size: self.max_binary_size,
             fallibale_allocations: self.fallibale_allocations,
         };
-        let converter = ToRecordBatch::new(
-            &mut cursor,
-            self.schema.clone(),
-            buffer_allocation_options,
-            &self.quirks,
-        )?;
+        let converter =
+            ToRecordBatch::new(&mut cursor, self.schema.clone(), buffer_allocation_options)?;
         let bytes_per_row = converter.row_size_in_bytes();
         let buffer_size_in_rows = self.buffer_size_in_rows(bytes_per_row)?;
         let row_set_buffer =

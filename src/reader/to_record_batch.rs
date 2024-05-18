@@ -9,7 +9,7 @@ use odbc_api::{buffers::ColumnarAnyBuffer, ResultSetMetadata};
 
 use crate::{arrow_schema_from, BufferAllocationOptions, ColumnFailure, Error};
 
-use super::{choose_column_strategy, MappingError, Quirks, ReadStrategy};
+use super::{choose_column_strategy, MappingError, ReadStrategy};
 
 /// Transforms batches fetched from an ODBC data source in a
 /// [`odbc_api::bufferers::ColumnarAnyBuffer`] into arrow tables of the specified schemas. It also
@@ -27,7 +27,6 @@ impl ToRecordBatch {
         cursor: &mut impl ResultSetMetadata,
         schema: Option<SchemaRef>,
         buffer_allocation_options: BufferAllocationOptions,
-        quirks: &Quirks,
     ) -> Result<Self, Error> {
         // Infer schema if not given by the user
         let schema = if let Some(schema) = schema {
@@ -42,7 +41,7 @@ impl ToRecordBatch {
             .enumerate()
             .map(|(index, field)| {
                 let col_index = (index + 1).try_into().unwrap();
-                choose_column_strategy(field, cursor, col_index, buffer_allocation_options, quirks)
+                choose_column_strategy(field, cursor, col_index, buffer_allocation_options)
                     .map_err(|cause| cause.into_crate_error(field.name().clone(), index))
             })
             .collect::<Result<_, _>>()?;

@@ -24,11 +24,8 @@ mod odbc_reader;
 mod text;
 mod to_record_batch;
 
-use crate::{
-    date_time::{
-        days_since_epoch, ms_since_epoch, ns_since_epoch, seconds_since_epoch, us_since_epoch,
-    },
-    Quirks,
+use crate::date_time::{
+    days_since_epoch, ms_since_epoch, ns_since_epoch, seconds_since_epoch, us_since_epoch,
 };
 
 pub use self::{
@@ -121,7 +118,6 @@ pub fn choose_column_strategy(
     query_metadata: &mut impl ResultSetMetadata,
     col_index: u16,
     buffer_allocation_options: BufferAllocationOptions,
-    quirks: &Quirks,
 ) -> Result<Box<dyn ReadStrategy + Send>, ColumnFailure> {
     let strat: Box<dyn ReadStrategy + Send> = match field.data_type() {
         ArrowDataType::Boolean => {
