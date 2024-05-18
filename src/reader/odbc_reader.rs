@@ -177,7 +177,7 @@ where
             Ok(None) => None,
             // We had an error fetching the next batch from the database, let's report it as an
             // external error.
-            Err(odbc_error) => Some(Err(ArrowError::ExternalError(Box::new(odbc_error)))),
+            Err(odbc_error) => Some(Err(odbc_to_arrow_error(odbc_error))),
         }
     }
 }
@@ -357,4 +357,8 @@ impl OdbcReaderBuilder {
             fallibale_allocations: self.fallibale_allocations,
         })
     }
+}
+
+pub fn odbc_to_arrow_error(odbc_error: odbc_api::Error) -> ArrowError {
+    ArrowError::from_external_error(Box::new(odbc_error))
 }

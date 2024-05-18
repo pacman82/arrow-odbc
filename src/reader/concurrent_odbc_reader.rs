@@ -7,7 +7,7 @@ use odbc_api::{buffers::ColumnarAnyBuffer, BlockCursor, ConcurrentBlockCursor, C
 
 use crate::Error;
 
-use super::to_record_batch::ToRecordBatch;
+use super::{odbc_reader::odbc_to_arrow_error, to_record_batch::ToRecordBatch};
 
 /// Arrow ODBC reader. Implements the [`arrow::record_batch::RecordBatchReader`] trait so it can be
 /// used to fill Arrow arrays from an ODBC data source. Similar to [`crate::OdbcReader`], yet
@@ -134,7 +134,7 @@ where
             Ok(false) => None,
             // We had an error fetching the next batch from the database, let's report it as an
             // external error.
-            Err(odbc_error) => Some(Err(ArrowError::ExternalError(Box::new(odbc_error)))),
+            Err(odbc_error) => Some(Err(odbc_to_arrow_error(odbc_error))),
         }
     }
 }
