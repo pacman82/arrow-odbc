@@ -94,15 +94,16 @@ fn fetch_16bit_integer() {
     assert_eq!([1, 2, 3], *array_vals.values());
 }
 
-/// Fill a record batch with non nullable Integer 8 Bit directly from the datasource
+/// Fill a record batch with non nullable Integer 8 Bit directly from the datasource. Remark:
+/// Tinyint is unsigned for MSSQL
 #[test]
-fn fetch_8bit_integer() {
+fn fetch_unsigend_8bit_integer() {
     let table_name = function_name!().rsplit_once(':').unwrap().1;
 
-    let array_any = fetch_arrow_data(table_name, "TINYINT NOT NULL", "(1),(2),(3)").unwrap();
+    let array_any = fetch_arrow_data(table_name, "TINYINT NOT NULL", "(1),(0),(255)").unwrap();
 
-    let array_vals = array_any.as_any().downcast_ref::<Int8Array>().unwrap();
-    assert_eq!([1, 2, 3], *array_vals.values());
+    let array_vals = array_any.as_any().downcast_ref::<UInt8Array>().unwrap();
+    assert_eq!([1, 0, 255], *array_vals.values());
 }
 
 /// Fill a record batch with non nullable Integer 8 Bit usigned integer. Since that type would never

@@ -83,7 +83,8 @@ fn main() -> Result<(), anyhow::Error> {
 | Timestamp(p: 4..6)       | TimestampMicroSecond |
 | Timestamp(p >= 7 )       | TimestampNanoSecond  |
 | BigInt                   | Int64                |
-| TinyInt                  | Int8                 |
+| TinyInt Signed           | Int8                 |
+| TinyInt Unsigend         | UInt8                |
 | Bit                      | Boolean              |
 | Varbinary                | Binary               |
 | Binary                   | FixedSizedBinary     |
@@ -123,10 +124,6 @@ fn main() -> Result<(), anyhow::Error> {
 | All others            | Unsupported        |
 
 The mapping for insertion is not the optimal yet, but before spending a lot of work on improving it I was curious that usecase would pop up for users. So if something does not work, but maybe could provided a better mapping of Arrow to ODBC types, feel free to open an issue. If you do so please give a lot of context of what you are trying to do.
-
-## Supported Arrow types
-
-Appart from the afformentioned Arrow types `Uint8` is also supported if specifying the Arrow schema directly.
 
 ## Build
 
