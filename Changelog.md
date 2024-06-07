@@ -1,5 +1,9 @@
 # Changelog
 
+## 11.1.0
+
+* Update arrow `>= 29, < 52` -> `>= 29, < 53`
+
 ## 11.0.0
 
 * Unsigned Tinyint are now mapped to `UInt8` instead of `Int8`.
