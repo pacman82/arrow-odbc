@@ -1,5 +1,9 @@
 # Changelog
 
+## 9.1.0
+
+* Update arrow `>= 29, < 52` -> `>= 29, < 53`
+
 ## 9.0.0
 
 * Then generating the insert statement on behalf of the user quote column names which are not valid transact SQL qualifiers using double quotes (`"`)
