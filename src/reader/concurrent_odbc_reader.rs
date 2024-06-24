@@ -52,7 +52,8 @@ use super::{odbc_reader::odbc_to_arrow_error, to_record_batch::ToRecordBatch};
 ///     let cursor = connection
 ///         // Using `into_cursor` instead of `execute` takes ownership of the connection and
 ///         // allows for a cursor with static lifetime.
-///         .into_cursor("SELECT * FROM MyTable", parameters)?
+///         .into_cursor("SELECT * FROM MyTable", parameters)
+///         .map_err(|e| e.error)?
 ///         .expect("SELECT statement must produce a cursor");
 ///
 ///     // Construct ODBC reader and make it concurrent
