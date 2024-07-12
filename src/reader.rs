@@ -16,6 +16,7 @@ use odbc_api::{
 };
 use thiserror::Error;
 
+mod async_odbc_reader;
 mod binary;
 mod concurrent_odbc_reader;
 mod decimal;

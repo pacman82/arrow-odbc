@@ -5,11 +5,95 @@ use arrow::{
     error::ArrowError,
     record_batch::{RecordBatch, RecordBatchReader},
 };
-use odbc_api::{buffers::ColumnarAnyBuffer, BlockCursor, Cursor};
+use odbc_api::{
+    buffers::ColumnarAnyBuffer, handles::AsStatementRef, BlockCursor, BlockCursorPolling, Cursor,
+    CursorPolling,
+};
 
 use crate::{BufferAllocationOptions, ConcurrentOdbcReader, Error};
 
-use super::to_record_batch::ToRecordBatch;
+use super::{async_odbc_reader::AsyncOdbcReaderImpl, to_record_batch::ToRecordBatch};
+
+// Arrow ODBC reader. Implements the [`arrow::record_batch::RecordBatchReader`] trait so it can be
+/// used to fill Arrow arrays from an ODBC data source.
+///
+/// This reader is generic over the cursor type so it can be used in cases there the cursor only
+/// borrows a statement handle (most likely the case then using prepared queries), or owned
+/// statement handles (recommened then using one shot queries, to have an easier life with the
+/// borrow checker).
+///
+/// # Example
+///
+/// ```no_run
+/// use arrow_odbc::{odbc_api::{Environment, ConnectionOptions}, OdbcReaderBuilder};
+///
+/// const CONNECTION_STRING: &str = "\
+///     Driver={ODBC Driver 17 for SQL Server};\
+///     Server=localhost;\
+///     UID=SA;\
+///     PWD=My@Test@Password1;\
+/// ";
+///
+/// fn main() -> Result<(), anyhow::Error> {
+///
+///     let odbc_environment = Environment::new()?;
+///     
+///     // Connect with database.
+///     let connection = odbc_environment.connect_with_connection_string(
+///         CONNECTION_STRING,
+///         ConnectionOptions::default()
+///     )?;
+///
+///     // This SQL statement does not require any arguments.
+///     let parameters = ();
+///
+///     // Execute query and create result set
+///     let cursor = connection
+///         .execute("SELECT * FROM MyTable", parameters)?
+///         .expect("SELECT statement must produce a cursor");
+///
+///     // Read result set as arrow batches. Infer Arrow types automatically using the meta
+///     // information of `cursor`.
+///     let arrow_record_batches = OdbcReaderBuilder::new()
+///         .build(cursor)?;
+///
+///     for batch in arrow_record_batches {
+///         // ... process batch ...
+///     }
+///     Ok(())
+/// }
+/// ```
+pub struct AsyncOdbcReader<S: AsStatementRef> {
+    /// Converts the content of ODBC buffers into Arrow record batches
+    converter: ToRecordBatch,
+    /// Fetches values from the ODBC datasource using columnar batches. Values are streamed batch
+    /// by batch in order to avoid reallocation of the buffers used for tranistion.
+    batch_stream: CursorPolling<S>,
+    /// We remember if the user decided to use fallibale allocations or not in case we need to
+    /// allocate another buffer due to a state transition towards [`ConcurrentOdbcReader`].
+    fallibale_allocations: bool,
+    max_rows_per_batch: usize,
+}
+
+impl<C: Cursor> AsyncOdbcReader<C> {
+    /// Size of the internal preallocated buffer bound to the cursor and filled by your ODBC driver
+    /// in rows. Each record batch will at most have this many rows. Only the last one may have
+    /// less.
+    pub fn max_rows_per_batch(&self) -> usize {
+        self.max_rows_per_batch
+    }
+
+    pub fn into_stream(self) {
+        AsyncOdbcReaderImpl::from_cursor_polling(
+            self.batch_stream,
+            self.converter,
+            self.fallibale_allocations,
+            self.max_rows_per_batch,
+        );
+
+        todo!()
+    }
+}
 
 /// Arrow ODBC reader. Implements the [`arrow::record_batch::RecordBatchReader`] trait so it can be
 /// used to fill Arrow arrays from an ODBC data source.
@@ -356,6 +440,28 @@ impl OdbcReaderBuilder {
             converter,
             batch_stream,
             fallibale_allocations: self.fallibale_allocations,
+        })
+    }
+
+    pub fn build_async<S>(&self, mut cursor: CursorPolling<S>) -> Result<AsyncOdbcReader<S>, Error>
+    where
+        S: AsStatementRef,
+    {
+        let buffer_allocation_options = BufferAllocationOptions {
+            max_text_size: self.max_text_size,
+            max_binary_size: self.max_binary_size,
+            fallibale_allocations: self.fallibale_allocations,
+        };
+        let converter =
+            ToRecordBatch::new(&mut cursor, self.schema.clone(), buffer_allocation_options)?;
+        let bytes_per_row = converter.row_size_in_bytes();
+        let buffer_size_in_rows = self.buffer_size_in_rows(bytes_per_row)?;
+
+        Ok(AsyncOdbcReader {
+            converter,
+            batch_stream: cursor,
+            fallibale_allocations: self.fallibale_allocations,
+            max_rows_per_batch: buffer_size_in_rows,
         })
     }
 }
