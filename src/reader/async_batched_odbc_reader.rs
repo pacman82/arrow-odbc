@@ -13,8 +13,8 @@ use super::{odbc_reader::odbc_to_arrow_error, to_record_batch::ToRecordBatch};
 pub struct AsyncBatchedOdbcReader<S: AsStatementRef> {
     /// Converts the content of ODBC buffers into Arrow record batches
     converter: ToRecordBatch,
-    /// Fetches values from the ODBC datasource using columnar batches. Values are streamed batch
-    /// by batch in order to avoid reallocation of the buffers used for tranistion.
+    /// Fetches values from the ODBC datasource using columnar batches asynchronously. Values are
+    /// by batch in order to avoid reallocation of the buffers used for transition.
     batch_stream: BlockCursorPolling<CursorPolling<S>, ColumnarAnyBuffer>,
 }
 
