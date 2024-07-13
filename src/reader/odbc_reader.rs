@@ -84,6 +84,10 @@ impl<S: AsStatementRef> AsyncOdbcReader<S> {
         self.max_rows_per_batch
     }
 
+    pub fn schema(&self) -> SchemaRef {
+        self.converter.schema().clone()
+    }
+
     pub fn into_stream<S2>(
         self,
         sleep: impl Fn() -> S2,

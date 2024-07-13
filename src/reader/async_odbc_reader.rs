@@ -163,7 +163,9 @@ where
                             .map_err(|mapping_error| ArrowError::ExternalError(Box::new(mapping_error)));
                         yield result_record_batch?;
                     }
-                    Ok(None) => break,
+                    Ok(None) =>  {
+                        break;
+                    }
                     Err(odbc_error) => Err(odbc_to_arrow_error(odbc_error))?,
                 }
             }

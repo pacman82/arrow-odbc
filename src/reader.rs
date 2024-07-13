@@ -35,7 +35,7 @@ pub use self::{
     concurrent_odbc_reader::ConcurrentOdbcReader,
     decimal::Decimal,
     map_odbc_to_arrow::{MapOdbcToArrow, MappingError},
-    odbc_reader::{OdbcReader, OdbcReaderBuilder},
+    odbc_reader::{AsyncOdbcReader, OdbcReader, OdbcReaderBuilder},
     text::choose_text_strategy,
 };
 
