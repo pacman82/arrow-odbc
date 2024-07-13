@@ -8,10 +8,7 @@ use odbc_api::{
 
 use super::{ColumnFailure, MappingError, ReadStrategy};
 
-/// This function decides wether this column will be queried as narrow (assumed to be utf-8) or
-/// wide text (assumed to be utf-16). The reason we do not always use narrow is that the encoding
-/// dependends on the system locals which is usually not UTF-8 on windows systems. Furthermore we
-/// are trying to adapt the buffer size to the maximum string length the column could contain.
+/// Async version of `choose_text_strategy`
 pub async fn choose_text_strategy_async<F>(
     sql_type: OdbcDataType,
     lazy_display_size: impl FnOnce() -> F,
@@ -35,13 +32,6 @@ where
 
         let hex_len = apply_buffer_limit(hex_len.map(NonZeroUsize::get))?;
 
-        // let hex_len = sql_type
-        //     .utf16_len()
-        //     .map(Ok)
-        //     .or_else(|| lazy_display_size().transpose())
-        //     .transpose()
-        //     .map_err(|source| ColumnFailure::UnknownStringLength { sql_type, source })?;
-        // let hex_len = apply_buffer_limit(hex_len.map(NonZeroUsize::get))?;
         wide_text_strategy(hex_len)
     } else {
         let octet_len = match sql_type.utf8_len() {

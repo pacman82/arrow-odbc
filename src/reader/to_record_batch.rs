@@ -55,6 +55,7 @@ impl ToRecordBatch {
         })
     }
 
+    /// Async version of `new`
     pub async fn new_from_async<S: Sleep>(
         cursor: &mut impl AsyncResultSetMetadata,
         schema: Option<SchemaRef>,
@@ -86,23 +87,6 @@ impl ToRecordBatch {
 
             column_strategies.push(strategy);
         }
-
-        // let column_strategies: Vec<Box<dyn ReadStrategy + Send>> = schema
-        //     .fields()
-        //     .iter()
-        //     .enumerate()
-        //     .map(|(index, field)| {
-        //         let col_index = (index + 1).try_into().unwrap();
-        //         choose_column_strategy_async(
-        //             field,
-        //             cursor,
-        //             col_index,
-        //             buffer_allocation_options,
-        //             sleep,
-        //         )
-        //         .map_err(|cause| cause.into_crate_error(field.name().clone(), index))
-        //     })
-        //     .collect::<Result<_, _>>()?;
 
         Ok(ToRecordBatch {
             column_strategies,

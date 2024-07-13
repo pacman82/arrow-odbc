@@ -65,13 +65,14 @@ pub async fn arrow_schema_from_async<S: Sleep>(
     Ok(Schema::new(fields))
 }
 
+/// Async version of `arrow_field_from`
 async fn arrow_field_from_async<S: Sleep>(
-    resut_set_metadata: &mut impl AsyncResultSetMetadata,
+    result_set_metadata: &mut impl AsyncResultSetMetadata,
     index: u16,
     sleep: &impl Fn() -> S,
 ) -> Result<Field, Error> {
     let mut column_description = ColumnDescription::default();
-    resut_set_metadata
+    result_set_metadata
         .describe_col(index + 1, &mut column_description, sleep())
         .await
         .map_err(|cause| Error::ColumnFailure {
@@ -115,7 +116,7 @@ async fn arrow_field_from_async<S: Sleep>(
         }
         OdbcDataType::BigInt => ArrowDataType::Int64,
         OdbcDataType::TinyInt => {
-            let is_unsigned = resut_set_metadata
+            let is_unsigned = result_set_metadata
                 .column_is_unsigned(index + 1, sleep())
                 .await
                 .map_err(|e| Error::ColumnFailure {
