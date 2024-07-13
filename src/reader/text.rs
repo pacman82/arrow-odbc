@@ -40,12 +40,6 @@ where
         }
         .map_err(|source| ColumnFailure::UnknownStringLength { sql_type, source })?;
 
-        // let octet_len = sql_type
-        //     .utf8_len()
-        //     .map(Ok)
-        //     .or_else(|| lazy_display_size().transpose())
-        //     .transpose()
-        //     .map_err(|source| ColumnFailure::UnknownStringLength { sql_type, source })?;
         let octet_len = apply_buffer_limit(octet_len.map(NonZeroUsize::get))?;
         // So far only Linux users seemed to have complained about panics due to garbage indices?
         // Linux usually would use UTF-8, so we only invest work in working around this for narrow
