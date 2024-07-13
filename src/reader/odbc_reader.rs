@@ -23,7 +23,7 @@ pub struct AsyncOdbcReader<S: AsStatementRef> {
     /// by batch in order to avoid reallocation of the buffers used for tranistion.
     cursor_polling: CursorPolling<S>,
     /// We remember if the user decided to use fallibale allocations or not in case we need to
-    /// allocate another buffer due to a state transition towards [`ConcurrentOdbcReader`].
+    /// allocate another buffer due to a state transition towards [`AsyncBatchedOdbcReader`].
     fallibale_allocations: bool,
     max_rows_per_batch: usize,
 }
