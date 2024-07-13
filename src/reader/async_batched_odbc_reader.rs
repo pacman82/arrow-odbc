@@ -67,6 +67,30 @@ where
         }
     }
 
+    pub fn next<'a, S2>(
+        &'a mut self,
+        sleep: impl Fn() -> S2 + 'a,
+    ) -> impl std::future::Future<Output = Result<Option<RecordBatch>, ArrowError>> + 'a
+    where
+        S2: Sleep,
+    {
+        async move {
+            match self.batch_stream.fetch(sleep()).await {
+                Ok(Some(batch)) => {
+                    let result_record_batch =
+                        self.converter
+                            .buffer_to_record_batch(batch)
+                            .map_err(|mapping_error| {
+                                ArrowError::ExternalError(Box::new(mapping_error))
+                            });
+                    Ok(Some(result_record_batch?))
+                }
+                Ok(None) => Ok(None),
+                Err(odbc_error) => Err(odbc_to_arrow_error(odbc_error)),
+            }
+        }
+    }
+
     pub fn as_stream<'a, S2>(
         &'a mut self,
         sleep: impl Fn() -> S2 + 'a,
