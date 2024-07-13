@@ -5,11 +5,14 @@ use arrow::{
     record_batch::RecordBatch,
 };
 use log::info;
-use odbc_api::{buffers::ColumnarAnyBuffer, ResultSetMetadata};
+use odbc_api::{buffers::ColumnarAnyBuffer, AsyncResultSetMetadata, ResultSetMetadata, Sleep};
 
-use crate::{arrow_schema_from, BufferAllocationOptions, ColumnFailure, Error};
+use crate::{
+    arrow_schema_from, schema::arrow_schema_from_async, BufferAllocationOptions, ColumnFailure,
+    Error,
+};
 
-use super::{choose_column_strategy, MappingError, ReadStrategy};
+use super::{choose_column_strategy, choose_column_strategy_async, MappingError, ReadStrategy};
 
 /// Transforms batches fetched from an ODBC data source in a
 /// [`odbc_api::bufferers::ColumnarAnyBuffer`] into arrow tables of the specified schemas. It also
@@ -45,6 +48,61 @@ impl ToRecordBatch {
                     .map_err(|cause| cause.into_crate_error(field.name().clone(), index))
             })
             .collect::<Result<_, _>>()?;
+
+        Ok(ToRecordBatch {
+            column_strategies,
+            schema,
+        })
+    }
+
+    pub async fn new_from_async<S: Sleep>(
+        cursor: &mut impl AsyncResultSetMetadata,
+        schema: Option<SchemaRef>,
+        buffer_allocation_options: BufferAllocationOptions,
+        sleep: impl Fn() -> S,
+    ) -> Result<Self, Error> {
+        // Infer schema if not given by the user
+        let schema = if let Some(schema) = schema {
+            schema
+        } else {
+            Arc::new(arrow_schema_from_async(cursor, &sleep).await?)
+        };
+
+        let mut column_strategies = Vec::with_capacity(schema.fields().len());
+
+        // note that we don't try and call these in parallel or out of order since once we start
+        // calling one of the ODBC functions asynchronously, we can't call another one until the first returns
+        for (index, field) in schema.fields().iter().enumerate() {
+            let col_index = (index + 1).try_into().unwrap();
+            let strategy = choose_column_strategy_async(
+                field,
+                cursor,
+                col_index,
+                buffer_allocation_options,
+                &sleep,
+            )
+            .await
+            .map_err(|cause| cause.into_crate_error(field.name().clone(), index))?;
+
+            column_strategies.push(strategy);
+        }
+
+        // let column_strategies: Vec<Box<dyn ReadStrategy + Send>> = schema
+        //     .fields()
+        //     .iter()
+        //     .enumerate()
+        //     .map(|(index, field)| {
+        //         let col_index = (index + 1).try_into().unwrap();
+        //         choose_column_strategy_async(
+        //             field,
+        //             cursor,
+        //             col_index,
+        //             buffer_allocation_options,
+        //             sleep,
+        //         )
+        //         .map_err(|cause| cause.into_crate_error(field.name().clone(), index))
+        //     })
+        //     .collect::<Result<_, _>>()?;
 
         Ok(ToRecordBatch {
             column_strategies,

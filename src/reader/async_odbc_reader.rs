@@ -142,16 +142,16 @@ impl<S: AsStatementRef> AsyncOdbcReaderImpl<S> {
 //     }
 // }
 
-impl<C> AsyncOdbcReaderImpl<C>
+impl<S> AsyncOdbcReaderImpl<S>
 where
-    C: Cursor,
+    S: AsStatementRef,
 {
-    pub fn into_stream<S>(
+    pub fn into_stream<S2>(
         mut self,
-        sleep: impl Fn() -> S,
+        sleep: impl Fn() -> S2,
     ) -> impl Stream<Item = Result<RecordBatch, ArrowError>>
     where
-        S: Sleep,
+        S2: Sleep,
     {
         try_stream! {
             loop {

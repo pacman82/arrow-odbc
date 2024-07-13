@@ -12,8 +12,9 @@ use arrow::{
 use log::debug;
 use odbc_api::{
     buffers::{AnySlice, BufferDesc, Item},
-    Bit, DataType as OdbcDataType, ResultSetMetadata,
+    AsyncResultSetMetadata, Bit, DataType as OdbcDataType, ResultSetMetadata, Sleep,
 };
+use text::choose_text_strategy_async;
 use thiserror::Error;
 
 mod async_odbc_reader;
@@ -112,6 +113,96 @@ pub struct BufferAllocationOptions {
     /// the buffers can not be allocated due to their size. This might have a performance cost for
     /// constructing the reader. `false` by default.
     pub fallibale_allocations: bool,
+}
+
+pub async fn choose_column_strategy_async<S: Sleep>(
+    field: &Field,
+    query_metadata: &mut impl AsyncResultSetMetadata,
+    col_index: u16,
+    buffer_allocation_options: BufferAllocationOptions,
+    sleep: &impl Fn() -> S,
+) -> Result<Box<dyn ReadStrategy + Send>, ColumnFailure> {
+    let strat: Box<dyn ReadStrategy + Send> = match field.data_type() {
+        ArrowDataType::Boolean => {
+            if field.is_nullable() {
+                Box::new(NullableBoolean)
+            } else {
+                Box::new(NonNullableBoolean)
+            }
+        }
+        ArrowDataType::Int8 => Int8Type::identical(field.is_nullable()),
+        ArrowDataType::Int16 => Int16Type::identical(field.is_nullable()),
+        ArrowDataType::Int32 => Int32Type::identical(field.is_nullable()),
+        ArrowDataType::Int64 => Int64Type::identical(field.is_nullable()),
+        ArrowDataType::UInt8 => UInt8Type::identical(field.is_nullable()),
+        ArrowDataType::Float32 => Float32Type::identical(field.is_nullable()),
+        ArrowDataType::Float64 => Float64Type::identical(field.is_nullable()),
+        ArrowDataType::Date32 => {
+            Date32Type::map_with(field.is_nullable(), |e| Ok(days_since_epoch(e)))
+        }
+        ArrowDataType::Utf8 => {
+            let sql_type = query_metadata
+                .col_data_type(col_index, sleep())
+                .await
+                .map_err(ColumnFailure::FailedToDescribeColumn)?;
+            // Use a zero based index here, because we use it everywhere else there we communicate
+            // with users.
+            debug!("Relational type of column {}: {sql_type:?}", col_index - 1);
+            let lazy_display_size =
+                || async move { query_metadata.col_display_size(col_index, sleep()).await };
+            // Use the SQL type first to determine buffer length.
+            choose_text_strategy_async(
+                sql_type,
+                lazy_display_size,
+                buffer_allocation_options.max_text_size,
+            )
+            .await?
+        }
+        ArrowDataType::Decimal128(precision, scale @ 0..) => {
+            Box::new(Decimal::new(*precision, *scale))
+        }
+        ArrowDataType::Binary => {
+            let sql_type = query_metadata
+                .col_data_type(col_index, sleep())
+                .await
+                .map_err(ColumnFailure::FailedToDescribeColumn)?;
+            let length = sql_type.column_size();
+            let length = match (length, buffer_allocation_options.max_binary_size) {
+                (None, None) => return Err(ColumnFailure::ZeroSizedColumn { sql_type }),
+                (None, Some(limit)) => limit,
+                (Some(len), None) => len.get(),
+                (Some(len), Some(limit)) => {
+                    if len.get() < limit {
+                        len.get()
+                    } else {
+                        limit
+                    }
+                }
+            };
+            Box::new(Binary::new(length))
+        }
+        ArrowDataType::Timestamp(TimeUnit::Second, _) => {
+            TimestampSecondType::map_with(field.is_nullable(), |e| Ok(seconds_since_epoch(e)))
+        }
+        ArrowDataType::Timestamp(TimeUnit::Millisecond, _) => {
+            TimestampMillisecondType::map_with(field.is_nullable(), |e| Ok(ms_since_epoch(e)))
+        }
+        ArrowDataType::Timestamp(TimeUnit::Microsecond, _) => {
+            TimestampMicrosecondType::map_with(field.is_nullable(), |e| Ok(us_since_epoch(e)))
+        }
+        ArrowDataType::Timestamp(TimeUnit::Nanosecond, _) => {
+            TimestampNanosecondType::map_with(field.is_nullable(), ns_since_epoch)
+        }
+        ArrowDataType::FixedSizeBinary(length) => {
+            Box::new(FixedSizedBinary::new((*length).try_into().unwrap()))
+        }
+        unsupported_arrow_type => {
+            return Err(ColumnFailure::UnsupportedArrowType(
+                unsupported_arrow_type.clone(),
+            ))
+        }
+    };
+    Ok(strat)
 }
 
 pub fn choose_column_strategy(

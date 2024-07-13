@@ -5,9 +5,10 @@ use arrow::{
     error::ArrowError,
     record_batch::{RecordBatch, RecordBatchReader},
 };
+use futures_core::Stream;
 use odbc_api::{
     buffers::ColumnarAnyBuffer, handles::AsStatementRef, BlockCursor, BlockCursorPolling, Cursor,
-    CursorPolling,
+    CursorPolling, Sleep,
 };
 
 use crate::{BufferAllocationOptions, ConcurrentOdbcReader, Error};
@@ -75,7 +76,7 @@ pub struct AsyncOdbcReader<S: AsStatementRef> {
     max_rows_per_batch: usize,
 }
 
-impl<C: Cursor> AsyncOdbcReader<C> {
+impl<S: AsStatementRef> AsyncOdbcReader<S> {
     /// Size of the internal preallocated buffer bound to the cursor and filled by your ODBC driver
     /// in rows. Each record batch will at most have this many rows. Only the last one may have
     /// less.
@@ -83,15 +84,20 @@ impl<C: Cursor> AsyncOdbcReader<C> {
         self.max_rows_per_batch
     }
 
-    pub fn into_stream(self) {
-        AsyncOdbcReaderImpl::from_cursor_polling(
+    pub fn into_stream<S2>(
+        self,
+        sleep: impl Fn() -> S2,
+    ) -> Result<impl Stream<Item = Result<RecordBatch, ArrowError>>, Error>
+    where
+        S2: Sleep,
+    {
+        Ok(AsyncOdbcReaderImpl::from_cursor_polling(
             self.batch_stream,
             self.converter,
             self.fallibale_allocations,
             self.max_rows_per_batch,
-        );
-
-        todo!()
+        )?
+        .into_stream(sleep))
     }
 }
 
@@ -443,7 +449,11 @@ impl OdbcReaderBuilder {
         })
     }
 
-    pub fn build_async<S>(&self, mut cursor: CursorPolling<S>) -> Result<AsyncOdbcReader<S>, Error>
+    pub async fn build_async<S, S2: Sleep>(
+        &self,
+        mut cursor: CursorPolling<S>,
+        sleep: impl Fn() -> S2,
+    ) -> Result<AsyncOdbcReader<S>, Error>
     where
         S: AsStatementRef,
     {
@@ -452,8 +462,13 @@ impl OdbcReaderBuilder {
             max_binary_size: self.max_binary_size,
             fallibale_allocations: self.fallibale_allocations,
         };
-        let converter =
-            ToRecordBatch::new(&mut cursor, self.schema.clone(), buffer_allocation_options)?;
+        let converter = ToRecordBatch::new_from_async(
+            &mut cursor,
+            self.schema.clone(),
+            buffer_allocation_options,
+            sleep,
+        )
+        .await?;
         let bytes_per_row = converter.row_size_in_bytes();
         let buffer_size_in_rows = self.buffer_size_in_rows(bytes_per_row)?;
 

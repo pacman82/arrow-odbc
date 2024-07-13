@@ -12,6 +12,64 @@ use super::{ColumnFailure, MappingError, ReadStrategy};
 /// wide text (assumed to be utf-16). The reason we do not always use narrow is that the encoding
 /// dependends on the system locals which is usually not UTF-8 on windows systems. Furthermore we
 /// are trying to adapt the buffer size to the maximum string length the column could contain.
+pub async fn choose_text_strategy_async<F>(
+    sql_type: OdbcDataType,
+    lazy_display_size: impl FnOnce() -> F,
+    max_text_size: Option<usize>,
+) -> Result<Box<dyn ReadStrategy + Send>, ColumnFailure>
+where
+    F: std::future::Future<Output = Result<Option<NonZeroUsize>, odbc_api::Error>>,
+{
+    let apply_buffer_limit = |len| match (len, max_text_size) {
+        (None, None) => Err(ColumnFailure::ZeroSizedColumn { sql_type }),
+        (None, Some(limit)) => Ok(limit),
+        (Some(len), None) => Ok(len),
+        (Some(len), Some(limit)) => Ok(min(len, limit)),
+    };
+    let strategy: Box<dyn ReadStrategy + Send> = if cfg!(target_os = "windows") {
+        let hex_len = match sql_type.utf16_len() {
+            len @ Some(_) => Ok(len),
+            None => lazy_display_size().await,
+        }
+        .map_err(|source| ColumnFailure::UnknownStringLength { sql_type, source })?;
+
+        let hex_len = apply_buffer_limit(hex_len.map(NonZeroUsize::get))?;
+
+        // let hex_len = sql_type
+        //     .utf16_len()
+        //     .map(Ok)
+        //     .or_else(|| lazy_display_size().transpose())
+        //     .transpose()
+        //     .map_err(|source| ColumnFailure::UnknownStringLength { sql_type, source })?;
+        // let hex_len = apply_buffer_limit(hex_len.map(NonZeroUsize::get))?;
+        wide_text_strategy(hex_len)
+    } else {
+        let octet_len = match sql_type.utf8_len() {
+            len @ Some(_) => Ok(len),
+            None => lazy_display_size().await,
+        }
+        .map_err(|source| ColumnFailure::UnknownStringLength { sql_type, source })?;
+
+        // let octet_len = sql_type
+        //     .utf8_len()
+        //     .map(Ok)
+        //     .or_else(|| lazy_display_size().transpose())
+        //     .transpose()
+        //     .map_err(|source| ColumnFailure::UnknownStringLength { sql_type, source })?;
+        let octet_len = apply_buffer_limit(octet_len.map(NonZeroUsize::get))?;
+        // So far only Linux users seemed to have complained about panics due to garbage indices?
+        // Linux usually would use UTF-8, so we only invest work in working around this for narrow
+        // strategies
+        narrow_text_strategy(octet_len)
+    };
+
+    Ok(strategy)
+}
+
+/// This function decides wether this column will be queried as narrow (assumed to be utf-8) or
+/// wide text (assumed to be utf-16). The reason we do not always use narrow is that the encoding
+/// dependends on the system locals which is usually not UTF-8 on windows systems. Furthermore we
+/// are trying to adapt the buffer size to the maximum string length the column could contain.
 pub fn choose_text_strategy(
     sql_type: OdbcDataType,
     lazy_display_size: impl FnOnce() -> Result<Option<NonZeroUsize>, odbc_api::Error>,
@@ -53,9 +111,7 @@ fn wide_text_strategy(u16_len: usize) -> Box<dyn ReadStrategy + Send> {
     Box::new(WideText::new(u16_len))
 }
 
-fn narrow_text_strategy(
-    octet_len: usize,
-) -> Box<dyn ReadStrategy + Send> {
+fn narrow_text_strategy(octet_len: usize) -> Box<dyn ReadStrategy + Send> {
     Box::new(NarrowText::new(octet_len))
 }
 
