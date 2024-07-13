@@ -13,57 +13,9 @@ use odbc_api::{
 
 use crate::{BufferAllocationOptions, ConcurrentOdbcReader, Error};
 
-use super::{async_odbc_reader::AsyncOdbcReaderImpl, to_record_batch::ToRecordBatch};
+use super::{async_batched_odbc_reader::AsyncBatchedOdbcReader, to_record_batch::ToRecordBatch};
 
-// Arrow ODBC reader. Implements the [`arrow::record_batch::RecordBatchReader`] trait so it can be
-/// used to fill Arrow arrays from an ODBC data source.
-///
-/// This reader is generic over the cursor type so it can be used in cases there the cursor only
-/// borrows a statement handle (most likely the case then using prepared queries), or owned
-/// statement handles (recommened then using one shot queries, to have an easier life with the
-/// borrow checker).
-///
-/// # Example
-///
-/// ```no_run
-/// use arrow_odbc::{odbc_api::{Environment, ConnectionOptions}, OdbcReaderBuilder};
-///
-/// const CONNECTION_STRING: &str = "\
-///     Driver={ODBC Driver 17 for SQL Server};\
-///     Server=localhost;\
-///     UID=SA;\
-///     PWD=My@Test@Password1;\
-/// ";
-///
-/// fn main() -> Result<(), anyhow::Error> {
-///
-///     let odbc_environment = Environment::new()?;
-///     
-///     // Connect with database.
-///     let connection = odbc_environment.connect_with_connection_string(
-///         CONNECTION_STRING,
-///         ConnectionOptions::default()
-///     )?;
-///
-///     // This SQL statement does not require any arguments.
-///     let parameters = ();
-///
-///     // Execute query and create result set
-///     let cursor = connection
-///         .execute("SELECT * FROM MyTable", parameters)?
-///         .expect("SELECT statement must produce a cursor");
-///
-///     // Read result set as arrow batches. Infer Arrow types automatically using the meta
-///     // information of `cursor`.
-///     let arrow_record_batches = OdbcReaderBuilder::new()
-///         .build(cursor)?;
-///
-///     for batch in arrow_record_batches {
-///         // ... process batch ...
-///     }
-///     Ok(())
-/// }
-/// ```
+// Async Arrow ODBC reader.
 pub struct AsyncOdbcReader<S: AsStatementRef> {
     /// Converts the content of ODBC buffers into Arrow record batches
     converter: ToRecordBatch,
@@ -95,7 +47,7 @@ impl<S: AsStatementRef> AsyncOdbcReader<S> {
     where
         S2: Sleep,
     {
-        Ok(AsyncOdbcReaderImpl::from_cursor_polling(
+        Ok(AsyncBatchedOdbcReader::from_cursor_polling(
             self.cursor_polling,
             self.converter,
             self.fallibale_allocations,
@@ -104,8 +56,8 @@ impl<S: AsStatementRef> AsyncOdbcReader<S> {
         .into_stream(sleep))
     }
 
-    pub fn as_impl(self) -> Result<AsyncOdbcReaderImpl<S>, Error> {
-        AsyncOdbcReaderImpl::from_cursor_polling(
+    pub fn into_batched(self) -> Result<AsyncBatchedOdbcReader<S>, Error> {
+        AsyncBatchedOdbcReader::from_cursor_polling(
             self.cursor_polling,
             self.converter,
             self.fallibale_allocations,

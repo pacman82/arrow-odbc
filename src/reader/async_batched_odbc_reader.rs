@@ -10,7 +10,7 @@ use crate::Error;
 use super::{odbc_reader::odbc_to_arrow_error, to_record_batch::ToRecordBatch};
 
 /// Async Arrow ODBC reader.
-pub struct AsyncOdbcReaderImpl<S: AsStatementRef> {
+pub struct AsyncBatchedOdbcReader<S: AsStatementRef> {
     /// Converts the content of ODBC buffers into Arrow record batches
     converter: ToRecordBatch,
     /// Fetches values from the ODBC datasource using columnar batches. Values are streamed batch
@@ -18,21 +18,15 @@ pub struct AsyncOdbcReaderImpl<S: AsStatementRef> {
     batch_stream: BlockCursorPolling<CursorPolling<S>, ColumnarAnyBuffer>,
 }
 
-impl<S: AsStatementRef> AsyncOdbcReaderImpl<S> {
+impl<S: AsStatementRef> AsyncBatchedOdbcReader<S> {
     /// The schema implied by `block_cursor` and `converter` must match. Invariant is hard to check
-    /// in type system, keep this constructor private to this crate. Users should use
-    /// [`crate::OdbcReader::into_concurrent`] instead.
+    /// in type system, keep this constructor private to this crate.
     pub(crate) fn from_cursor_polling(
         cursor_polling: CursorPolling<S>,
         converter: ToRecordBatch,
         fallibale_allocations: bool,
         max_batch_size: usize,
     ) -> Result<Self, Error> {
-        // let max_batch_size = cursor_polling.row_array_size();
-        // let batch_stream = ConcurrentBlockCursor::from_block_cursor(block_cursor);
-        // Note that we delay buffer allocation until after the fetch thread has started and we
-        // start fetching the first row group concurrently as early, not waiting for the buffer
-        // allocation to go through.
         let buffer = converter.allocate_buffer(max_batch_size, fallibale_allocations)?;
         let batch_stream = cursor_polling.bind_buffer(buffer).unwrap();
 
@@ -43,7 +37,7 @@ impl<S: AsStatementRef> AsyncOdbcReaderImpl<S> {
     }
 }
 
-impl<S> AsyncOdbcReaderImpl<S>
+impl<S> AsyncBatchedOdbcReader<S>
 where
     S: AsStatementRef,
 {

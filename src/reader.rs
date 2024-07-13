@@ -17,7 +17,7 @@ use odbc_api::{
 use text::choose_text_strategy_async;
 use thiserror::Error;
 
-mod async_odbc_reader;
+mod async_batched_odbc_reader;
 mod binary;
 mod concurrent_odbc_reader;
 mod decimal;
