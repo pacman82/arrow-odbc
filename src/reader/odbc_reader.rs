@@ -69,7 +69,7 @@ pub struct AsyncOdbcReader<S: AsStatementRef> {
     converter: ToRecordBatch,
     /// Fetches values from the ODBC datasource using columnar batches. Values are streamed batch
     /// by batch in order to avoid reallocation of the buffers used for tranistion.
-    batch_stream: CursorPolling<S>,
+    cursor_polling: CursorPolling<S>,
     /// We remember if the user decided to use fallibale allocations or not in case we need to
     /// allocate another buffer due to a state transition towards [`ConcurrentOdbcReader`].
     fallibale_allocations: bool,
@@ -96,12 +96,21 @@ impl<S: AsStatementRef> AsyncOdbcReader<S> {
         S2: Sleep,
     {
         Ok(AsyncOdbcReaderImpl::from_cursor_polling(
-            self.batch_stream,
+            self.cursor_polling,
             self.converter,
             self.fallibale_allocations,
             self.max_rows_per_batch,
         )?
         .into_stream(sleep))
+    }
+
+    pub fn as_impl(self) -> Result<AsyncOdbcReaderImpl<S>, Error> {
+        AsyncOdbcReaderImpl::from_cursor_polling(
+            self.cursor_polling,
+            self.converter,
+            self.fallibale_allocations,
+            self.max_rows_per_batch,
+        )
     }
 }
 
@@ -478,7 +487,7 @@ impl OdbcReaderBuilder {
 
         Ok(AsyncOdbcReader {
             converter,
-            batch_stream: cursor,
+            cursor_polling: cursor,
             fallibale_allocations: self.fallibale_allocations,
             max_rows_per_batch: buffer_size_in_rows,
         })
