@@ -3,6 +3,7 @@ use std::{char::decode_utf16, cmp::min, num::NonZeroUsize, sync::Arc};
 use arrow::array::{ArrayRef, StringBuilder};
 use odbc_api::{
     buffers::{AnySlice, BufferDesc},
+    sys::SqlDataType,
     DataType as OdbcDataType,
 };
 
@@ -43,7 +44,7 @@ pub fn choose_text_strategy(
         // So far only Linux users seemed to have complained about panics due to garbage indices?
         // Linux usually would use UTF-8, so we only invest work in working around this for narrow
         // strategies
-        narrow_text_strategy(octet_len)
+        narrow_text_strategy(octet_len, sql_type)
     };
 
     Ok(strategy)
@@ -53,10 +54,8 @@ fn wide_text_strategy(u16_len: usize) -> Box<dyn ReadStrategy + Send> {
     Box::new(WideText::new(u16_len))
 }
 
-fn narrow_text_strategy(
-    octet_len: usize,
-) -> Box<dyn ReadStrategy + Send> {
-    Box::new(NarrowText::new(octet_len))
+fn narrow_text_strategy(octet_len: usize, sql_type: OdbcDataType) -> Box<dyn ReadStrategy + Send> {
+    Box::new(NarrowText::new(octet_len, sql_type))
 }
 
 /// Strategy requesting the text from the database as UTF-16 (Wide characters) and emmitting it as
@@ -84,7 +83,7 @@ impl ReadStrategy for WideText {
         let view = column_view.as_w_text_view().unwrap();
         let item_capacity = view.len();
         // Any utf-16 character could take up to 4 Bytes if represented as utf-8, but since mostly
-        // this is 1 to one, and also not every string is likeyl to use its maximum capacity, we
+        // this is 1 to one, and also not every string is likely to use its maximum capacity, we
         // rather accept the reallocation in these scenarios.
         let data_capacity = self.max_str_len * item_capacity;
         let mut builder = StringBuilder::with_capacity(item_capacity, data_capacity);
@@ -100,6 +99,7 @@ impl ReadStrategy for WideText {
             } else {
                 None
             };
+
             builder.append_option(opt);
         }
         Ok(Arc::new(builder.finish()))
@@ -109,11 +109,16 @@ impl ReadStrategy for WideText {
 pub struct NarrowText {
     /// Maximum string length in u8, excluding terminating zero
     max_str_len: usize,
+    /// The originating database type for this text column
+    sql_type: OdbcDataType,
 }
 
 impl NarrowText {
-    pub fn new(max_str_len: usize) -> Self {
-        Self { max_str_len }
+    pub fn new(max_str_len: usize, sql_type: OdbcDataType) -> Self {
+        Self {
+            max_str_len,
+            sql_type,
+        }
     }
 }
 
@@ -128,10 +133,22 @@ impl ReadStrategy for NarrowText {
         let view = column_view.as_text_view().unwrap();
         let mut builder = StringBuilder::with_capacity(view.len(), self.max_str_len * view.len());
         for value in view.iter() {
-            builder.append_option(value.map(|bytes| {
+            let opt = value.map(|bytes| {
                 std::str::from_utf8(bytes)
                     .expect("ODBC driver had been expected to return valid utf8, but did not.")
-            }));
+            });
+
+            let opt = if self.sql_type.data_type() == SqlDataType::CHAR {
+                // Utf8 arrow strings could be thought of as a varchar in some sense
+                // When converting char to varchar, common databases will trim the trailing spaces
+                // Datafusion does this as well for their char->arrow conversions:
+                // https://github.com/datafusion-contrib/datafusion-table-providers/blob/main/src/sql/arrow_sql_gen/postgres.rs#L246
+                opt.map(str::trim_end)
+            } else {
+                opt
+            };
+
+            builder.append_option(opt);
         }
         Ok(Arc::new(builder.finish()))
     }
