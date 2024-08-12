@@ -539,6 +539,27 @@ fn fetch_out_of_range_date_time_ns() {
     )
 }
 
+/// Precision 7 timestamps need to be mapped to nanoseconds. Nanoseconds timestamps have a valid
+/// range in arrow between 1677-09-21 00:12:44 and 2262-04-11 23:47:16.854775807 due to be
+/// represented as a signed 64Bit Integer. Default behaviour is to emit an error. In this case we
+/// want to map such values to NULL though.
+#[test]
+fn map_out_of_range_date_time_to_null() {
+    let table_name = function_name!().rsplit_once(':').unwrap().1;
+    let cursor = cursor_over(table_name, "DATETIME2 NOT NULL", "('2300-01-01 00:00:00.1234567')");
+
+    // Now that we have a cursor, we want to iterate over its rows and fill an arrow batch with it.
+    let mut reader = OdbcReaderBuilder::new()
+        .with_max_num_rows_per_batch(100)
+        .build(cursor)
+        .unwrap()
+        .into_concurrent()
+        .unwrap();
+    // Batch for batch copy values from ODBC buffer into arrow batches
+    let record_batch = reader.next().unwrap().unwrap();
+    let array = record_batch.column(0).clone();
+}
+
 /// Fill a record batch of Decimals
 #[test]
 fn fetch_decimals() {
