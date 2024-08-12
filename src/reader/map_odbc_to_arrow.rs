@@ -23,6 +23,15 @@ pub trait MapOdbcToArrow {
     where
         U: Item + 'static + Send;
 
+    /// Use the infallible function provided to convert an element of an ODBC column buffer into the
+    /// desired element of an arrow array.
+    fn map_infallible<U>(
+        nullable: bool,
+        odbc_to_arrow: impl Fn(&U) -> Result<Self::ArrowElement, MappingError> + 'static + Send,
+    ) -> Box<dyn ReadStrategy + Send>
+    where
+        U: Item + 'static + Send;
+
     /// Should the arrow array element be identical to an item in the ODBC buffer no mapping is
     /// needed. We still need to account for nullability.
     fn identical(nullable: bool) -> Box<dyn ReadStrategy + Send>
@@ -37,6 +46,20 @@ where
     type ArrowElement = T::Native;
 
     fn map_with<U>(
+        nullable: bool,
+        odbc_to_arrow: impl Fn(&U) -> Result<Self::ArrowElement, MappingError> + 'static + Send,
+    ) -> Box<dyn ReadStrategy + Send>
+    where
+        U: Item + 'static + Send,
+    {
+        if nullable {
+            Box::new(NullableStrategy::<Self, U, _>::new(odbc_to_arrow))
+        } else {
+            Box::new(NonNullableStrategy::<Self, U, _>::new(odbc_to_arrow))
+        }
+    }
+
+    fn map_infallible<U>(
         nullable: bool,
         odbc_to_arrow: impl Fn(&U) -> Result<Self::ArrowElement, MappingError> + 'static + Send,
     ) -> Box<dyn ReadStrategy + Send>
@@ -175,6 +198,43 @@ impl<P, O, F> NullableStrategy<P, O, F> {
 }
 
 impl<P, O, F> ReadStrategy for NullableStrategy<P, O, F>
+where
+    P: ArrowPrimitiveType + Send,
+    O: Item + Send,
+    F: Fn(&O) -> Result<P::Native, MappingError> + Send,
+{
+    fn buffer_desc(&self) -> BufferDesc {
+        O::buffer_desc(true)
+    }
+
+    fn fill_arrow_array(&self, column_view: AnySlice) -> Result<ArrayRef, MappingError> {
+        let opts = column_view.as_nullable_slice::<O>().unwrap();
+        let mut builder = PrimitiveBuilder::<P>::with_capacity(opts.len());
+        for odbc_opt in opts {
+            builder.append_option(odbc_opt.map(&self.odbc_to_arrow).transpose()?);
+        }
+        Ok(Arc::new(builder.finish()))
+    }
+}
+
+/// Map invalid values to `NULL` rather than emitting a [`MappingError`]`.
+struct ErrorToNullStrategy<P, O, F> {
+    _primitive_type: PhantomData<P>,
+    _odbc_item: PhantomData<O>,
+    odbc_to_arrow: F,
+}
+
+impl<P, O, F> ErrorToNullStrategy<P, O, F> {
+    fn new(odbc_to_arrow: F) -> Self {
+        Self {
+            _primitive_type: PhantomData,
+            _odbc_item: PhantomData,
+            odbc_to_arrow,
+        }
+    }
+}
+
+impl<P, O, F> ReadStrategy for ErrorToNullStrategy<P, O, F>
 where
     P: ArrowPrimitiveType + Send,
     O: Item + Send,

@@ -118,6 +118,7 @@ pub fn choose_column_strategy(
     query_metadata: &mut impl ResultSetMetadata,
     col_index: u16,
     buffer_allocation_options: BufferAllocationOptions,
+    map_value_errors_to_null: bool,
 ) -> Result<Box<dyn ReadStrategy + Send>, ColumnFailure> {
     let strat: Box<dyn ReadStrategy + Send> = match field.data_type() {
         ArrowDataType::Boolean => {
@@ -135,7 +136,7 @@ pub fn choose_column_strategy(
         ArrowDataType::Float32 => Float32Type::identical(field.is_nullable()),
         ArrowDataType::Float64 => Float64Type::identical(field.is_nullable()),
         ArrowDataType::Date32 => {
-            Date32Type::map_with(field.is_nullable(), |e| Ok(days_since_epoch(e)))
+            Date32Type::map_infallible(field.is_nullable(), |e| Ok(days_since_epoch(e)))
         }
         ArrowDataType::Utf8 => {
             let sql_type = query_metadata
@@ -175,13 +176,13 @@ pub fn choose_column_strategy(
             Box::new(Binary::new(length))
         }
         ArrowDataType::Timestamp(TimeUnit::Second, _) => {
-            TimestampSecondType::map_with(field.is_nullable(), |e| Ok(seconds_since_epoch(e)))
+            TimestampSecondType::map_infallible(field.is_nullable(), |e| Ok(seconds_since_epoch(e)))
         }
         ArrowDataType::Timestamp(TimeUnit::Millisecond, _) => {
-            TimestampMillisecondType::map_with(field.is_nullable(), |e| Ok(ms_since_epoch(e)))
+            TimestampMillisecondType::map_infallible(field.is_nullable(), |e| Ok(ms_since_epoch(e)))
         }
         ArrowDataType::Timestamp(TimeUnit::Microsecond, _) => {
-            TimestampMicrosecondType::map_with(field.is_nullable(), |e| Ok(us_since_epoch(e)))
+            TimestampMicrosecondType::map_infallible(field.is_nullable(), |e| Ok(us_since_epoch(e)))
         }
         ArrowDataType::Timestamp(TimeUnit::Nanosecond, _) => {
             TimestampNanosecondType::map_with(field.is_nullable(), ns_since_epoch)
