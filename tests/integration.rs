@@ -551,6 +551,7 @@ fn map_out_of_range_date_time_to_null() {
     // Now that we have a cursor, we want to iterate over its rows and fill an arrow batch with it.
     let mut reader = OdbcReaderBuilder::new()
         .with_max_num_rows_per_batch(100)
+        .value_errors_as_null(true)
         .build(cursor)
         .unwrap()
         .into_concurrent()
@@ -771,7 +772,7 @@ fn fetch_schema_for_table() {
     let mut prepared = conn.prepare(&sql).unwrap();
 
     // Now that we have prepared statement, we want to use it to query metadata.
-    let schema = arrow_schema_from(&mut prepared).unwrap();
+    let schema = arrow_schema_from(&mut prepared, false).unwrap();
 
     assert_eq!(
         "Field { \

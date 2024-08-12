@@ -207,6 +207,7 @@ pub struct OdbcReaderBuilder {
     schema: Option<SchemaRef>,
     max_text_size: Option<usize>,
     max_binary_size: Option<usize>,
+    map_value_errors_to_null: bool,
     fallibale_allocations: bool,
 }
 
@@ -228,6 +229,7 @@ impl OdbcReaderBuilder {
             max_text_size: None,
             max_binary_size: None,
             fallibale_allocations: false,
+            map_value_errors_to_null: false,
         }
     }
 
@@ -307,6 +309,15 @@ impl OdbcReaderBuilder {
         self
     }
 
+    /// Set to `true` in order to map a value in the database which can not be successfully
+    /// converted into its target type to NULL, rather than emitting an external Arrow Error.
+    /// E.g. currently mapping errors can happen if a datetime value is not in the rang
+    /// representable by arrow. Default is `false`.
+    pub fn value_errors_as_null(&mut self, map_value_errors_to_null: bool) -> &mut Self {
+        self.map_value_errors_to_null = map_value_errors_to_null;
+        self
+    }
+
     /// No matter if the user explicitly specified a limit in row size, a memory limit, both or
     /// neither. In order to construct a reader we need to decide on the buffer size in rows.
     fn buffer_size_in_rows(&self, bytes_per_row: usize) -> Result<usize, Error> {
@@ -345,7 +356,7 @@ impl OdbcReaderBuilder {
             fallibale_allocations: self.fallibale_allocations,
         };
         let converter =
-            ToRecordBatch::new(&mut cursor, self.schema.clone(), buffer_allocation_options)?;
+            ToRecordBatch::new(&mut cursor, self.schema.clone(), buffer_allocation_options, self.map_value_errors_to_null)?;
         let bytes_per_row = converter.row_size_in_bytes();
         let buffer_size_in_rows = self.buffer_size_in_rows(bytes_per_row)?;
         let row_set_buffer =

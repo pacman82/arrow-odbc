@@ -29,7 +29,10 @@ use crate::{ColumnFailure, Error};
 ///     Ok(schema)
 /// }
 /// ```
-pub fn arrow_schema_from(resut_set_metadata: &mut impl ResultSetMetadata) -> Result<Schema, Error> {
+pub fn arrow_schema_from(
+    resut_set_metadata: &mut impl ResultSetMetadata,
+    map_value_errors_to_null: bool,
+) -> Result<Schema, Error> {
     let num_cols: u16 = resut_set_metadata
         .num_result_cols()
         .map_err(Error::UnableToRetrieveNumCols)?

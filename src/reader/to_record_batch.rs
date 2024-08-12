@@ -27,12 +27,13 @@ impl ToRecordBatch {
         cursor: &mut impl ResultSetMetadata,
         schema: Option<SchemaRef>,
         buffer_allocation_options: BufferAllocationOptions,
+        map_value_errors_to_null: bool,
     ) -> Result<Self, Error> {
         // Infer schema if not given by the user
         let schema = if let Some(schema) = schema {
             schema
         } else {
-            Arc::new(arrow_schema_from(cursor)?)
+            Arc::new(arrow_schema_from(cursor, map_value_errors_to_null)?)
         };
 
         let column_strategies: Vec<Box<dyn ReadStrategy + Send>> = schema
@@ -41,8 +42,14 @@ impl ToRecordBatch {
             .enumerate()
             .map(|(index, field)| {
                 let col_index = (index + 1).try_into().unwrap();
-                choose_column_strategy(field, cursor, col_index, buffer_allocation_options)
-                    .map_err(|cause| cause.into_crate_error(field.name().clone(), index))
+                choose_column_strategy(
+                    field,
+                    cursor,
+                    col_index,
+                    buffer_allocation_options,
+                    map_value_errors_to_null,
+                )
+                .map_err(|cause| cause.into_crate_error(field.name().clone(), index))
             })
             .collect::<Result<_, _>>()?;
 
