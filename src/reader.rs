@@ -185,7 +185,7 @@ pub fn choose_column_strategy(
             TimestampMicrosecondType::map_infallible(field.is_nullable(), |e| Ok(us_since_epoch(e)))
         }
         ArrowDataType::Timestamp(TimeUnit::Nanosecond, _) => {
-            TimestampNanosecondType::map_with(field.is_nullable(), ns_since_epoch)
+            TimestampNanosecondType::map_falliable(field.is_nullable(), map_value_errors_to_null, ns_since_epoch)
         }
         ArrowDataType::FixedSizeBinary(length) => {
             Box::new(FixedSizedBinary::new((*length).try_into().unwrap()))

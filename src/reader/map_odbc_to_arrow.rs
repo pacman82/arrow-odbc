@@ -15,9 +15,10 @@ pub trait MapOdbcToArrow {
     type ArrowElement;
 
     /// Use the provided function to convert an element of an ODBC column buffer into the desired
-    /// element of an arrow array.
-    fn map_with<U>(
+    /// element of an arrow array. This method assumes the conversion is falliable.
+    fn map_falliable<U>(
         nullable: bool,
+        map_errors_to_null: bool,
         odbc_to_arrow: impl Fn(&U) -> Result<Self::ArrowElement, MappingError> + 'static + Send,
     ) -> Box<dyn ReadStrategy + Send>
     where
@@ -45,18 +46,23 @@ where
 {
     type ArrowElement = T::Native;
 
-    fn map_with<U>(
+    fn map_falliable<U>(
         nullable: bool,
+        map_errors_to_null: bool,
         odbc_to_arrow: impl Fn(&U) -> Result<Self::ArrowElement, MappingError> + 'static + Send,
     ) -> Box<dyn ReadStrategy + Send>
     where
         U: Item + 'static + Send,
     {
-        if nullable {
-            Box::new(NullableStrategy::<Self, U, _>::new(odbc_to_arrow))
-        } else {
-            Box::new(NonNullableStrategy::<Self, U, _>::new(odbc_to_arrow))
+        if map_errors_to_null {
+            return Box::new(ErrorToNullStrategy::<Self, U, _>::new(odbc_to_arrow));
         }
+
+        if nullable {
+            return Box::new(NullableStrategy::<Self, U, _>::new(odbc_to_arrow));
+        }
+
+        Box::new(NonNullableStrategy::<Self, U, _>::new(odbc_to_arrow))
     }
 
     fn map_infallible<U>(
@@ -248,7 +254,7 @@ where
         let opts = column_view.as_nullable_slice::<O>().unwrap();
         let mut builder = PrimitiveBuilder::<P>::with_capacity(opts.len());
         for odbc_opt in opts {
-            builder.append_option(odbc_opt.map(&self.odbc_to_arrow).transpose()?);
+            builder.append_option(odbc_opt.and_then(|val| (self.odbc_to_arrow)(val).ok()));
         }
         Ok(Arc::new(builder.finish()))
     }
