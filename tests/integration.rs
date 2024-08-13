@@ -546,7 +546,11 @@ fn fetch_out_of_range_date_time_ns() {
 #[test]
 fn map_out_of_range_date_time_to_null() {
     let table_name = function_name!().rsplit_once(':').unwrap().1;
-    let cursor = cursor_over(table_name, "DATETIME2 NOT NULL", "('2300-01-01 00:00:00.1234567')");
+    let cursor = cursor_over(
+        table_name,
+        "DATETIME2 NOT NULL",
+        "('2300-01-01 00:00:00.1234567'),('2002-09-30 12:43:17.456')",
+    );
 
     // Now that we have a cursor, we want to iterate over its rows and fill an arrow batch with it.
     let mut reader = OdbcReaderBuilder::new()
@@ -559,6 +563,22 @@ fn map_out_of_range_date_time_to_null() {
     // Batch for batch copy values from ODBC buffer into arrow batches
     let record_batch = reader.next().unwrap().unwrap();
     let array = record_batch.column(0).clone();
+
+    // Assert that the correct values are found within the arrow batch
+    let array_vals = array
+        .as_any()
+        .downcast_ref::<TimestampNanosecondArray>()
+        .unwrap();
+    assert!(array_vals.is_null(0));
+    assert_eq!(
+        Some(
+            NaiveDate::from_ymd_opt(2002, 9, 30)
+                .unwrap()
+                .and_hms_nano_opt(12, 43, 17, 456_000_000)
+                .unwrap()
+        ),
+        array_vals.value_as_datetime(1)
+    );
 }
 
 /// Fill a record batch of Decimals
@@ -1949,7 +1969,9 @@ fn sanatize_column_names() {
         .connect_with_connection_string(MSSQL, Default::default())
         .unwrap();
     let drop_table = &format!("DROP TABLE IF EXISTS {table_name}");
-    let create_table = format!("CREATE TABLE {table_name} (id int IDENTITY(1,1),\"column name with spaces\" INTEGER);");
+    let create_table = format!(
+        "CREATE TABLE {table_name} (id int IDENTITY(1,1),\"column name with spaces\" INTEGER);"
+    );
     conn.execute(drop_table, ()).unwrap();
     conn.execute(&create_table, ()).unwrap();
     let array = Int32Array::from(vec![Some(42)]);
