@@ -25,7 +25,8 @@ use crate::{ColumnFailure, Error};
 ///     let mut prepared = connection.prepare(&sql)?;
 ///     
 ///     // Now that we have prepared statement, we want to use it to query metadata.
-///     let schema = arrow_schema_from(&mut prepared)?;
+///     let map_errors_to_null = false;
+///     let schema = arrow_schema_from(&mut prepared, map_errors_to_null)?;
 ///     Ok(schema)
 /// }
 /// ```
@@ -40,7 +41,7 @@ pub fn arrow_schema_from(
         .unwrap();
     let mut fields = Vec::new();
     for index in 0..num_cols {
-        let field = arrow_field_from(resut_set_metadata, index)?;
+        let field = arrow_field_from(resut_set_metadata, index, map_value_errors_to_null)?;
 
         fields.push(field)
     }
@@ -50,6 +51,7 @@ pub fn arrow_schema_from(
 fn arrow_field_from(
     resut_set_metadata: &mut impl ResultSetMetadata,
     index: u16,
+    map_value_errors_to_null: bool,
 ) -> Result<Field, Error> {
     let mut column_description = ColumnDescription::default();
     resut_set_metadata
@@ -141,6 +143,9 @@ fn arrow_field_from(
         | OdbcDataType::LongVarchar { length: _ }
         | OdbcDataType::Varchar { length: _ } => ArrowDataType::Utf8,
     };
-    let field = Field::new(name, data_type, column_description.could_be_nullable());
+    let is_falliable = matches!(data_type, ArrowDataType::Timestamp(TimeUnit::Nanosecond, _));
+    let nullable =
+        column_description.could_be_nullable() || (is_falliable && map_value_errors_to_null);
+    let field = Field::new(name, data_type, nullable);
     Ok(field)
 }
