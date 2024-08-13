@@ -135,9 +135,7 @@ pub fn choose_column_strategy(
         ArrowDataType::UInt8 => UInt8Type::identical(field.is_nullable()),
         ArrowDataType::Float32 => Float32Type::identical(field.is_nullable()),
         ArrowDataType::Float64 => Float64Type::identical(field.is_nullable()),
-        ArrowDataType::Date32 => {
-            Date32Type::map_infallible(field.is_nullable(), |e| Ok(days_since_epoch(e)))
-        }
+        ArrowDataType::Date32 => Date32Type::map_infalliable(field.is_nullable(), days_since_epoch),
         ArrowDataType::Utf8 => {
             let sql_type = query_metadata
                 .col_data_type(col_index)
@@ -176,16 +174,20 @@ pub fn choose_column_strategy(
             Box::new(Binary::new(length))
         }
         ArrowDataType::Timestamp(TimeUnit::Second, _) => {
-            TimestampSecondType::map_infallible(field.is_nullable(), |e| Ok(seconds_since_epoch(e)))
+            TimestampSecondType::map_infalliable(field.is_nullable(), seconds_since_epoch)
         }
         ArrowDataType::Timestamp(TimeUnit::Millisecond, _) => {
-            TimestampMillisecondType::map_infallible(field.is_nullable(), |e| Ok(ms_since_epoch(e)))
+            TimestampMillisecondType::map_infalliable(field.is_nullable(), ms_since_epoch)
         }
         ArrowDataType::Timestamp(TimeUnit::Microsecond, _) => {
-            TimestampMicrosecondType::map_infallible(field.is_nullable(), |e| Ok(us_since_epoch(e)))
+            TimestampMicrosecondType::map_infalliable(field.is_nullable(), us_since_epoch)
         }
         ArrowDataType::Timestamp(TimeUnit::Nanosecond, _) => {
-            TimestampNanosecondType::map_falliable(field.is_nullable(), map_value_errors_to_null, ns_since_epoch)
+            TimestampNanosecondType::map_falliable(
+                field.is_nullable(),
+                map_value_errors_to_null,
+                ns_since_epoch,
+            )
         }
         ArrowDataType::FixedSizeBinary(length) => {
             Box::new(FixedSizedBinary::new((*length).try_into().unwrap()))

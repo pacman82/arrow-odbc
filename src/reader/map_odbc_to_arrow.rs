@@ -26,9 +26,9 @@ pub trait MapOdbcToArrow {
 
     /// Use the infallible function provided to convert an element of an ODBC column buffer into the
     /// desired element of an arrow array.
-    fn map_infallible<U>(
+    fn map_infalliable<U>(
         nullable: bool,
-        odbc_to_arrow: impl Fn(&U) -> Result<Self::ArrowElement, MappingError> + 'static + Send,
+        odbc_to_arrow: impl Fn(&U) -> Self::ArrowElement + 'static + Send,
     ) -> Box<dyn ReadStrategy + Send>
     where
         U: Item + 'static + Send;
@@ -65,17 +65,17 @@ where
         Box::new(NonNullableStrategy::<Self, U, _>::new(odbc_to_arrow))
     }
 
-    fn map_infallible<U>(
+    fn map_infalliable<U>(
         nullable: bool,
-        odbc_to_arrow: impl Fn(&U) -> Result<Self::ArrowElement, MappingError> + 'static + Send,
+        odbc_to_arrow: impl Fn(&U) -> Self::ArrowElement + 'static + Send,
     ) -> Box<dyn ReadStrategy + Send>
     where
         U: Item + 'static + Send,
     {
         if nullable {
-            Box::new(NullableStrategy::<Self, U, _>::new(odbc_to_arrow))
+            Box::new(NullableStrategy::<Self, U, _>::new(OkWrappedMapped(odbc_to_arrow)))
         } else {
-            Box::new(NonNullableStrategy::<Self, U, _>::new(odbc_to_arrow))
+            Box::new(NonNullableStrategy::<Self, U, _>::new(OkWrappedMapped(odbc_to_arrow)))
         }
     }
 
@@ -88,6 +88,39 @@ where
         } else {
             Box::new(NonNullDirectStrategy::<Self>::new())
         }
+    }
+}
+
+/// We introduce this trait instead of using the Fn(...) trait syntax directly, in order to being
+/// able to provide an implementation for `OkWrappedMapped`. Which in turn we need to reuse our
+/// Strategy implementations for falliable and infalliable cases.
+///
+/// We could save our selves all of this if Rust would be better at figuring out then to promote
+/// the lifetimes in closures to higher order liftimes, but at time of writing this, I've not been
+/// able to Ok wrapping with a straight forward lambda `|e| Ok(f(e))``. (Current version 1.79).
+///
+/// Since Fn traits can not be implemented manually either we introduce this one.
+trait MapElement<O, A> {
+    fn map_element(&self, odbc: &O) -> Result<A, MappingError>;
+}
+
+impl<T, O, A> MapElement<O, A> for T
+where
+    T: Fn(&O) -> Result<A, MappingError>,
+{
+    fn map_element(&self, odbc: &O) -> Result<A, MappingError> {
+        self(odbc)
+    }
+}
+
+struct OkWrappedMapped<F>(F);
+
+impl<F, O, A> MapElement<O, A> for OkWrappedMapped<F>
+where
+    F: Fn(&O) -> A,
+{
+    fn map_element(&self, odbc: &O) -> Result<A, MappingError> {
+        Ok((self.0)(odbc))
     }
 }
 
@@ -171,7 +204,7 @@ impl<P, O, F> ReadStrategy for NonNullableStrategy<P, O, F>
 where
     P: ArrowPrimitiveType + Send,
     O: Item + Send,
-    F: Fn(&O) -> Result<P::Native, MappingError> + Send,
+    F: MapElement<O, P::Native>,
 {
     fn buffer_desc(&self) -> BufferDesc {
         O::buffer_desc(false)
@@ -181,7 +214,7 @@ where
         let slice = column_view.as_slice::<O>().unwrap();
         let mut builder = PrimitiveBuilder::<P>::with_capacity(slice.len());
         for odbc_value in slice {
-            builder.append_value((self.odbc_to_arrow)(odbc_value)?);
+            builder.append_value(self.odbc_to_arrow.map_element(odbc_value)?);
         }
         Ok(Arc::new(builder.finish()))
     }
@@ -207,7 +240,7 @@ impl<P, O, F> ReadStrategy for NullableStrategy<P, O, F>
 where
     P: ArrowPrimitiveType + Send,
     O: Item + Send,
-    F: Fn(&O) -> Result<P::Native, MappingError> + Send,
+    F: MapElement<O, P::Native>,
 {
     fn buffer_desc(&self) -> BufferDesc {
         O::buffer_desc(true)
@@ -217,7 +250,11 @@ where
         let opts = column_view.as_nullable_slice::<O>().unwrap();
         let mut builder = PrimitiveBuilder::<P>::with_capacity(opts.len());
         for odbc_opt in opts {
-            builder.append_option(odbc_opt.map(&self.odbc_to_arrow).transpose()?);
+            builder.append_option(
+                odbc_opt
+                    .map(|odbc_element| self.odbc_to_arrow.map_element(odbc_element))
+                    .transpose()?,
+            );
         }
         Ok(Arc::new(builder.finish()))
     }
