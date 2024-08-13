@@ -82,7 +82,7 @@ impl ReadStrategy for NullableBoolean {
 
 /// Allows setting limits for buffers bound to the ODBC data source. Check this out if you find that
 /// you get memory allocation, or zero sized column errors. Used than constructing a reader using
-/// [`crate::OdbcReader::with`].
+/// [`crate::OdbcReaderBuilder`].
 #[derive(Default, Debug, Clone, Copy)]
 pub struct BufferAllocationOptions {
     /// An upper limit for the size of buffers bound to variadic text columns of the data source.

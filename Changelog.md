@@ -1,5 +1,10 @@
 # Changelog
 
+## 12.0.0
+
+* Enable mapping out of ranges dates to `NULL`. You can do so using `OdbcReaderBuilder::value_errors_as_null`.
+* Breaking: `arrow_schema_from` now takes an additional boolean parameter `map_value_errors_to_null`.
+
 ## 11.2.0
 
 * Update odbc-api `>= 6, < 8` -> `>= 6, < 9`

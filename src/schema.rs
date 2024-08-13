@@ -6,8 +6,8 @@ use std::convert::TryInto;
 use crate::{ColumnFailure, Error};
 
 /// Query the metadata to create an arrow schema. This method is invoked automatically for you by
-/// [`crate::OdbcReader::new`]. You may want to call this method in situtation ther you want to
-/// create an arrow schema without creating the reader yet.
+/// [`crate::OdbcReaderBuilder::build`]. You may want to call this method in situtation ther you want
+/// to create an arrow schema without creating the reader yet.
 ///
 /// # Example
 ///
