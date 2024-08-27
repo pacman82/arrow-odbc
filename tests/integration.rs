@@ -301,6 +301,31 @@ fn fetch_varchar() {
     assert!(array_vals.is_null(2));
 }
 
+/// Fill a record batch of Strings from a varchar source column
+#[test]
+fn trim_fixed_sized_character_data() {
+    let table_name = function_name!().rsplit_once(':').unwrap().1;
+
+    let cursor = cursor_over(table_name, "CHAR(4)", "('1234'),(' 123'),('123 ')");
+    // Now that we have a cursor, we want to iterate over its rows and fill an arrow batch with it.
+    let mut reader = OdbcReaderBuilder::new()
+        .with_max_num_rows_per_batch(4)
+        .trim_fixed_sized_characters(true)
+        .build(cursor)
+        .unwrap()
+        .into_concurrent()
+        .unwrap();
+    // Batch for batch copy values from ODBC buffer into arrow batches
+    let record_batch = reader.next().unwrap().unwrap();
+    let array_any = record_batch.column(0).clone();
+
+    // Assert that the correct values are found within the arrow batch
+    let array_vals = array_any.as_any().downcast_ref::<StringArray>().unwrap();
+    assert_eq!("1234", array_vals.value(0));
+    assert_eq!(" 123", array_vals.value(1));
+    assert_eq!("123 ", array_vals.value(2));
+}
+
 /// Fill a record batch of Strings from a nvarchar source column
 #[test]
 fn fetch_nvarchar() {
