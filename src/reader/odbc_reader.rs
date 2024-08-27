@@ -318,6 +318,12 @@ impl OdbcReaderBuilder {
         self
     }
 
+    /// If set to `true` text in fixed sized character columns like e.g. CHAR are trimmed of
+    /// whitespaces before converted into Arrow UTF-8 arrays. Default is `false`.
+    pub fn trim_fixed_sized_characters(&mut self, fixed_sized_character_strings_are_trimmed: bool) -> &mut Self{
+        self
+    }
+
     /// No matter if the user explicitly specified a limit in row size, a memory limit, both or
     /// neither. In order to construct a reader we need to decide on the buffer size in rows.
     fn buffer_size_in_rows(&self, bytes_per_row: usize) -> Result<usize, Error> {
