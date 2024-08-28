@@ -119,6 +119,7 @@ pub fn choose_column_strategy(
     col_index: u16,
     buffer_allocation_options: BufferAllocationOptions,
     map_value_errors_to_null: bool,
+    trim_fixed_sized_character_strings: bool,
 ) -> Result<Box<dyn ReadStrategy + Send>, ColumnFailure> {
     let strat: Box<dyn ReadStrategy + Send> = match field.data_type() {
         ArrowDataType::Boolean => {
@@ -149,6 +150,7 @@ pub fn choose_column_strategy(
                 sql_type,
                 lazy_display_size,
                 buffer_allocation_options.max_text_size,
+                trim_fixed_sized_character_strings,
             )?
         }
         ArrowDataType::Decimal128(precision, scale @ 0..) => {

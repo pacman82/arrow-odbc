@@ -28,6 +28,7 @@ impl ToRecordBatch {
         schema: Option<SchemaRef>,
         buffer_allocation_options: BufferAllocationOptions,
         map_value_errors_to_null: bool,
+        trim_fixed_sized_character_strings: bool,
     ) -> Result<Self, Error> {
         // Infer schema if not given by the user
         let schema = if let Some(schema) = schema {
@@ -48,6 +49,7 @@ impl ToRecordBatch {
                     col_index,
                     buffer_allocation_options,
                     map_value_errors_to_null,
+                    trim_fixed_sized_character_strings,
                 )
                 .map_err(|cause| cause.into_crate_error(field.name().clone(), index))
             })

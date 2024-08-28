@@ -16,6 +16,7 @@ pub fn choose_text_strategy(
     sql_type: OdbcDataType,
     lazy_display_size: impl FnOnce() -> Result<Option<NonZeroUsize>, odbc_api::Error>,
     max_text_size: Option<usize>,
+    trim_fixed_sized_character_strings: bool,
 ) -> Result<Box<dyn ReadStrategy + Send>, ColumnFailure> {
     let apply_buffer_limit = |len| match (len, max_text_size) {
         (None, None) => Err(ColumnFailure::ZeroSizedColumn { sql_type }),
@@ -23,6 +24,11 @@ pub fn choose_text_strategy(
         (Some(len), None) => Ok(len),
         (Some(len), Some(limit)) => Ok(min(len, limit)),
     };
+    let is_fixed_sized_char = matches!(
+        sql_type,
+        OdbcDataType::Char { .. } | OdbcDataType::WChar { .. }
+    );
+    let trim = trim_fixed_sized_character_strings && is_fixed_sized_char;
     let strategy: Box<dyn ReadStrategy + Send> = if cfg!(target_os = "windows") {
         let hex_len = sql_type
             .utf16_len()
@@ -31,7 +37,7 @@ pub fn choose_text_strategy(
             .transpose()
             .map_err(|source| ColumnFailure::UnknownStringLength { sql_type, source })?;
         let hex_len = apply_buffer_limit(hex_len.map(NonZeroUsize::get))?;
-        wide_text_strategy(hex_len)
+        wide_text_strategy(hex_len, trim)
     } else {
         let octet_len = sql_type
             .utf8_len()
@@ -43,20 +49,18 @@ pub fn choose_text_strategy(
         // So far only Linux users seemed to have complained about panics due to garbage indices?
         // Linux usually would use UTF-8, so we only invest work in working around this for narrow
         // strategies
-        narrow_text_strategy(octet_len)
+        narrow_text_strategy(octet_len, trim)
     };
 
     Ok(strategy)
 }
 
-fn wide_text_strategy(u16_len: usize) -> Box<dyn ReadStrategy + Send> {
-    Box::new(WideText::new(u16_len))
+fn wide_text_strategy(u16_len: usize, trim: bool) -> Box<dyn ReadStrategy + Send> {
+    Box::new(WideText::new(u16_len, trim))
 }
 
-fn narrow_text_strategy(
-    octet_len: usize,
-) -> Box<dyn ReadStrategy + Send> {
-    Box::new(NarrowText::new(octet_len))
+fn narrow_text_strategy(octet_len: usize, trim: bool) -> Box<dyn ReadStrategy + Send> {
+    Box::new(NarrowText::new(octet_len, trim))
 }
 
 /// Strategy requesting the text from the database as UTF-16 (Wide characters) and emmitting it as
@@ -65,11 +69,13 @@ fn narrow_text_strategy(
 pub struct WideText {
     /// Maximum string length in u16, excluding terminating zero
     max_str_len: usize,
+    /// Wether the string should be trimmed.
+    trim: bool,
 }
 
 impl WideText {
-    pub fn new(max_str_len: usize) -> Self {
-        Self { max_str_len }
+    pub fn new(max_str_len: usize, trim: bool) -> Self {
+        Self { max_str_len, trim }
     }
 }
 
@@ -96,7 +102,12 @@ impl ReadStrategy for WideText {
                 for c in decode_utf16(utf16.as_slice().iter().cloned()) {
                     buf_utf8.push(c.unwrap());
                 }
-                Some(&buf_utf8)
+                let slice = if self.trim {
+                    buf_utf8.trim()
+                } else {
+                    buf_utf8.as_str()
+                };
+                Some(slice)
             } else {
                 None
             };
@@ -109,11 +120,13 @@ impl ReadStrategy for WideText {
 pub struct NarrowText {
     /// Maximum string length in u8, excluding terminating zero
     max_str_len: usize,
+    /// Wether the string should be trimmed.
+    trim: bool,
 }
 
 impl NarrowText {
-    pub fn new(max_str_len: usize) -> Self {
-        Self { max_str_len }
+    pub fn new(max_str_len: usize, trim: bool) -> Self {
+        Self { max_str_len, trim }
     }
 }
 
@@ -129,8 +142,13 @@ impl ReadStrategy for NarrowText {
         let mut builder = StringBuilder::with_capacity(view.len(), self.max_str_len * view.len());
         for value in view.iter() {
             builder.append_option(value.map(|bytes| {
-                std::str::from_utf8(bytes)
-                    .expect("ODBC driver had been expected to return valid utf8, but did not.")
+                let untrimmed = std::str::from_utf8(bytes)
+                    .expect("ODBC driver had been expected to return valid utf8, but did not.");
+                if self.trim {
+                    untrimmed.trim()
+                } else {
+                    untrimmed
+                }
             }));
         }
         Ok(Arc::new(builder.finish()))
