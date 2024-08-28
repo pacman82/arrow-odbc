@@ -322,8 +322,8 @@ fn trim_fixed_sized_character_data() {
     // Assert that the correct values are found within the arrow batch
     let array_vals = array_any.as_any().downcast_ref::<StringArray>().unwrap();
     assert_eq!("1234", array_vals.value(0));
-    assert_eq!(" 123", array_vals.value(1));
-    assert_eq!("123 ", array_vals.value(2));
+    assert_eq!("123", array_vals.value(1));
+    assert_eq!("123", array_vals.value(2));
 }
 
 /// Fill a record batch of Strings from a nvarchar source column

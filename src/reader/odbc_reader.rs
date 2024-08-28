@@ -209,6 +209,7 @@ pub struct OdbcReaderBuilder {
     max_binary_size: Option<usize>,
     map_value_errors_to_null: bool,
     fallibale_allocations: bool,
+    trim_fixed_sized_character_strings: bool,
 }
 
 impl OdbcReaderBuilder {
@@ -230,6 +231,7 @@ impl OdbcReaderBuilder {
             max_binary_size: None,
             fallibale_allocations: false,
             map_value_errors_to_null: false,
+            trim_fixed_sized_character_strings: false,
         }
     }
 
@@ -320,7 +322,11 @@ impl OdbcReaderBuilder {
 
     /// If set to `true` text in fixed sized character columns like e.g. CHAR are trimmed of
     /// whitespaces before converted into Arrow UTF-8 arrays. Default is `false`.
-    pub fn trim_fixed_sized_characters(&mut self, fixed_sized_character_strings_are_trimmed: bool) -> &mut Self{
+    pub fn trim_fixed_sized_characters(
+        &mut self,
+        fixed_sized_character_strings_are_trimmed: bool,
+    ) -> &mut Self {
+        self.trim_fixed_sized_character_strings = fixed_sized_character_strings_are_trimmed;
         self
     }
 
@@ -361,8 +367,13 @@ impl OdbcReaderBuilder {
             max_binary_size: self.max_binary_size,
             fallibale_allocations: self.fallibale_allocations,
         };
-        let converter =
-            ToRecordBatch::new(&mut cursor, self.schema.clone(), buffer_allocation_options, self.map_value_errors_to_null)?;
+        let converter = ToRecordBatch::new(
+            &mut cursor,
+            self.schema.clone(),
+            buffer_allocation_options,
+            self.map_value_errors_to_null,
+            self.trim_fixed_sized_character_strings
+        )?;
         let bytes_per_row = converter.row_size_in_bytes();
         let buffer_size_in_rows = self.buffer_size_in_rows(bytes_per_row)?;
         let row_set_buffer =
