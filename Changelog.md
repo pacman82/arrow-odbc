@@ -1,5 +1,9 @@
 # Changelog
 
+## 12.1.0
+
+* Enabling trimming of fixed sized character data via `OdbcReaderBuilder::trim_fixed_sized_characters`.
+
 ## 12.0.0
 
 * Enable mapping out of ranges dates to `NULL`. You can do so using `OdbcReaderBuilder::value_errors_as_null`.
