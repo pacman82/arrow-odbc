@@ -1,5 +1,9 @@
 # Changelog
 
+## 12.2.0
+
+* Update arrow `>= 29, < 53` -> `>= 29, < 54`
+
 ## 12.1.0
 
 * Enabling trimming of fixed sized character data via `OdbcReaderBuilder::trim_fixed_sized_characters`.
