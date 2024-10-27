@@ -75,7 +75,7 @@ pub struct ConcurrentOdbcReader<C: Cursor> {
     converter: ToRecordBatch,
     /// Fetches values from the ODBC datasource using columnar batches. Values are streamed batch
     /// by batch in order to avoid reallocation of the buffers used for tranistion.
-    batch_stream: ConcurrentBlockCursor<C>,
+    batch_stream: ConcurrentBlockCursor<C, ColumnarAnyBuffer>,
 }
 
 impl<C: Cursor + Send + 'static> ConcurrentOdbcReader<C> {
