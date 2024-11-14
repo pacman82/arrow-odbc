@@ -58,3 +58,9 @@ stdext = "0.3.3"
 float_eq = "1.0.1"
 
 [features]
+
+## For Apple Silicon users who installed unixodbc via:
+##    `brew install unixodbc`
+## This allows them to build the crate. 
+[target.'cfg(target_arch = "aarch64")'.build]
+rustflags = ["-L/opt/homebrew/lib", "-I/opt/homebrew/include"]

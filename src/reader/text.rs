@@ -1,12 +1,10 @@
-use std::{char::decode_utf16, cmp::min, num::NonZeroUsize, sync::Arc};
-
+use super::{ColumnFailure, MappingError, ReadStrategy};
 use arrow::array::{ArrayRef, StringBuilder};
 use odbc_api::{
     buffers::{AnySlice, BufferDesc},
     DataType as OdbcDataType,
 };
-
-use super::{ColumnFailure, MappingError, ReadStrategy};
+use std::{char::decode_utf16, cmp::min, num::NonZeroUsize, sync::Arc};
 
 /// This function decides wether this column will be queried as narrow (assumed to be utf-8) or
 /// wide text (assumed to be utf-16). The reason we do not always use narrow is that the encoding
@@ -139,17 +137,41 @@ impl ReadStrategy for NarrowText {
 
     fn fill_arrow_array(&self, column_view: AnySlice) -> Result<ArrayRef, MappingError> {
         let view = column_view.as_text_view().unwrap();
-        let mut builder = StringBuilder::with_capacity(view.len(), self.max_str_len * view.len());
+
+        let n = view.len();
+        let mut builder = StringBuilder::with_capacity(n, self.max_str_len * n);
+
+        // To be used only in the event of invalid UTF-8 bytes returned by the ODBC driver
+        let mut fallback = String::with_capacity(self.max_str_len * n);
+
         for value in view.iter() {
-            builder.append_option(value.map(|bytes| {
-                let untrimmed = std::str::from_utf8(bytes)
-                    .expect("ODBC driver had been expected to return valid utf8, but did not.");
-                if self.trim {
-                    untrimmed.trim()
-                } else {
-                    untrimmed
+            let value = value.map(|bytes| match std::str::from_utf8(&bytes) {
+                // If the bytes are valid UTF-8, happy days
+                Ok(utf8) => match self.trim {
+                    true => utf8.trim(),
+                    false => utf8,
+                },
+
+                // If the bytes are not valid UTF-8, we decode them lossily
+                // Lossily means that we replace invalid UTF-8 sequences with the
+                // Unicode replacement character (�) \u{FFFD}
+                Err(e) => {
+                    eprintln!(
+                        "Invalid UTF-8 returned by ODBC driver, decoding lossily. Error: {}",
+                        e
+                    );
+
+                    fallback.clear();
+                    fallback.push_str(String::from_utf8_lossy(&bytes).as_ref());
+
+                    match self.trim {
+                        true => fallback.trim(),
+                        false => fallback.as_ref(),
+                    }
                 }
-            }));
+            });
+
+            builder.append_option(value);
         }
         Ok(Arc::new(builder.finish()))
     }
