@@ -76,13 +76,7 @@ pub fn ns_since_epoch(from: &Timestamp) -> Result<i64, MappingError> {
 }
 
 pub fn epoch_to_timestamp<const UNIT_FACTOR: i64>(from: i64) -> Timestamp {
-    let ndt = DateTime::from_timestamp(
-        from / UNIT_FACTOR,
-        ((from % UNIT_FACTOR) * (1_000_000_000 / UNIT_FACTOR))
-            .try_into()
-            .unwrap(),
-    )
-    .unwrap();
+    let ndt = DateTime::from_timestamp_nanos(from * (1_000_000_000 / UNIT_FACTOR));
     let date = ndt.date_naive();
     let time = ndt.time();
     Timestamp {

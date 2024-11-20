@@ -501,6 +501,36 @@ fn fetch_date_time_ms() {
     );
 }
 
+/// Fetch a timestamp before unix epoch. See issue:
+/// <https://github.com/pacman82/arrow-odbc/issues/111>
+#[test]
+fn fetch_date_time_ms_before_epoch() {
+    let table_name = function_name!().rsplit_once(':').unwrap().1;
+
+    let array_any = fetch_arrow_data(
+        table_name,
+        "DATETIME",
+        "('1900-01-01 12:43:17.123')",
+    )
+    .unwrap();
+
+    let array_vals = array_any
+        .as_any()
+        .downcast_ref::<TimestampMillisecondArray>()
+        .unwrap();
+
+    // Assert that the correct values are found within the arrow batch
+    assert_eq!(
+        Some(
+            NaiveDate::from_ymd_opt(1900, 1, 1)
+                .unwrap()
+                .and_hms_milli_opt(12, 43, 17, 123)
+                .unwrap()
+        ),
+        array_vals.value_as_datetime(0)
+    );
+}
+
 /// Fill a record batch of non nullable timestamps with nanoseconds precision
 #[test]
 fn fetch_non_null_date_time_ns() {
