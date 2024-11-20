@@ -1,5 +1,17 @@
 # Changelog
 
+## [13.0.1](https://github.com/pacman82/arrow-odbc/compare/v13.0.0...v13.0.1) - 2024-11-20
+
+### Fixed
+
+- Timestamps with fractional seconds now work even if they are older than unix epoch.
+
+### Other
+
+- setup release-plz
+- use uppercase for changelog
+- Update thiserror requirement from 1.0.65 to 2.0.0
+
 ## 13.0.0
 
 * Update odbc-api `>= 6, < 9` -> `>= 9, < 10`
