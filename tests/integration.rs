@@ -501,7 +501,7 @@ fn fetch_date_time_ms() {
     );
 }
 
-/// Fetch a timestamp before unix epoch. See issue:
+/// Fetch a timestamp older than unix epoch, i.e 1970-01-01 00:00:00. See issue:
 /// <https://github.com/pacman82/arrow-odbc/issues/111>
 #[test]
 fn fetch_date_time_ms_before_epoch() {
@@ -511,6 +511,40 @@ fn fetch_date_time_ms_before_epoch() {
         table_name,
         "DATETIME",
         "('1900-01-01 12:43:17.123')",
+    )
+    .unwrap();
+
+    let array_vals = array_any
+        .as_any()
+        .downcast_ref::<TimestampMillisecondArray>()
+        .unwrap();
+
+    // Assert that the correct values are found within the arrow batch
+    assert_eq!(
+        Some(
+            NaiveDate::from_ymd_opt(1900, 1, 1)
+                .unwrap()
+                .and_hms_milli_opt(12, 43, 17, 123)
+                .unwrap()
+        ),
+        array_vals.value_as_datetime(0)
+    );
+}
+
+/// Overflows could occur if reusing the same conversion logic across different time units (e.g. ns
+/// and ms) due to the difference in time ranges an i64 associated with each unit might be able
+/// to represent.
+/// See issue: <https://github.com/pacman82/arrow-odbc/issues/113#issuecomment-2492380871>
+#[test]
+fn fetch_timestamp_ms_which_could_not_be_represented_as_i64_ns() {
+    let table_name = function_name!().rsplit_once(':').unwrap().1;
+
+    // Earliest date representable in ns is  1677-09-21T00:12:43.145224192, so this is earlier, but
+    // should still work, due to the precision, being set to ms
+    let array_any = fetch_arrow_data(
+        table_name,
+        "DATETIME2(3)",
+        "('1600-06-18T23:12:44.000Z')",
     )
     .unwrap();
 
