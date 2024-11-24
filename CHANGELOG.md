@@ -6,13 +6,6 @@
 
 - Overflow in epoch to timestamp is fixed. It is now possible to insert 1600-06-18 23:12:44.123 into a database with ms precision
 
-### Other
-
-- formatting
-- actual reproducing test for overflow in epoch to timestamp
-- fix test assertion
-- reproducing integartion test for overflow in epoch to timestamp
-
 ## [13.0.1](https://github.com/pacman82/arrow-odbc/compare/v13.0.0...v13.0.1) - 2024-11-20
 
 ### Fixed
