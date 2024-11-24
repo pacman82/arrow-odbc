@@ -16,7 +16,7 @@ use arrow::{
     error::ArrowError,
     record_batch::{RecordBatch, RecordBatchReader},
 };
-use chrono::{NaiveDate, NaiveDateTime};
+use chrono::NaiveDate;
 use float_eq::assert_float_eq;
 use lazy_static::lazy_static;
 
@@ -507,12 +507,8 @@ fn fetch_date_time_ms() {
 fn fetch_date_time_ms_before_epoch() {
     let table_name = function_name!().rsplit_once(':').unwrap().1;
 
-    let array_any = fetch_arrow_data(
-        table_name,
-        "DATETIME",
-        "('1900-01-01 12:43:17.123')",
-    )
-    .unwrap();
+    let array_any =
+        fetch_arrow_data(table_name, "DATETIME", "('1900-01-01 12:43:17.123')").unwrap();
 
     let array_vals = array_any
         .as_any()
@@ -540,12 +536,8 @@ fn fetch_timestamp_ms_which_could_not_be_represented_as_i64_ns() {
 
     // Earliest date representable in ns is  1677-09-21T00:12:43.145224192, so this is earlier, but
     // should still work, due to the precision, being set to ms
-    let array_any = fetch_arrow_data(
-        table_name,
-        "DATETIME2(3)",
-        "('1600-06-18T23:12:44.123Z')",
-    )
-    .unwrap();
+    let array_any =
+        fetch_arrow_data(table_name, "DATETIME2(3)", "('1600-06-18T23:12:44.123Z')").unwrap();
 
     let array_vals = array_any
         .as_any()
@@ -1614,7 +1606,7 @@ fn insert_timestamp_with_milliseconds_precisions() {
 /// Overflows could occur if reusing the same conversion logic across different time units (e.g. ns
 /// and ms) due to the difference in time ranges an i64 associated with each unit might be able
 /// to represent.
-/// 
+///
 /// See issue: <https://github.com/pacman82/arrow-odbc/issues/113>
 #[test]
 fn insert_timestamp_with_milliseconds_precisions_which_is_not_representable_as_i64_ns() {
@@ -1630,7 +1622,10 @@ fn insert_timestamp_with_milliseconds_precisions_which_is_not_representable_as_i
         false,
     )]));
     // Corresponds to single element array with entry 1970-05-09T14:25:11.111
-    let ndt = NaiveDate::from_ymd_opt(1600, 6, 18).unwrap().and_hms_milli_opt(23, 12, 44, 123).unwrap();
+    let ndt = NaiveDate::from_ymd_opt(1600, 6, 18)
+        .unwrap()
+        .and_hms_milli_opt(23, 12, 44, 123)
+        .unwrap();
     let epoch_ms = ndt.and_utc().timestamp_millis();
     let array = TimestampMillisecondArray::from(vec![epoch_ms]);
     let batch = RecordBatch::try_new(schema.clone(), vec![Arc::new(array)]).unwrap();

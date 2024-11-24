@@ -75,8 +75,29 @@ pub fn ns_since_epoch(from: &Timestamp) -> Result<i64, MappingError> {
         .ok_or(MappingError::OutOfRangeTimestampNs { value: ndt })
 }
 
-pub fn epoch_to_timestamp<const UNIT_FACTOR: i64>(from: i64) -> Timestamp {
-    let ndt = DateTime::from_timestamp_nanos(from * (1_000_000_000 / UNIT_FACTOR));
+pub fn epoch_to_timestamp_ns(from: i64) -> Timestamp {
+    let ndt = DateTime::from_timestamp_nanos(from);
+    datetime_to_timestamp(ndt)
+}
+
+pub fn epoch_to_timestamp_us(from: i64) -> Timestamp {
+    let ndt =
+        DateTime::from_timestamp_micros(from ).expect("Timestamp must be in range for microseconds");
+    datetime_to_timestamp(ndt)
+}
+
+pub fn epoch_to_timestamp_ms(from: i64) -> Timestamp {
+    let ndt =
+        DateTime::from_timestamp_millis(from).expect("Timestamp must be in range for milliseconds");
+    datetime_to_timestamp(ndt)
+}
+
+pub fn epoch_to_timestamp_s(from: i64) -> Timestamp {
+    let ndt = DateTime::from_timestamp_millis(from * 1_000).expect("Timestamp must be in range for milliseconds");
+    datetime_to_timestamp(ndt)
+}
+
+fn datetime_to_timestamp(ndt: DateTime<chrono::Utc>) -> Timestamp {
     let date = ndt.date_naive();
     let time = ndt.time();
     Timestamp {

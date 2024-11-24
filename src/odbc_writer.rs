@@ -21,7 +21,7 @@ use odbc_api::{
 
 use crate::{
     date_time::{
-        epoch_to_date, epoch_to_timestamp, sec_since_midnight_to_time, NullableTimeAsText,
+        epoch_to_date, epoch_to_timestamp_s, epoch_to_timestamp_ms, epoch_to_timestamp_ns, epoch_to_timestamp_us, sec_since_midnight_to_time, NullableTimeAsText
     },
     decimal::{NullableDecimal128AsText, NullableDecimal256AsText},
 };
@@ -349,18 +349,18 @@ fn field_to_write_strategy(field: &Field) -> Result<Box<dyn WriteStrategy>, Writ
         DataType::Float32 => Float32Type::identical(is_nullable),
         DataType::Float64 => Float64Type::identical(is_nullable),
         DataType::Timestamp(TimeUnit::Second, None) => {
-            TimestampSecondType::map_with(is_nullable, epoch_to_timestamp::<1>)
+            TimestampSecondType::map_with(is_nullable, epoch_to_timestamp_s)
         }
         DataType::Timestamp(TimeUnit::Millisecond, None) => {
-            TimestampMillisecondType::map_with(is_nullable, epoch_to_timestamp::<1_000>)
+            TimestampMillisecondType::map_with(is_nullable, epoch_to_timestamp_ms)
         }
         DataType::Timestamp(TimeUnit::Microsecond, None) => {
-            TimestampMicrosecondType::map_with(is_nullable, epoch_to_timestamp::<1_000_000>)
+            TimestampMicrosecondType::map_with(is_nullable, epoch_to_timestamp_us)
         }
         DataType::Timestamp(TimeUnit::Nanosecond, None) => {
             TimestampNanosecondType::map_with(is_nullable, |ns| {
                 // Drop the last to digits of precision, since we bind it with precision 7 and not 9.
-                epoch_to_timestamp::<10_000_000>(ns / 100)
+                epoch_to_timestamp_ns((ns / 100) * 100)
             })
         }
         DataType::Date32 => Date32Type::map_with(is_nullable, epoch_to_date),
