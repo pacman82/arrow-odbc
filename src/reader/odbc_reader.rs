@@ -372,7 +372,7 @@ impl OdbcReaderBuilder {
             self.schema.clone(),
             buffer_allocation_options,
             self.map_value_errors_to_null,
-            self.trim_fixed_sized_character_strings
+            self.trim_fixed_sized_character_strings,
         )?;
         let bytes_per_row = converter.row_size_in_bytes();
         let buffer_size_in_rows = self.buffer_size_in_rows(bytes_per_row)?;

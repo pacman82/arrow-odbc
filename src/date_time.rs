@@ -82,7 +82,7 @@ pub fn epoch_to_timestamp_ns(from: i64) -> Timestamp {
 
 pub fn epoch_to_timestamp_us(from: i64) -> Timestamp {
     let ndt =
-        DateTime::from_timestamp_micros(from ).expect("Timestamp must be in range for microseconds");
+        DateTime::from_timestamp_micros(from).expect("Timestamp must be in range for microseconds");
     datetime_to_timestamp(ndt)
 }
 
@@ -93,7 +93,8 @@ pub fn epoch_to_timestamp_ms(from: i64) -> Timestamp {
 }
 
 pub fn epoch_to_timestamp_s(from: i64) -> Timestamp {
-    let ndt = DateTime::from_timestamp_millis(from * 1_000).expect("Timestamp must be in range for milliseconds");
+    let ndt = DateTime::from_timestamp_millis(from * 1_000)
+        .expect("Timestamp must be in range for milliseconds");
     datetime_to_timestamp(ndt)
 }
 

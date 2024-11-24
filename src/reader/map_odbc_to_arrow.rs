@@ -73,9 +73,13 @@ where
         U: Item + 'static + Send,
     {
         if nullable {
-            Box::new(NullableStrategy::<Self, U, _>::new(OkWrappedMapped(odbc_to_arrow)))
+            Box::new(NullableStrategy::<Self, U, _>::new(OkWrappedMapped(
+                odbc_to_arrow,
+            )))
         } else {
-            Box::new(NonNullableStrategy::<Self, U, _>::new(OkWrappedMapped(odbc_to_arrow)))
+            Box::new(NonNullableStrategy::<Self, U, _>::new(OkWrappedMapped(
+                odbc_to_arrow,
+            )))
         }
     }
 
