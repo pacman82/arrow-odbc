@@ -16,7 +16,7 @@ use arrow::{
     error::ArrowError,
     record_batch::{RecordBatch, RecordBatchReader},
 };
-use chrono::NaiveDate;
+use chrono::{NaiveDate, NaiveDateTime};
 use float_eq::assert_float_eq;
 use lazy_static::lazy_static;
 
@@ -534,7 +534,6 @@ fn fetch_date_time_ms_before_epoch() {
 /// Overflows could occur if reusing the same conversion logic across different time units (e.g. ns
 /// and ms) due to the difference in time ranges an i64 associated with each unit might be able
 /// to represent.
-/// See issue: <https://github.com/pacman82/arrow-odbc/issues/113#issuecomment-2492380871>
 #[test]
 fn fetch_timestamp_ms_which_could_not_be_represented_as_i64_ns() {
     let table_name = function_name!().rsplit_once(':').unwrap().1;
@@ -1609,6 +1608,40 @@ fn insert_timestamp_with_milliseconds_precisions() {
     // Then
     let actual = table_to_string(&conn, table_name, &["a"]);
     let expected = "1970-05-09 14:25:11.111";
+    assert_eq!(expected, actual);
+}
+
+/// Overflows could occur if reusing the same conversion logic across different time units (e.g. ns
+/// and ms) due to the difference in time ranges an i64 associated with each unit might be able
+/// to represent.
+/// 
+/// See issue: <https://github.com/pacman82/arrow-odbc/issues/113>
+#[test]
+fn insert_timestamp_with_milliseconds_precisions_which_is_not_representable_as_i64_ns() {
+    // Given a table and a record batch reader returning a batch with a text column.
+    let table_name = function_name!().rsplit_once(':').unwrap().1;
+    let conn = ENV
+        .connect_with_connection_string(MSSQL, Default::default())
+        .unwrap();
+    setup_empty_table(&conn, table_name, &["DATETIME2(3)"]).unwrap();
+    let schema = Arc::new(Schema::new(vec![Field::new(
+        "a",
+        DataType::Timestamp(TimeUnit::Millisecond, None),
+        false,
+    )]));
+    // Corresponds to single element array with entry 1970-05-09T14:25:11.111
+    let ndt = NaiveDate::from_ymd_opt(1600, 6, 18).unwrap().and_hms_milli_opt(23, 12, 44, 123).unwrap();
+    let epoch_ms = ndt.and_utc().timestamp_millis();
+    let array = TimestampMillisecondArray::from(vec![epoch_ms]);
+    let batch = RecordBatch::try_new(schema.clone(), vec![Arc::new(array)]).unwrap();
+    let mut reader = StubBatchReader::new(schema, vec![batch]);
+
+    // When
+    insert_into_table(&conn, &mut reader, table_name, 5).unwrap();
+
+    // Then
+    let actual = table_to_string(&conn, table_name, &["a"]);
+    let expected = "1600-06-18 23:12:44.123";
     assert_eq!(expected, actual);
 }
 
