@@ -544,7 +544,7 @@ fn fetch_timestamp_ms_which_could_not_be_represented_as_i64_ns() {
     let array_any = fetch_arrow_data(
         table_name,
         "DATETIME2(3)",
-        "('1600-06-18T23:12:44.000Z')",
+        "('1600-06-18T23:12:44.123Z')",
     )
     .unwrap();
 
@@ -556,9 +556,9 @@ fn fetch_timestamp_ms_which_could_not_be_represented_as_i64_ns() {
     // Assert that the correct values are found within the arrow batch
     assert_eq!(
         Some(
-            NaiveDate::from_ymd_opt(1900, 1, 1)
+            NaiveDate::from_ymd_opt(1600, 6, 18)
                 .unwrap()
-                .and_hms_milli_opt(12, 43, 17, 123)
+                .and_hms_milli_opt(23, 12, 44, 123)
                 .unwrap()
         ),
         array_vals.value_as_datetime(0)
