@@ -38,7 +38,7 @@ pub enum Error {
     /// We use UTF-16 encoding on windows by default. Since UTF-8 locals on windows system can not
     /// be expected to be the default. Since we use wide methods the ODBC standard demands the
     /// encoding to be UTF-16.
-    #[cfg(target_os = "windows")]
+    #[cfg(any(feature = "wide", all(not(feature = "narrow"), target_os = "windows")))]
     #[error(
         "Expected the database to return UTF-16, yet what came back was not valid UTF-16. Precise \
         encoding error: {source}. This is likely a bug in your ODBC driver not supporting wide \
@@ -47,7 +47,7 @@ pub enum Error {
     EncodingInvalid { source: std::char::DecodeUtf16Error },
     /// We expect UTF-8 to be the default on non-windows platforms. Yet still some systems are
     /// configured different.
-    #[cfg(not(target_os = "windows"))]
+    #[cfg(not(any(feature = "wide", all(not(feature = "narrow"), target_os = "windows"))))]
     #[error(
         "Expected the database to return UTF-8, yet what came back was not valid UTF-8. According \
         to the ODBC standard the encoding is specified by your system locale. So you may want to \

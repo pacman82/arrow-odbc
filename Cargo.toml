@@ -34,20 +34,9 @@ chrono = "0.4.38"
 log = "0.4.22"
 thiserror = "2.0.0"
 
-# On windows we can not assume the default locale to be UTF-8, so we compile odbc-api with default
-# features implying the use of UTF-16 for queries, connection strings and error messages. This
-# should work on any system
-[target.'cfg(target_os = "windows")'.dependencies]
-odbc-api = ">= 9, < 10"
+odbc-api = ">= 10, < 11"
 
-# On linux we assume use of a UTF-8 locale. So we set the narrow features implying that for queries,
-# connection strings and error messages the driver and driver manager supply utf8-strings. This
-# might also be slightly faster since no transcoding between UTF-8 and UTF-16 is required.
-# Overall speed always depends on the driver, but it is reasonable to assume this is faster, more
-# importantly, UTF-8 is likely to be more battled tested on these platforms, while UTF-16 is "only"
-# required by the standard.
-[target.'cfg(not(target_os = "windows"))'.dependencies]
-odbc-api = { version = ">= 9, < 10", features = ["narrow"] }
+
 
 [dev-dependencies]
 anyhow = "1.0.91"
@@ -58,3 +47,26 @@ stdext = "0.3.3"
 float_eq = "1.0.1"
 
 [features]
+
+# On linux we assume use of a UTF-8 locale. So we set the narrow features implying that for queries,
+# connection strings and error messages the driver and driver manager supply utf8-strings. This
+# might also be slightly faster since no transcoding between UTF-8 and UTF-16 is required.
+# Overall speed always depends on the driver, but it is reasonable to assume this is faster, more
+# importantly, UTF-8 is likely to be more battled tested on these platforms, while UTF-16 is "only"
+# required by the standard.
+
+# On windows we can not assume the default locale to be UTF-8, so we compile odbc-api with default
+# features implying the use of UTF-16 for queries, connection strings and error messages. This
+# should work on any system. However if you would like to use the narrow UTF-8 function calls on
+# windows systems you can set this feature flag.
+narrow = ["odbc-api/narrow"]
+
+# On linux we assume use of a UTF-8 locale. So we set the narrow features implying that for queries,
+# connection strings and error messages the driver and driver manager supply utf8-strings. This
+# might also be slightly faster since no transcoding between UTF-8 and UTF-16 is required.
+# Overall speed always depends on the driver, but it is reasonable to assume this is faster, more
+# importantly, UTF-8 is likely to be more battled tested on these platforms, while UTF-16 is "only"
+# required by the standard. However, if you are e.g. faced with a driver which does not use UTF-8,
+# but only ascii, or want to use the wide functions calls for any other reason on a non-windows
+# system you can set the `wide` feature flag to overwrite this behavior.
+wide = ["odbc-api/wide"]
