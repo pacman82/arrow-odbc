@@ -1,10 +1,12 @@
 # Changelog
 
-## [13.1.0](https://github.com/pacman82/arrow-odbc/compare/v13.0.2...v13.1.0) - 2024-11-24
+## [14.0.0](https://github.com/pacman82/arrow-odbc/compare/v13.0.2...v14.0.0) - 2024-11-25
 
 ### Added
 
-- wide feature flag added. This supports wide function calls on non-windows systems.
+- You can now compile with using the wide (i.e. UTF-16) character set versions of ODBC functions calls on non-windows platforms by specifying the `wide` feature. Similarly you can now complie using the narrow character set on windows platforms by specifying the `narrow` feature. The default remains `wide` on windows and `narrow` on non-windows targets. This required updating using `odbc-api 10.0.0`. The only thing thing changing however from `odbc-api` 9 to 10 are the default compilation of feature flags, so your code should just continue working.
+
+- [**breaking**] Update odbc-api `>= 9, < 10` -> `>= 10, < 11`
 
 ## [13.0.2](https://github.com/pacman82/arrow-odbc/compare/v13.0.1...v13.0.2) - 2024-11-24
 
