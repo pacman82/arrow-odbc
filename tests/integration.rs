@@ -1257,7 +1257,6 @@ fn insert_text() {
 ///
 /// See issue: <https://github.com/pacman82/arrow-odbc-py/issues/115>
 #[test]
-#[should_panic] // Issue not fixed yet
 fn insert_multiple_small_batches() {
     // Given
     let table_name = function_name!().rsplit_once(':').unwrap().1;

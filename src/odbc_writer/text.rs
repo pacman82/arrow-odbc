@@ -123,7 +123,7 @@ fn insert_into_wide_slice<'a>(
     for (row_index, element) in from.enumerate() {
         if let Some(text) = element {
             utf_16.extend(text.encode_utf16());
-            to.ensure_max_element_length(utf_16.len(), row_index)
+            to.ensure_max_element_length(utf_16.len(), at + row_index)
                 .map_err(WriterError::RebindBuffer)?;
             to.set_cell(at + row_index, Some(&utf_16));
             utf_16.clear();
