@@ -1,4 +1,4 @@
-use arrow::array::{Array, LargeStringArray, StringArray};
+use arrow::{array::{Array, LargeStringArray, StringArray}, row};
 use odbc_api::buffers::{AnySliceMut, BufferDesc, TextColumnSliceMut};
 
 use super::{WriteStrategy, WriterError};
@@ -121,14 +121,19 @@ fn insert_into_wide_slice<'a>(
     // allocations.
     let mut utf_16 = Vec::new();
     for (row_index, element) in from.enumerate() {
+        // Total number of rows written into the inserter (`to`). This includes the values from the
+        // current batch (`row_index`), as well as the ones from the previous batches (`at`). In
+        // case of reallocation, we need to copy all these values. Also, this is the index of the
+        // element we currently want to write.
+        let num_rows_written_so_far = at + row_index;
         if let Some(text) = element {
             utf_16.extend(text.encode_utf16());
-            to.ensure_max_element_length(utf_16.len(), at + row_index)
+            to.ensure_max_element_length(utf_16.len(), num_rows_written_so_far)
                 .map_err(WriterError::RebindBuffer)?;
-            to.set_cell(at + row_index, Some(&utf_16));
+            to.set_cell(num_rows_written_so_far, Some(&utf_16));
             utf_16.clear();
         } else {
-            to.set_cell(at + row_index, None);
+            to.set_cell(num_rows_written_so_far, None);
         }
     }
     Ok(())
