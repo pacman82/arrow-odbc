@@ -61,12 +61,17 @@ fn insert_into_narrow_slice<'a>(
     param_offset: usize,
 ) -> Result<(), WriterError> {
     for (row_index, element) in from.enumerate() {
+        // Total number of rows written into the inserter (`to`). This includes the values from the
+        // current batch (`row_index`), as well as the ones from the previous batches
+        // (`param_offset`). In case of reallocation, we need to copy all these values. Also, this
+        // is the index of the element we currently want to write.
+        let num_rows_written_so_far = param_offset + row_index;
         if let Some(text) = element {
-            to.ensure_max_element_length(text.len(), row_index)
+            to.ensure_max_element_length(text.len(), num_rows_written_so_far)
                 .map_err(WriterError::RebindBuffer)?;
-            to.set_cell(param_offset + row_index, Some(text.as_bytes()))
+            to.set_cell(num_rows_written_so_far, Some(text.as_bytes()))
         } else {
-            to.set_cell(param_offset + row_index, None);
+            to.set_cell(num_rows_written_so_far, None);
         }
     }
     Ok(())
