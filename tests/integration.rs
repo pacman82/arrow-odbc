@@ -1250,7 +1250,7 @@ fn insert_text() {
 }
 
 /// Insert multiple batches into the database using only one roundtrip.
-/// 
+///
 /// For this test we are sending two batches, each containing one string for the same column. The
 /// second string is longer than the first one. This reproduces an issue which occurred in the
 /// context of arrow-odbc-py using chunked arrays .
