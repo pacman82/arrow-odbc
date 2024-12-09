@@ -1,5 +1,19 @@
 # Changelog
 
+## [14.0.1](https://github.com/pacman82/arrow-odbc/compare/v14.0.0...v14.0.1) - 2024-12-09
+
+### Fixed
+
+- Also for non-windows platforms, inserting multiple small batches now works, even if the second batch triggers rebinding the buffer due to element size.
+- Inserting multiple small batches now works, even if the second batch triggers rebinding the buffer due to element size.
+
+### Other
+
+- formatting
+- Remove unused import
+- Extract expression into variable
+- Reproducing test inserting multiple small batches
+
 ## [14.0.0](https://github.com/pacman82/arrow-odbc/compare/v13.0.2...v14.0.0) - 2024-11-25
 
 ### Added
