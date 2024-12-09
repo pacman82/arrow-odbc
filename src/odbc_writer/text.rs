@@ -1,4 +1,4 @@
-use arrow::{array::{Array, LargeStringArray, StringArray}, row};
+use arrow::array::{Array, LargeStringArray, StringArray};
 use odbc_api::buffers::{AnySliceMut, BufferDesc, TextColumnSliceMut};
 
 use super::{WriteStrategy, WriterError};
