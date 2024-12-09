@@ -1249,6 +1249,38 @@ fn insert_text() {
     assert_eq!(expected, actual);
 }
 
+/// Insert multiple batches into the database using only one roundtrip.
+/// 
+/// For this test we are sending two batches, each containing one string for the same column. The
+/// second string is longer than the first one. This reproduces an issue which occurred in the
+/// context of arrow-odbc-py using chunked arrays .
+///
+/// See issue: <https://github.com/pacman82/arrow-odbc-py/issues/115>
+#[test]
+#[should_panic] // Issue not fixed yet
+fn insert_multiple_small_batches() {
+    // Given
+    let table_name = function_name!().rsplit_once(':').unwrap().1;
+    let conn = ENV
+        .connect_with_connection_string(MSSQL, Default::default())
+        .unwrap();
+    setup_empty_table(&conn, table_name, &["VARCHAR(10)"]).unwrap();
+    let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Utf8, true)]));
+    let first_string = StringArray::from(vec![Some("a")]);
+    let first_batch = RecordBatch::try_new(schema.clone(), vec![Arc::new(first_string)]).unwrap();
+    let second_string = StringArray::from(vec![Some("bc")]);
+    let second_batch = RecordBatch::try_new(schema.clone(), vec![Arc::new(second_string)]).unwrap();
+    let mut reader = StubBatchReader::new(schema, vec![first_batch, second_batch]);
+
+    // When
+    insert_into_table(&conn, &mut reader, table_name, 5).unwrap();
+
+    // Then
+    let actual = table_to_string(&conn, table_name, &["a"]);
+    let expected = "a\nbc";
+    assert_eq!(expected, actual);
+}
+
 /// This test is most relevant on windows platforms, the UTF-8 is not the default encoding and text
 /// should be encoded as UTF-16
 #[test]
