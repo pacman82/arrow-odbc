@@ -277,18 +277,19 @@ impl OdbcReaderBuilder {
         self
     }
 
-    /// An upper limit for the size of buffers bound to variadic text columns of the data source.
-    /// This limit does not (directly) apply to the size of the created arrow buffers, but rather
-    /// applies to the buffers used for the data in transit. Use this option if you have e.g.
-    /// `VARCHAR(MAX)` fields in your database schema. In such a case without an upper limit, the
-    /// ODBC driver of your data source is asked for the maximum size of an element, and is likely
-    /// to answer with either `0` or a value which is way larger than any actual entry in the column
-    /// If you can not adapt your database schema, this limit might be what you are looking for. On
-    /// windows systems the size is double words (16Bit), as windows utilizes an UTF-16 encoding. So
-    /// this translates to roughly the size in letters. On non windows systems this is the size in
-    /// bytes and the datasource is assumed to utilize an UTF-8 encoding. If this method is not
-    /// called no upper limit is set and the maximum element size, reported by ODBC is used to
-    /// determine buffer sizes.
+    /// In order for fast bulk fetching to work, `arrow-odbc` needs to know the size of the largest
+    /// possible field in each column. It will do so itself automatically by considering the schema
+    /// information. However, trouble arises if the schema contains ounbounded variadic fields like
+    /// `VARCHAR(MAX)` which can hold really large values. These have a very high upper element
+    /// size, if any. In order to work with such schemas we need a limit, of what the an upper
+    /// bound of the actual values in the column is, as opposed to the what the largest value is the
+    /// column could theoretically store. There is no need for this to be very precise, but just
+    /// knowing that a value would never exceed 4KiB rather than 2GiB is enough to allow for
+    /// tremendous efficiency gains. The size of the text is specified in UTF-8 encoded bytes if
+    /// using a narrow encoding (typically all non-windows systems) and in UTF-16 encoded pairs of
+    /// bytes on systems using a wide encoding (typically windows). This means about the size in
+    /// letters, yet if you are using a lot of emojis or other special characters this number might
+    /// need to be larger.
     pub fn with_max_text_size(&mut self, max_text_size: usize) -> &mut Self {
         self.max_text_size = Some(max_text_size);
         self
