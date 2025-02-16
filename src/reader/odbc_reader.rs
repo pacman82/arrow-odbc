@@ -44,9 +44,12 @@ use super::to_record_batch::ToRecordBatch;
 ///     // This SQL statement does not require any arguments.
 ///     let parameters = ();
 ///
+///     // Do not apply any timeout.
+///     let timeout_sec = None;
+///
 ///     // Execute query and create result set
 ///     let cursor = connection
-///         .execute("SELECT * FROM MyTable", parameters)?
+///         .execute("SELECT * FROM MyTable", parameters, timeout_sec)?
 ///         .expect("SELECT statement must produce a cursor");
 ///
 ///     // Read result set as arrow batches. Infer Arrow types automatically using the meta
@@ -109,11 +112,14 @@ impl<C: Cursor> OdbcReader<C> {
     ///     // This SQL statement does not require any arguments.
     ///     let parameters = ();
     ///
+    ///     // Do not apply any timeout.
+    ///     let timeout_sec = None;
+    ///
     ///     // Execute query and create result set
     ///     let cursor = connection
     ///         // Using `into_cursor` instead of `execute` takes ownership of the connection and
     ///         // allows for a cursor with static lifetime.
-    ///         .into_cursor("SELECT * FROM MyTable", parameters)
+    ///         .into_cursor("SELECT * FROM MyTable", parameters, timeout_sec)
     ///         .map_err(|e|e.error)?
     ///         .expect("SELECT statement must produce a cursor");
     ///

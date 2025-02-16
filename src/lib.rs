@@ -25,9 +25,12 @@
 //!     // This SQL statement does not require any arguments.
 //!     let parameters = ();
 //!
+//!     // Do not apply any timeout.
+//!     let timeout_sec = None;
+//!
 //!     // Execute query and create result set
 //!     let cursor = connection
-//!         .execute("SELECT * FROM MyTable", parameters)?
+//!         .execute("SELECT * FROM MyTable", parameters, timeout_sec)?
 //!         .expect("SELECT statement must produce a cursor");
 //!
 //!     // Read result set as arrow batches. Infer Arrow types automatically using the meta

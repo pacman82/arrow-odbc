@@ -48,11 +48,14 @@ use super::{odbc_reader::odbc_to_arrow_error, to_record_batch::ToRecordBatch};
 ///     // This SQL statement does not require any arguments.
 ///     let parameters = ();
 ///
+///     // Do not apply any timout.
+///     let timeout_sec = None;
+///
 ///     // Execute query and create result set
 ///     let cursor = connection
 ///         // Using `into_cursor` instead of `execute` takes ownership of the connection and
 ///         // allows for a cursor with static lifetime.
-///         .into_cursor("SELECT * FROM MyTable", parameters)
+///         .into_cursor("SELECT * FROM MyTable", parameters, timeout_sec)
 ///         .map_err(|e| e.error)?
 ///         .expect("SELECT statement must produce a cursor");
 ///

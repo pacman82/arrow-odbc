@@ -118,11 +118,11 @@ fn fetch_8bit_unsigned_integer_explicit_schema() {
         .unwrap();
     setup_empty_table(&conn, table_name, &["TINYINT NOT NULL"]).unwrap();
     let sql = format!("INSERT INTO {table_name} (a) VALUES (1),(2),(3)");
-    conn.execute(&sql, ()).unwrap();
+    conn.execute(&sql, (), None).unwrap();
 
     // Query column with values to get a cursor
     let sql = format!("SELECT a FROM {table_name}");
-    let cursor = conn.execute(&sql, ()).unwrap().unwrap();
+    let cursor = conn.execute(&sql, (), None).unwrap().unwrap();
 
     // Now that we have a cursor, we want to iterate over its rows and fill an arrow batch with it.
 
@@ -158,11 +158,11 @@ fn fetch_decimal128_negative_scale_unsupported() {
         .unwrap();
     setup_empty_table(&conn, table_name, &["NUMERIC(5,0) NOT NULL"]).unwrap();
     let sql = format!("INSERT INTO {table_name} (a) VALUES (12300)");
-    conn.execute(&sql, ()).unwrap();
+    conn.execute(&sql, (), None).unwrap();
 
     // Query column with values to get a cursor
     let sql = format!("SELECT a FROM {table_name}");
-    let cursor = conn.execute(&sql, ()).unwrap().unwrap();
+    let cursor = conn.execute(&sql, (), None).unwrap().unwrap();
 
     // Specify Uint8 manually, since inference of the arrow type from the sql type would yield a
     // signed 8 bit integer.
@@ -194,11 +194,11 @@ fn unsupported_16bit_unsigned_integer() {
         .unwrap();
     setup_empty_table(&conn, table_name, &["SMALLINT NOT NULL"]).unwrap();
     let sql = format!("INSERT INTO {table_name} (a) VALUES (1),(2),(3)");
-    conn.execute(&sql, ()).unwrap();
+    conn.execute(&sql, (), None).unwrap();
 
     // Query column with values to get a cursor
     let sql = format!("SELECT a FROM {table_name}");
-    let cursor = conn.execute(&sql, ()).unwrap().unwrap();
+    let cursor = conn.execute(&sql, (), None).unwrap().unwrap();
 
     // Specify Uint16 manually, since inference of the arrow type from the sql type would yield a
     // signed 16 bit integer.
@@ -727,7 +727,7 @@ fn fetch_varbinary_data() {
 
     // Query column with values to get a cursor
     let sql = format!("SELECT a FROM {table_name} ORDER BY id");
-    let cursor = conn.execute(&sql, ()).unwrap().unwrap();
+    let cursor = conn.execute(&sql, (), None).unwrap().unwrap();
 
     // Now that we have a cursor, we want to iterate over its rows and fill an arrow batch with it.
     let mut reader = OdbcReaderBuilder::new()
@@ -769,7 +769,7 @@ fn fetch_fixed_sized_binary_data() {
 
     // Query column with values to get a cursor
     let sql = format!("SELECT a FROM {table_name} ORDER BY id");
-    let cursor = conn.execute(&sql, ()).unwrap().unwrap();
+    let cursor = conn.execute(&sql, (), None).unwrap().unwrap();
 
     // Now that we have a cursor, we want to iterate over its rows and fill an arrow batch with it.
     let mut reader = OdbcReaderBuilder::new()
@@ -803,7 +803,7 @@ fn prepared_query() {
         .unwrap();
     setup_empty_table(&conn, table_name, &["REAL NOT NULL"]).unwrap();
     let sql = format!("INSERT INTO {table_name} (a) VALUES (1),(2),(3)");
-    conn.execute(&sql, ()).unwrap();
+    conn.execute(&sql, (), None).unwrap();
 
     // Query column with values to get a cursor
     let sql = format!("SELECT a FROM {table_name}");
@@ -842,7 +842,7 @@ fn infer_schema() {
 
     // Prepare query to get metadata
     let sql = format!("SELECT a FROM {table_name}");
-    let cursor = conn.execute(&sql, ()).unwrap().unwrap();
+    let cursor = conn.execute(&sql, (), None).unwrap().unwrap();
 
     // Now that we have a cursor, we want to iterate over its rows and fill an arrow batch with it.
     let reader = OdbcReaderBuilder::new()
@@ -952,7 +952,7 @@ fn should_allow_to_fetch_from_varchar_max() {
         .unwrap();
     setup_empty_table(&conn, table_name, &["VARCHAR(MAX)"]).unwrap();
     let sql = format!("SELECT a FROM {table_name}");
-    let cursor = conn.execute(&sql, ()).unwrap().unwrap();
+    let cursor = conn.execute(&sql, (), None).unwrap().unwrap();
 
     // When
     let result = OdbcReaderBuilder::new()
@@ -975,9 +975,9 @@ fn should_error_for_truncation() {
         .unwrap();
     setup_empty_table(&conn, table_name, &["VARCHAR(MAX)"]).unwrap();
     let sql = format!("INSERT INTO {table_name} (a) VALUES ('123456789')");
-    conn.execute(&sql, ()).unwrap();
+    conn.execute(&sql, (), None).unwrap();
     let sql = format!("SELECT a FROM {table_name}");
-    let cursor = conn.execute(&sql, ()).unwrap().unwrap();
+    let cursor = conn.execute(&sql, (), None).unwrap().unwrap();
 
     // When fetching that value with a text limit of 5
     let mut reader = OdbcReaderBuilder::new()
@@ -1000,7 +1000,7 @@ fn should_allow_to_fetch_from_varbinary_max() {
         .unwrap();
     setup_empty_table(&conn, table_name, &["VARBINARY(MAX)"]).unwrap();
     let sql = format!("SELECT a FROM {table_name}");
-    let cursor = conn.execute(&sql, ()).unwrap().unwrap();
+    let cursor = conn.execute(&sql, (), None).unwrap().unwrap();
 
     // When
     let result = OdbcReaderBuilder::new()
@@ -1022,7 +1022,7 @@ fn fallibale_allocations() {
         .unwrap();
     setup_empty_table(&conn, table_name, &["VARBINARY(4096)"]).unwrap();
     let sql = format!("SELECT a FROM {table_name}");
-    let cursor = conn.execute(&sql, ()).unwrap().unwrap();
+    let cursor = conn.execute(&sql, (), None).unwrap().unwrap();
 
     // When
     let result = OdbcReaderBuilder::new()
@@ -1054,7 +1054,7 @@ fn read_multiple_result_sets() {
         .connect_with_connection_string(MSSQL, Default::default())
         .unwrap();
     let cursor = conn
-        .execute("SELECT 1 AS A; SELECT 2 AS B;", ())
+        .execute("SELECT 1 AS A; SELECT 2 AS B;", (), None)
         .unwrap()
         .unwrap();
 
@@ -1099,6 +1099,7 @@ fn read_multiple_result_sets_with_second_no_schema() {
         .execute(
             "SELECT 1 AS A; SELECT 1 AS A INTO #local_temp_table; SELECT A FROM #local_temp_table;",
             (),
+            None,
         )
         .unwrap()
         .unwrap();
@@ -2120,8 +2121,8 @@ fn sanatize_column_names() {
     let create_table = format!(
         "CREATE TABLE {table_name} (id int IDENTITY(1,1),\"column name with spaces\" INTEGER);"
     );
-    conn.execute(drop_table, ()).unwrap();
-    conn.execute(&create_table, ()).unwrap();
+    conn.execute(drop_table, (), None).unwrap();
+    conn.execute(&create_table, (), None).unwrap();
     let array = Int32Array::from(vec![Some(42)]);
 
     // When inserting from a reader which features a schema with an unescaped column name
@@ -2258,7 +2259,7 @@ fn read_multiple_result_sets_using_concurrent_cursor() {
         .connect_with_connection_string(MSSQL, Default::default())
         .unwrap();
     let cursor = conn
-        .into_cursor("SELECT 1 AS A; SELECT 2 AS B;", ())
+        .into_cursor("SELECT 1 AS A; SELECT 2 AS B;", (), None)
         .unwrap()
         .unwrap();
 
@@ -2354,8 +2355,8 @@ fn setup_empty_table(
         .join(", ");
 
     let create_table = format!("CREATE TABLE {table_name} (id int IDENTITY(1,1),{cols});");
-    conn.execute(drop_table, ())?;
-    conn.execute(&create_table, ())?;
+    conn.execute(drop_table, (), None)?;
+    conn.execute(&create_table, (), None)?;
     Ok(())
 }
 
@@ -2363,7 +2364,7 @@ fn setup_empty_table(
 pub fn table_to_string(conn: &Connection<'_>, table_name: &str, column_names: &[&str]) -> String {
     let cols = column_names.join(", ");
     let query = format!("SELECT {cols} FROM {table_name}");
-    let cursor = conn.execute(&query, ()).unwrap().unwrap();
+    let cursor = conn.execute(&query, (), None).unwrap().unwrap();
     cursor_to_string(cursor)
 }
 
@@ -2429,10 +2430,10 @@ fn cursor_over(
     setup_empty_table(&conn, table_name, &[column_type]).unwrap();
     // Insert values using literals
     let sql = format!("INSERT INTO {table_name} (a) VALUES {literal}");
-    conn.execute(&sql, ()).unwrap();
+    conn.execute(&sql, (), None).unwrap();
     // Query column with values to get a cursor
     let sql = format!("SELECT a FROM {table_name}");
-    let cursor = conn.into_cursor(&sql, ()).unwrap().unwrap();
+    let cursor = conn.into_cursor(&sql, (), None).unwrap().unwrap();
     cursor
 }
 
@@ -2444,7 +2445,7 @@ fn empty_cursor(table_name: &str, column_type: &str) -> CursorImpl<StatementConn
     setup_empty_table(&conn, table_name, &[column_type]).unwrap();
     // Query column with values to get a cursor
     let sql = format!("SELECT a FROM {table_name}");
-    let cursor = conn.into_cursor(&sql, ()).unwrap().unwrap();
+    let cursor = conn.into_cursor(&sql, (), None).unwrap().unwrap();
     cursor
 }
 
@@ -2460,10 +2461,10 @@ fn query_single_value(
     setup_empty_table(&conn, table_name, &[column_type]).unwrap();
     // Insert values using literals
     let sql = format!("INSERT INTO {table_name} (a) VALUES (?)");
-    conn.execute(&sql, &value.into_parameter()).unwrap();
+    conn.execute(&sql, &value.into_parameter(), None).unwrap();
     // Query column with values to get a cursor
     let sql = format!("SELECT a FROM {table_name}");
-    conn.into_cursor(&sql, ()).unwrap().unwrap()
+    conn.into_cursor(&sql, (), None).unwrap().unwrap()
 }
 
 /// An arrow batch reader emitting predefined batches. Used to test insertion.
