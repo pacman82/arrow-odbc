@@ -1,5 +1,17 @@
 # Changelog
 
+## [14.2.0](https://github.com/pacman82/arrow-odbc/compare/v14.1.0...v14.2.0) - 2025-02-16
+
+### Added
+
+- Support odbc-api 11
+
+### Other
+
+- Use ODBC driver 18 for tests
+- Install unixODBC in release plz workflow
+- Install unixodbc-dev
+
 ## [14.1.0](https://github.com/pacman82/arrow-odbc/compare/v14.0.1...v14.1.0) - 2025-01-01
 
 ### Added
