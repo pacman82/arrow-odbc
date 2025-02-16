@@ -1,5 +1,11 @@
 # Changelog
 
+## [14.2.1](https://github.com/pacman82/arrow-odbc/compare/v14.2.0...v14.2.1) - 2025-02-16
+
+### Other
+
+- Rewrite docs for with_max_text_size
+
 ## [14.2.0](https://github.com/pacman82/arrow-odbc/compare/v14.1.0...v14.2.0) - 2025-02-16
 
 ### Added
