@@ -37,7 +37,7 @@ jobs:
           curl https://packages.microsoft.com/keys/microsoft.asc | apt-key add -
           curl https://packages.microsoft.com/config/ubuntu/20.04/prod.list > /etc/apt/sources.list.d/mssql-release.list
           apt-get update
-          ACCEPT_EULA=Y apt-get install -y msodbcsql17
+          ACCEPT_EULA=Y apt-get install -y msodbcsql17 unixodbc-dev
           ln -s /opt/microsoft/msodbcsql17/lib64/libmsodbcsql-17.*.so.* /opt/microsoft/msodbcsql17/lib64/libmsodbcsql-17.so
         shell: sudo bash {0}
       - name: Print odbcinst.ini
