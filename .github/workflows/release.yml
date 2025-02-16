@@ -16,12 +16,17 @@ jobs:
     name: Release-plz release
     runs-on: ubuntu-latest
     steps:
+      - name: Install UnixODBC
+        run: |
+          apt-get update
+          ACCEPT_EULA=Y apt-get install -y unixodbc-dev
+        shell: sudo bash {0}
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
       - name: Run release-plz
         uses: MarcoIeni/release-plz-action@v0.5
         with:
@@ -38,12 +43,17 @@ jobs:
       group: release-plz-${{ github.ref }}
       cancel-in-progress: false
     steps:
+      - name: Install UnixODBC
+        run: |
+          apt-get update
+          ACCEPT_EULA=Y apt-get install -y unixodbc-dev
+        shell: sudo bash {0}
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
       - name: Run release-plz
         uses: MarcoIeni/release-plz-action@v0.5
         with:
