@@ -39,10 +39,11 @@ use arrow_odbc::{
 use stdext::function_name;
 
 /// Connection string to our Microsoft SQL Database. Boot it up with docker-compose up
-const MSSQL: &str = "Driver={ODBC Driver 17 for SQL Server};\
+const MSSQL: &str = "Driver={ODBC Driver 18 for SQL Server};\
     Server=localhost;\
     UID=SA;\
-    PWD=My@Test@Password1;";
+    PWD=My@Test@Password1;\
+    TrustServerCertificate=yes;";
 
 // Rust by default executes tests in parallel. Yet only one environment is allowed at a time.
 lazy_static! {

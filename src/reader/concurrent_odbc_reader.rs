@@ -29,7 +29,7 @@ use super::{odbc_reader::odbc_to_arrow_error, to_record_batch::ToRecordBatch};
 /// static ENV: OnceLock<Environment> = OnceLock::new();
 ///
 /// const CONNECTION_STRING: &str = "\
-///     Driver={ODBC Driver 17 for SQL Server};\
+///     Driver={ODBC Driver 18 for SQL Server};\
 ///     Server=localhost;\
 ///     UID=SA;\
 ///     PWD=My@Test@Password1;\

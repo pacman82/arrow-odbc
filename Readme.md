@@ -26,7 +26,7 @@ use arrow_odbc::odbc_api as odbc_api;
 use odbc_api::{Environment, ConnectionOptions};
 
 const CONNECTION_STRING: &str = "\
-    Driver={ODBC Driver 17 for SQL Server};\
+    Driver={ODBC Driver 18 for SQL Server};\
     Server=localhost;\
     UID=SA;\
     PWD=My@Test@Password1;\
