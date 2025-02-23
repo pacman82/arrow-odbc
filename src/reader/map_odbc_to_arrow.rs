@@ -313,4 +313,6 @@ pub enum MappingError {
         Suggestions to fix this error either reduce the precision or fetch the values as text."
     )]
     OutOfRangeTimestampNs { value: NaiveDateTime },
+    #[error("Datasource returned invalid UTF-8. Lossy representation of value: {lossy_value}")]
+    InvalidUtf8 { lossy_value: String },
 }

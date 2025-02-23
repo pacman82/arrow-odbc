@@ -141,16 +141,50 @@ impl ReadStrategy for NarrowText {
         let view = column_view.as_text_view().unwrap();
         let mut builder = StringBuilder::with_capacity(view.len(), self.max_str_len * view.len());
         for value in view.iter() {
-            builder.append_option(value.map(|bytes| {
-                let untrimmed = std::str::from_utf8(bytes)
-                    .expect("ODBC driver had been expected to return valid utf8, but did not.");
-                if self.trim {
-                    untrimmed.trim()
-                } else {
-                    untrimmed
-                }
-            }));
+            builder.append_option(
+                value
+                    .map(|bytes| {
+                        let untrimmed =
+                            std::str::from_utf8(bytes).map_err(|_| MappingError::InvalidUtf8 {
+                                lossy_value: String::from_utf8_lossy(bytes).into_owned(),
+                            })?;
+                        Ok(if self.trim {
+                            untrimmed.trim()
+                        } else {
+                            untrimmed
+                        })
+                    })
+                    .transpose()?,
+            );
         }
         Ok(Arc::new(builder.finish()))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use odbc_api::buffers::{AnySlice, ColumnBuffer, TextColumn};
+
+    use crate::reader::{MappingError, ReadStrategy as _};
+
+    use super::NarrowText;
+
+    #[test]
+    fn must_return_error_for_invalid_utf8() {
+        // Given a slice with invalid utf-8
+        let mut column = TextColumn::new(1, 10);
+        column.set_value(0, Some(&[b'H', b'e', b'l', b'l', b'o', 0xc3]));
+        let column_view = AnySlice::Text(column.view(1));
+
+        // When
+        let strategy = NarrowText::new(5, false);
+        let result = strategy.fill_arrow_array(column_view);
+
+        // Then
+        let error = result.unwrap_err();
+        let MappingError::InvalidUtf8 { lossy_value } = error else {
+            panic!("Not an InvalidUtf8 error")
+        };
+        assert_eq!(lossy_value, "Hello�");
     }
 }
