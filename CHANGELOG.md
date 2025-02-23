@@ -1,5 +1,16 @@
 # Changelog
 
+## [15.0.0](https://github.com/pacman82/arrow-odbc/compare/v14.2.0...v15.0.0) - 2025-02-23
+
+### Added
+
+- [**breaking**] Dedicated Mapping error for InvalidUtf8
+
+### Other
+
+- [**breaking**] Update to edition 2024
+- Rewrite docs for with_max_text_size
+
 ## [14.2.0](https://github.com/pacman82/arrow-odbc/compare/v14.1.0...v14.2.0) - 2025-02-16
 
 ### Added
