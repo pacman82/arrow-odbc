@@ -2,7 +2,7 @@
 name = "arrow-odbc"
 version = "14.2.0"
 authors = ["Markus Klein"]
-edition = "2021"
+edition = "2024"
 license = "MIT"
 repository = "https://github.com/pacman82/arrow-odbc"
 documentation = "https://docs.rs/arrow-odbc/"
@@ -32,7 +32,7 @@ readme = "Readme.md"
 arrow = { version = ">= 29, < 55", default-features = false }
 chrono = "0.4.38"
 log = "0.4.22"
-thiserror = "2.0.0"
+thiserror = "2.0.11"
 
 odbc-api = ">= 10, < 12"
 
