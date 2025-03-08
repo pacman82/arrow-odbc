@@ -1205,7 +1205,7 @@ fn fetch_wide_data() {
     let table_name = function_name!().rsplit_once(':').unwrap().1;
     let cursor = cursor_over(
         table_name,
-        "VARCHAR(15)",
+        "VARCHAR(30)",
         "('Hällö, Wörld!')",
     );
 
