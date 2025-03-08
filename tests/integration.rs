@@ -25,15 +25,12 @@ use lazy_static::lazy_static;
 type F16 = <Float16Type as ArrowPrimitiveType>::Native;
 
 use arrow_odbc::{
-    arrow::array::Float64Array,
-    arrow_schema_from, insert_into_table,
-    odbc_api::{
+    arrow::array::Float64Array, arrow_schema_from, insert_into_table, odbc_api::{
         buffers::TextRowSet,
         sys::{AttrConnectionPooling, AttrCpMatch},
         Connection, ConnectionOptions, Cursor, CursorImpl, Environment, IntoParameter,
         StatementConnection,
-    },
-    ColumnFailure, Error, OdbcReaderBuilder, OdbcWriter, WriterError,
+    }, ColumnFailure, Error, OdbcReaderBuilder, OdbcWriter, TextEncoding, WriterError
 };
 
 use stdext::function_name;
@@ -1200,6 +1197,61 @@ fn memory_size_limit_can_not_hold_a_single_row() {
             bytes_per_row: _
         })
     ))
+}
+
+#[test]
+fn fetch_wide_data() {
+    // Given a cursor returning text data
+    let table_name = function_name!().rsplit_once(':').unwrap().1;
+    let cursor = cursor_over(
+        table_name,
+        "VARCHAR(15)",
+        "('Hällö, Wörld!')",
+    );
+
+    // When explicitly requesting a UTF-16 encoded transfer encoding
+    let mut reader = OdbcReaderBuilder::new()
+        .with_max_num_rows_per_batch(1)
+        .with_payload_text_encoding(TextEncoding::Utf16)
+        .build(cursor)
+        .unwrap();
+
+    // Then we should get an UTF-8 array with the correct value
+    let record_batch = reader.next().unwrap().unwrap();
+    let array_any = record_batch.column(0).clone();
+
+    // Assert that the correct values are found within the arrow batch
+    let array_vals = array_any.as_any().downcast_ref::<StringArray>().unwrap();
+    assert_eq!("Hällö, Wörld!", array_vals.value(0));
+}
+
+#[test]
+fn fetch_narrow_data() {
+    // Given an ASCII compatible text. We want this test to succeed on windows. Yet it is highly
+    // likely special characters are encoded as e.g. Latin 1 rather than UTF-8 on windows. To have
+    // some amount of testing we just do not use any special characters here. This is also the
+    // reason, why `narrow` is not the default on windows.
+    let table_name = function_name!().rsplit_once(':').unwrap().1;
+    let cursor = cursor_over(
+        table_name,
+        "VARCHAR(15)",
+        "('Hello, World!')",
+    );
+
+    // When explicitly requesting a UTF-8 encoded transfer encoding
+    let mut reader = OdbcReaderBuilder::new()
+        .with_max_num_rows_per_batch(1)
+        .with_payload_text_encoding(TextEncoding::Utf16)
+        .build(cursor)
+        .unwrap();
+
+    // Then we should get an UTF-8 array with the correct value
+    let record_batch = reader.next().unwrap().unwrap();
+    let array_any = record_batch.column(0).clone();
+
+    // Assert that the correct values are found within the arrow batch
+    let array_vals = array_any.as_any().downcast_ref::<StringArray>().unwrap();
+    assert_eq!("Hello, World!", array_vals.value(0));
 }
 
 #[test]

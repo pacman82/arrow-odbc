@@ -9,7 +9,7 @@ use odbc_api::{buffers::ColumnarAnyBuffer, BlockCursor, Cursor};
 
 use crate::{BufferAllocationOptions, ConcurrentOdbcReader, Error};
 
-use super::to_record_batch::ToRecordBatch;
+use super::{to_record_batch::ToRecordBatch, TextEncoding};
 
 /// Arrow ODBC reader. Implements the [`arrow::record_batch::RecordBatchReader`] trait so it can be
 /// used to fill Arrow arrays from an ODBC data source.
@@ -216,6 +216,7 @@ pub struct OdbcReaderBuilder {
     map_value_errors_to_null: bool,
     fallibale_allocations: bool,
     trim_fixed_sized_character_strings: bool,
+    text_encoding: TextEncoding,
 }
 
 impl OdbcReaderBuilder {
@@ -238,6 +239,7 @@ impl OdbcReaderBuilder {
             fallibale_allocations: false,
             map_value_errors_to_null: false,
             trim_fixed_sized_character_strings: false,
+            text_encoding: TextEncoding::Auto,
         }
     }
 
@@ -337,6 +339,17 @@ impl OdbcReaderBuilder {
         self
     }
 
+    /// Controls the encoding used for transferring text data from the ODBC data source to the
+    /// application. The resulting Arrow arrays will still be UTF-8 encoded. You may want to use
+    /// this if you get garbage characters or invalid UTF-8 errors on non-windows systems to set the
+    /// encoding to [`TextEncoding::Wide`]. On windows systems you may want to set this to
+    /// [`TextEncoding::Narrow`] to gain performance benefits, after you have verified that your
+    /// system locale is set to UTF-8. The default is [`TextEncoding::Auto`].
+    pub fn with_payload_text_encoding(&mut self, text_encoding: TextEncoding) -> &mut Self {
+        self.text_encoding = text_encoding;
+        self
+    }
+
     /// No matter if the user explicitly specified a limit in row size, a memory limit, both or
     /// neither. In order to construct a reader we need to decide on the buffer size in rows.
     fn buffer_size_in_rows(&self, bytes_per_row: usize) -> Result<usize, Error> {
@@ -380,6 +393,7 @@ impl OdbcReaderBuilder {
             buffer_allocation_options,
             self.map_value_errors_to_null,
             self.trim_fixed_sized_character_strings,
+            self.text_encoding,
         )?;
         let bytes_per_row = converter.row_size_in_bytes();
         let buffer_size_in_rows = self.buffer_size_in_rows(bytes_per_row)?;

@@ -61,6 +61,7 @@ pub use self::{
     odbc_writer::{insert_into_table, insert_statement_from_schema, OdbcWriter, WriterError},
     reader::{
         BufferAllocationOptions, ColumnFailure, ConcurrentOdbcReader, OdbcReader, OdbcReaderBuilder,
+        TextEncoding,
     },
     schema::arrow_schema_from,
 };

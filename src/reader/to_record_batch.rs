@@ -9,7 +9,7 @@ use odbc_api::{buffers::ColumnarAnyBuffer, ResultSetMetadata};
 
 use crate::{arrow_schema_from, BufferAllocationOptions, ColumnFailure, Error};
 
-use super::{choose_column_strategy, MappingError, ReadStrategy};
+use super::{choose_column_strategy, TextEncoding, MappingError, ReadStrategy};
 
 /// Transforms batches fetched from an ODBC data source in a
 /// [`odbc_api::bufferers::ColumnarAnyBuffer`] into arrow tables of the specified schemas. It also
@@ -29,6 +29,7 @@ impl ToRecordBatch {
         buffer_allocation_options: BufferAllocationOptions,
         map_value_errors_to_null: bool,
         trim_fixed_sized_character_strings: bool,
+        text_encoding: TextEncoding,
     ) -> Result<Self, Error> {
         // Infer schema if not given by the user
         let schema = if let Some(schema) = schema {
@@ -50,6 +51,7 @@ impl ToRecordBatch {
                     buffer_allocation_options,
                     map_value_errors_to_null,
                     trim_fixed_sized_character_strings,
+                    text_encoding,
                 )
                 .map_err(|cause| cause.into_crate_error(field.name().clone(), index))
             })

@@ -34,7 +34,7 @@ pub use self::{
     decimal::Decimal,
     map_odbc_to_arrow::{MapOdbcToArrow, MappingError},
     odbc_reader::{OdbcReader, OdbcReaderBuilder},
-    text::choose_text_strategy,
+    text::{choose_text_strategy, TextEncoding},
 };
 
 /// All decisions needed to copy data from an ODBC buffer to an Arrow Array
@@ -120,6 +120,7 @@ pub fn choose_column_strategy(
     buffer_allocation_options: BufferAllocationOptions,
     map_value_errors_to_null: bool,
     trim_fixed_sized_character_strings: bool,
+    text_encoding: TextEncoding,
 ) -> Result<Box<dyn ReadStrategy + Send>, ColumnFailure> {
     let strat: Box<dyn ReadStrategy + Send> = match field.data_type() {
         ArrowDataType::Boolean => {
@@ -151,6 +152,7 @@ pub fn choose_column_strategy(
                 lazy_display_size,
                 buffer_allocation_options.max_text_size,
                 trim_fixed_sized_character_strings,
+                text_encoding,
             )?
         }
         ArrowDataType::Decimal128(precision, scale @ 0..) => {

@@ -17,6 +17,7 @@ pub fn choose_text_strategy(
     lazy_display_size: impl FnOnce() -> Result<Option<NonZeroUsize>, odbc_api::Error>,
     max_text_size: Option<usize>,
     trim_fixed_sized_character_strings: bool,
+    text_encoding: TextEncoding,
 ) -> Result<Box<dyn ReadStrategy + Send>, ColumnFailure> {
     let apply_buffer_limit = |len| match (len, max_text_size) {
         (None, None) => Err(ColumnFailure::ZeroSizedColumn { sql_type }),
@@ -29,7 +30,7 @@ pub fn choose_text_strategy(
         OdbcDataType::Char { .. } | OdbcDataType::WChar { .. }
     );
     let trim = trim_fixed_sized_character_strings && is_fixed_sized_char;
-    let strategy: Box<dyn ReadStrategy + Send> = if cfg!(target_os = "windows") {
+    let strategy: Box<dyn ReadStrategy + Send> = if text_encoding.use_utf16() {
         let hex_len = sql_type
             .utf16_len()
             .map(Ok)
@@ -53,6 +54,41 @@ pub fn choose_text_strategy(
     };
 
     Ok(strategy)
+}
+
+/// Used to indicate the preferred encoding for text columns.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TextEncoding {
+    /// Evaluates to [`Self::Wide`] on windows and [`Self::Narrow`] on other systems. We do this,
+    /// because most systems e.g. MacOs and Linux use UTF-8 as their default encoding, while windows
+    /// may still use a Latin1 or some other extended ASCII as their narrow encoding. On the other
+    /// hand many Posix drivers are lacking in their support for wide function calls and UTF-16. So
+    /// using `Wide` on windows and `Narrow` everythere else is a good starting point.
+    Auto,
+    /// Use narrow characters (one byte) to encode text in payloads. ODBC lets the client choose the
+    /// encoding which should be based on the system local. This is often not what is actually
+    /// happening though. If we use narrow encoding, we assume the text to be UTF-8 and error if we
+    /// find that not to be the case.
+    Utf8,
+    /// Use wide characters (two bytes) to encode text in payloads. ODBC defines the encoding to
+    /// be always UTF-16.
+    Utf16,
+}
+
+impl Default for TextEncoding {
+    fn default() -> Self {
+        Self::Auto
+    }
+}
+
+impl TextEncoding {
+    pub fn use_utf16(&self) -> bool {
+        match self {
+            Self::Auto => cfg!(target_os = "windows"),
+            Self::Utf8 => false,
+            Self::Utf16 => true,
+        }
+    }
 }
 
 fn wide_text_strategy(u16_len: usize, trim: bool) -> Box<dyn ReadStrategy + Send> {
