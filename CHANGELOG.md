@@ -1,5 +1,21 @@
 # Changelog
 
+## [15.1.0](https://github.com/pacman82/arrow-odbc/compare/v15.0.0...v15.1.0) - 2025-03-08
+
+### Added
+
+- Support for explicitly choosing the transfer encoding.
+
+### Fixed
+
+- Pin chrono version to 0.4.39 to fix build
+
+### Other
+
+- use input parameters rather than literals to setup preconditions for most tests
+- Fix "String or binary data would be truncated in table" on linux systems
+- fix test when block in fetch_narrow_data
+
 ## [15.0.0](https://github.com/pacman82/arrow-odbc/compare/v14.2.0...v15.0.0) - 2025-02-23
 
 ### Added
