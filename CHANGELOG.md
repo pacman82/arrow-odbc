@@ -1,5 +1,11 @@
 # Changelog
 
+## [15.1.1](https://github.com/pacman82/arrow-odbc/compare/v15.1.0...v15.1.1) - 2025-03-08
+
+### Other
+
+- Fix docstrings for TextEncoding
+
 ## [15.1.0](https://github.com/pacman82/arrow-odbc/compare/v15.0.0...v15.1.0) - 2025-03-08
 
 ### Added
