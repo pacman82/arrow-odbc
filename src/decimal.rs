@@ -4,7 +4,7 @@ use arrow::{
 };
 use odbc_api::buffers::{AnySliceMut, BufferDesc};
 
-use crate::{odbc_writer::WriteStrategy, WriterError};
+use crate::{WriterError, odbc_writer::WriteStrategy};
 
 pub struct NullableDecimal128AsText {
     precision: u8,

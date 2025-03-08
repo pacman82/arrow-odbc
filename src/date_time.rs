@@ -12,7 +12,7 @@ use odbc_api::{
     sys::{Date, Time, Timestamp},
 };
 
-use crate::{odbc_writer::WriteStrategy, reader::MappingError, WriterError};
+use crate::{WriterError, odbc_writer::WriteStrategy, reader::MappingError};
 
 /// Transform date to days since unix epoch as i32
 pub fn days_since_epoch(date: &Date) -> i32 {

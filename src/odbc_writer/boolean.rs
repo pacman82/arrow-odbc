@@ -1,7 +1,7 @@
 use arrow::array::{Array, BooleanArray};
 use odbc_api::{
-    buffers::{AnySliceMut, BufferDesc},
     Bit,
+    buffers::{AnySliceMut, BufferDesc},
 };
 
 use crate::WriterError;

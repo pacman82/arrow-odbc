@@ -3,8 +3,8 @@ use std::{sync::Arc, thread};
 use arrow::{
     array::{
         Array, ArrayRef, BinaryArray, BooleanArray, Date32Array, Date64Array, Decimal128Array,
-        Decimal256Builder, FixedSizeBinaryArray, Float16Array, Float32Array, Int16Array,
-        Int32Array, Int64Array, Int8Array, LargeStringArray, StringArray, Time32MillisecondArray,
+        Decimal256Builder, FixedSizeBinaryArray, Float16Array, Float32Array, Int8Array, Int16Array,
+        Int32Array, Int64Array, LargeStringArray, StringArray, Time32MillisecondArray,
         Time32SecondArray, Time64MicrosecondArray, Time64NanosecondArray,
         TimestampMicrosecondArray, TimestampMillisecondArray, TimestampNanosecondArray,
         TimestampSecondArray, UInt8Array,
@@ -25,12 +25,15 @@ use lazy_static::lazy_static;
 type F16 = <Float16Type as ArrowPrimitiveType>::Native;
 
 use arrow_odbc::{
-    arrow::array::Float64Array, arrow_schema_from, insert_into_table, odbc_api::{
-        buffers::TextRowSet,
-        sys::{AttrConnectionPooling, AttrCpMatch},
+    ColumnFailure, Error, OdbcReaderBuilder, OdbcWriter, TextEncoding, WriterError,
+    arrow::array::Float64Array,
+    arrow_schema_from, insert_into_table,
+    odbc_api::{
         Connection, ConnectionOptions, Cursor, CursorImpl, Environment, IntoParameter,
         StatementConnection,
-    }, ColumnFailure, Error, OdbcReaderBuilder, OdbcWriter, TextEncoding, WriterError
+        buffers::TextRowSet,
+        sys::{AttrConnectionPooling, AttrCpMatch},
+    },
 };
 
 use stdext::function_name;
@@ -304,7 +307,7 @@ fn fetch_varchar() {
 fn trim_fixed_sized_character_data() {
     let table_name = function_name!().rsplit_once(':').unwrap().1;
 
-    let cursor = cursor_over(table_name, "CHAR(4)", "('1234'),(' 123'),('123 ')");
+    let cursor = cursor_over_literals(table_name, "CHAR(4)", "('1234'),(' 123'),('123 ')");
     // Now that we have a cursor, we want to iterate over its rows and fill an arrow batch with it.
     let mut reader = OdbcReaderBuilder::new()
         .with_max_num_rows_per_batch(4)
@@ -624,7 +627,7 @@ fn fetch_out_of_range_date_time_ns() {
 #[test]
 fn map_out_of_range_date_time_to_null() {
     let table_name = function_name!().rsplit_once(':').unwrap().1;
-    let cursor = cursor_over(
+    let cursor = cursor_over_literals(
         table_name,
         "DATETIME2 NOT NULL",
         "('2300-01-01 00:00:00.1234567'),('2002-09-30 12:43:17.456')",
@@ -664,7 +667,7 @@ fn map_out_of_range_date_time_to_null() {
 fn fetch_decimals() {
     // Given a cursor over a table with one decimal column
     let table_name = function_name!().rsplit_once(':').unwrap().1;
-    let cursor = cursor_over(table_name, "DECIMAL(5,2) NOT NULL", "(123.45),(678.90)");
+    let cursor = cursor_over_literals(table_name, "DECIMAL(5,2) NOT NULL", "(123.45),(678.90)");
 
     // When fetching it in batches of five
     let mut reader = OdbcReaderBuilder::new()
@@ -688,7 +691,7 @@ fn fetch_decimals() {
 fn fetch_negative_decimal() {
     // Given a cursor over a table with one decimal column
     let table_name = function_name!().rsplit_once(':').unwrap().1;
-    let cursor = cursor_over(table_name, "DECIMAL(5,2) NOT NULL", "(-123.45)");
+    let cursor = cursor_over_value(table_name, "DECIMAL(5,2) NOT NULL", -123.45);
 
     // When fetching it in batches of five
     let mut reader = OdbcReaderBuilder::new()
@@ -1148,7 +1151,7 @@ fn read_multiple_result_sets_with_second_no_schema() {
 fn applies_row_limit_for_default_constructed_readers() {
     // Given a cursor over a datascheme with a small per row memory footprint
     let table_name = function_name!().rsplit_once(':').unwrap().1;
-    let cursor = cursor_over(table_name, "INTEGER", "(42)");
+    let cursor = cursor_over_value(table_name, "INTEGER", "42");
 
     // When constructing a reader from that cursor without specifying an explicity memory or row
     // limit
@@ -1162,7 +1165,7 @@ fn applies_row_limit_for_default_constructed_readers() {
 fn applies_memory_size_limit() {
     // Given a cursor over a datascheme with a small per row memory footprint
     let table_name = function_name!().rsplit_once(':').unwrap().1;
-    let cursor = cursor_over(table_name, "VARCHAR(512)", "('Hello')");
+    let cursor = cursor_over_value(table_name, "VARCHAR(512)", "Hello");
 
     // When constructing a reader from that cursor without specifying an explicity memory or row
     // limit
@@ -1180,7 +1183,7 @@ fn applies_memory_size_limit() {
 fn memory_size_limit_can_not_hold_a_single_row() {
     // Given a cursor over a datascheme with a small per row memory footprint
     let table_name = function_name!().rsplit_once(':').unwrap().1;
-    let cursor = cursor_over(table_name, "VARCHAR(512)", "('Hello')");
+    let cursor = cursor_over_value(table_name, "VARCHAR(512)", "Hello");
 
     // When constructing a reader from that cursor without specifying an explicity memory or row
     // limit
@@ -1203,11 +1206,7 @@ fn memory_size_limit_can_not_hold_a_single_row() {
 fn fetch_wide_data() {
     // Given a cursor returning text data
     let table_name = function_name!().rsplit_once(':').unwrap().1;
-    let cursor = cursor_over(
-        table_name,
-        "VARCHAR(30)",
-        "('Hällö, Wörld!')",
-    );
+    let cursor = cursor_over_value(table_name, "VARCHAR(30)", "Hällö, Wörld!");
 
     // When explicitly requesting a UTF-16 encoded transfer encoding
     let mut reader = OdbcReaderBuilder::new()
@@ -1232,11 +1231,7 @@ fn fetch_narrow_data() {
     // some amount of testing we just do not use any special characters here. This is also the
     // reason, why `narrow` is not the default on windows.
     let table_name = function_name!().rsplit_once(':').unwrap().1;
-    let cursor = cursor_over(
-        table_name,
-        "VARCHAR(15)",
-        "('Hello, World!')",
-    );
+    let cursor = cursor_over_value(table_name, "VARCHAR(15)", "Hello, World!");
 
     // When explicitly requesting a UTF-8 encoded transfer encoding
     let mut reader = OdbcReaderBuilder::new()
@@ -2200,7 +2195,7 @@ fn sanatize_column_names() {
 #[test]
 fn fetch_integer_concurrently() {
     let table_name = function_name!().rsplit_once(':').unwrap().1;
-    let cursor = cursor_over(table_name, "INTEGER", "(1),(NULL),(3)");
+    let cursor = cursor_over_literals(table_name, "INTEGER", "(1),(NULL),(3)");
     // Now that we have a cursor, we want to iterate over its rows and fill an arrow batch with it.
     let mut reader = OdbcReaderBuilder::new()
         .with_max_num_rows_per_batch(100)
@@ -2238,7 +2233,7 @@ fn fetch_empty_cursor_concurrently() {
 #[test]
 fn fetch_with_error_concurrently() {
     let table_name = function_name!().rsplit_once(':').unwrap().1;
-    let cursor = cursor_over(table_name, "VARCHAR(50)", "('Hello, World!')");
+    let cursor = cursor_over_value(table_name, "VARCHAR(50)", "Hello, World!");
 
     let mut reader = OdbcReaderBuilder::new()
         .with_max_num_rows_per_batch(100)
@@ -2258,7 +2253,7 @@ fn fetch_with_error_concurrently() {
 #[test]
 fn fetch_row_groups_repeatedly_concurrently() {
     let table_name = function_name!().rsplit_once(':').unwrap().1;
-    let cursor = cursor_over(table_name, "INTEGER", "(1),(NULL),(3)");
+    let cursor = cursor_over_literals(table_name, "INTEGER", "(1),(NULL),(3)");
     // Now that we have a cursor, we want to iterate over its rows and fill an arrow batch with it.
 
     let mut reader = OdbcReaderBuilder::new()
@@ -2352,7 +2347,7 @@ fn read_multiple_result_sets_using_concurrent_cursor() {
 #[test]
 fn promote_sequential_to_concurrent_cursor() {
     let table_name = function_name!().rsplit_once(':').unwrap().1;
-    let cursor = cursor_over(table_name, "INTEGER", "(42)");
+    let cursor = cursor_over_value(table_name, "INTEGER", 42);
     // Now that we have a cursor, we want to iterate over its rows and fill an arrow batch with it.
     let mut reader = OdbcReaderBuilder::new()
         .with_max_num_rows_per_batch(100)
@@ -2371,7 +2366,7 @@ fn promote_sequential_to_concurrent_cursor() {
 fn concurrent_reader_is_send() {
     // Given a conucurrent_reader
     let table_name = function_name!().rsplit_once(':').unwrap().1;
-    let cursor = cursor_over(table_name, "INTEGER", "(42)");
+    let cursor = cursor_over_value(table_name, "INTEGER", 42);
     let mut concurrent_reader = OdbcReaderBuilder::new()
         .with_max_num_rows_per_batch(100)
         .build(cursor)
@@ -2456,7 +2451,7 @@ fn fetch_arrow_data(
     column_type: &str,
     literal: &str,
 ) -> Result<ArrayRef, anyhow::Error> {
-    let cursor = cursor_over(table_name, column_type, literal);
+    let cursor = cursor_over_literals(table_name, column_type, literal);
     // Now that we have a cursor, we want to iterate over its rows and fill an arrow batch with it.
     let mut reader = OdbcReaderBuilder::new()
         .with_max_num_rows_per_batch(100)
@@ -2471,7 +2466,7 @@ fn fetch_arrow_data(
     Ok(record_batch.column(0).clone())
 }
 
-fn cursor_over(
+fn cursor_over_literals(
     table_name: &str,
     column_type: &str,
     literal: &str,
@@ -2484,6 +2479,25 @@ fn cursor_over(
     // Insert values using literals
     let sql = format!("INSERT INTO {table_name} (a) VALUES {literal}");
     conn.execute(&sql, (), None).unwrap();
+    // Query column with values to get a cursor
+    let sql = format!("SELECT a FROM {table_name}");
+    let cursor = conn.into_cursor(&sql, (), None).unwrap().unwrap();
+    cursor
+}
+
+fn cursor_over_value(
+    table_name: &str,
+    column_type: &str,
+    value: impl IntoParameter,
+) -> CursorImpl<StatementConnection<'static>> {
+    // Setup a table on the database
+    let conn = ENV
+        .connect_with_connection_string(MSSQL, ConnectionOptions::default())
+        .unwrap();
+    setup_empty_table(&conn, table_name, &[column_type]).unwrap();
+    // Insert values using literals
+    let sql = format!("INSERT INTO {table_name} (a) VALUES (?)");
+    conn.execute(&sql, &value.into_parameter(), None).unwrap();
     // Query column with values to get a cursor
     let sql = format!("SELECT a FROM {table_name}");
     let cursor = conn.into_cursor(&sql, (), None).unwrap().unwrap();

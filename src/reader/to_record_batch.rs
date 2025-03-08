@@ -5,11 +5,11 @@ use arrow::{
     record_batch::RecordBatch,
 };
 use log::info;
-use odbc_api::{buffers::ColumnarAnyBuffer, ResultSetMetadata};
+use odbc_api::{ResultSetMetadata, buffers::ColumnarAnyBuffer};
 
-use crate::{arrow_schema_from, BufferAllocationOptions, ColumnFailure, Error};
+use crate::{BufferAllocationOptions, ColumnFailure, Error, arrow_schema_from};
 
-use super::{choose_column_strategy, TextEncoding, MappingError, ReadStrategy};
+use super::{MappingError, ReadStrategy, TextEncoding, choose_column_strategy};
 
 /// Transforms batches fetched from an ODBC data source in a
 /// [`odbc_api::bufferers::ColumnarAnyBuffer`] into arrow tables of the specified schemas. It also

@@ -2,8 +2,8 @@ use std::{char::decode_utf16, cmp::min, num::NonZeroUsize, sync::Arc};
 
 use arrow::array::{ArrayRef, StringBuilder};
 use odbc_api::{
-    buffers::{AnySlice, BufferDesc},
     DataType as OdbcDataType,
+    buffers::{AnySlice, BufferDesc},
 };
 
 use super::{ColumnFailure, MappingError, ReadStrategy};

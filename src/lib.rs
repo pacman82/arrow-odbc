@@ -58,10 +58,10 @@ pub use odbc_api;
 
 pub use self::{
     error::Error,
-    odbc_writer::{insert_into_table, insert_statement_from_schema, OdbcWriter, WriterError},
+    odbc_writer::{OdbcWriter, WriterError, insert_into_table, insert_statement_from_schema},
     reader::{
-        BufferAllocationOptions, ColumnFailure, ConcurrentOdbcReader, OdbcReader, OdbcReaderBuilder,
-        TextEncoding,
+        BufferAllocationOptions, ColumnFailure, ConcurrentOdbcReader, OdbcReader,
+        OdbcReaderBuilder, TextEncoding,
     },
     schema::arrow_schema_from,
 };

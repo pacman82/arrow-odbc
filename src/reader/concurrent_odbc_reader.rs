@@ -3,7 +3,7 @@ use arrow::{
     error::ArrowError,
     record_batch::{RecordBatch, RecordBatchReader},
 };
-use odbc_api::{buffers::ColumnarAnyBuffer, BlockCursor, ConcurrentBlockCursor, Cursor};
+use odbc_api::{BlockCursor, ConcurrentBlockCursor, Cursor, buffers::ColumnarAnyBuffer};
 
 use crate::Error;
 

@@ -5,8 +5,8 @@ use thiserror::Error;
 use arrow::{
     array::Array,
     datatypes::{
-        DataType, Date32Type, Date64Type, Field, Float16Type, Float32Type, Float64Type, Int16Type,
-        Int32Type, Int64Type, Int8Type, Schema, Time32MillisecondType, Time32SecondType,
+        DataType, Date32Type, Date64Type, Field, Float16Type, Float32Type, Float64Type, Int8Type,
+        Int16Type, Int32Type, Int64Type, Schema, Time32MillisecondType, Time32SecondType,
         Time64MicrosecondType, Time64NanosecondType, TimeUnit, TimestampMicrosecondType,
         TimestampMillisecondType, TimestampNanosecondType, TimestampSecondType, UInt8Type,
     },
@@ -14,15 +14,15 @@ use arrow::{
     record_batch::{RecordBatch, RecordBatchReader},
 };
 use odbc_api::{
+    ColumnarBulkInserter, Connection, Prepared, StatementConnection,
     buffers::{AnyBuffer, AnySliceMut, BufferDesc},
     handles::{AsStatementRef, StatementImpl},
-    ColumnarBulkInserter, Connection, Prepared, StatementConnection,
 };
 
 use crate::{
     date_time::{
-        epoch_to_date, epoch_to_timestamp_ms, epoch_to_timestamp_ns, epoch_to_timestamp_s,
-        epoch_to_timestamp_us, sec_since_midnight_to_time, NullableTimeAsText,
+        NullableTimeAsText, epoch_to_date, epoch_to_timestamp_ms, epoch_to_timestamp_ns,
+        epoch_to_timestamp_s, epoch_to_timestamp_us, sec_since_midnight_to_time,
     },
     decimal::{NullableDecimal128AsText, NullableDecimal256AsText},
 };

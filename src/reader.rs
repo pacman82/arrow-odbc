@@ -3,16 +3,16 @@ use std::{convert::TryInto, sync::Arc};
 use arrow::{
     array::{ArrayRef, BooleanBuilder},
     datatypes::{
-        DataType as ArrowDataType, Date32Type, Field, Float32Type, Float64Type, Int16Type,
-        Int32Type, Int64Type, Int8Type, TimeUnit, TimestampMicrosecondType,
+        DataType as ArrowDataType, Date32Type, Field, Float32Type, Float64Type, Int8Type,
+        Int16Type, Int32Type, Int64Type, TimeUnit, TimestampMicrosecondType,
         TimestampMillisecondType, TimestampNanosecondType, TimestampSecondType, UInt8Type,
     },
 };
 
 use log::debug;
 use odbc_api::{
-    buffers::{AnySlice, BufferDesc, Item},
     Bit, DataType as OdbcDataType, ResultSetMetadata,
+    buffers::{AnySlice, BufferDesc, Item},
 };
 use thiserror::Error;
 
@@ -34,7 +34,7 @@ pub use self::{
     decimal::Decimal,
     map_odbc_to_arrow::{MapOdbcToArrow, MappingError},
     odbc_reader::{OdbcReader, OdbcReaderBuilder},
-    text::{choose_text_strategy, TextEncoding},
+    text::{TextEncoding, choose_text_strategy},
 };
 
 /// All decisions needed to copy data from an ODBC buffer to an Arrow Array
@@ -199,7 +199,7 @@ pub fn choose_column_strategy(
         unsupported_arrow_type => {
             return Err(ColumnFailure::UnsupportedArrowType(
                 unsupported_arrow_type.clone(),
-            ))
+            ));
         }
     };
     Ok(strat)
