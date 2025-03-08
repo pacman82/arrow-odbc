@@ -342,8 +342,8 @@ impl OdbcReaderBuilder {
     /// Controls the encoding used for transferring text data from the ODBC data source to the
     /// application. The resulting Arrow arrays will still be UTF-8 encoded. You may want to use
     /// this if you get garbage characters or invalid UTF-8 errors on non-windows systems to set the
-    /// encoding to [`TextEncoding::Wide`]. On windows systems you may want to set this to
-    /// [`TextEncoding::Narrow`] to gain performance benefits, after you have verified that your
+    /// encoding to [`TextEncoding::Utf16`]. On windows systems you may want to set this to
+    /// [`TextEncoding::Utf8`] to gain performance benefits, after you have verified that your
     /// system locale is set to UTF-8. The default is [`TextEncoding::Auto`].
     pub fn with_payload_text_encoding(&mut self, text_encoding: TextEncoding) -> &mut Self {
         self.text_encoding = text_encoding;

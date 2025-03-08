@@ -59,7 +59,7 @@ pub fn choose_text_strategy(
 /// Used to indicate the preferred encoding for text columns.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TextEncoding {
-    /// Evaluates to [`Self::Wide`] on windows and [`Self::Narrow`] on other systems. We do this,
+    /// Evaluates to [`Self::Utf16`] on windows and [`Self::Utf8`] on other systems. We do this,
     /// because most systems e.g. MacOs and Linux use UTF-8 as their default encoding, while windows
     /// may still use a Latin1 or some other extended ASCII as their narrow encoding. On the other
     /// hand many Posix drivers are lacking in their support for wide function calls and UTF-16. So
