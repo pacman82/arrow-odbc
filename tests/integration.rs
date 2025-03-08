@@ -1241,7 +1241,7 @@ fn fetch_narrow_data() {
     // When explicitly requesting a UTF-8 encoded transfer encoding
     let mut reader = OdbcReaderBuilder::new()
         .with_max_num_rows_per_batch(1)
-        .with_payload_text_encoding(TextEncoding::Utf16)
+        .with_payload_text_encoding(TextEncoding::Utf8)
         .build(cursor)
         .unwrap();
 
