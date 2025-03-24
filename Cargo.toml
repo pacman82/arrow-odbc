@@ -33,7 +33,7 @@ arrow = { version = ">= 29, < 55", default-features = false }
 # We use chrono for date conversions. We pin it for now to the version before 0.4.40. Due to a
 # nameclash of the `quarter` method between `DateLike` and `ChronoDateExt` traits. We can fix this
 # one arrow-arith, resolves the issue.
-chrono = "=0.4.39"
+chrono = "=0.4.40"
 log = "0.4.27"
 thiserror = "2.0.12"
 
