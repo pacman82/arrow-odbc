@@ -34,15 +34,15 @@ arrow = { version = ">= 29, < 55", default-features = false }
 # nameclash of the `quarter` method between `DateLike` and `ChronoDateExt` traits. We can fix this
 # one arrow-arith, resolves the issue.
 chrono = "=0.4.39"
-log = "0.4.22"
-thiserror = "2.0.11"
+log = "0.4.27"
+thiserror = "2.0.12"
 
 odbc-api = ">= 10, < 12"
 
 
 
 [dev-dependencies]
-anyhow = "1.0.91"
+anyhow = "1.0.97"
 # Used to share one ODBC environment in tests
 lazy_static = "1.5.0"
 # Function name macro is used to ensure unique table names in test
