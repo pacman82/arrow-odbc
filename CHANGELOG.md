@@ -1,5 +1,12 @@
 # Changelog
 
+## [15.1.2](https://github.com/pacman82/arrow-odbc/compare/v15.1.1...v15.1.2) - 2025-03-24
+
+### Other
+
+- Remove pin from chrono
+- update dependencies
+
 ## [15.1.1](https://github.com/pacman82/arrow-odbc/compare/v15.1.0...v15.1.1) - 2025-03-08
 
 ### Other
