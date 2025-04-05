@@ -1,5 +1,16 @@
 # Changelog
 
+## [16.0.0](https://github.com/pacman82/arrow-odbc/compare/v15.1.1...v16.0.0) - 2025-04-05
+
+### Added
+
+- [**breaking**] Update to support odbc-api 12.
+
+### Other
+
+- Remove pin from chrono
+- update dependencies
+
 ## [15.1.1](https://github.com/pacman82/arrow-odbc/compare/v15.1.0...v15.1.1) - 2025-03-08
 
 ### Other
