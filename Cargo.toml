@@ -35,7 +35,7 @@ chrono = "0.4.39"
 log = "0.4.27"
 thiserror = "2.0.12"
 
-odbc-api = ">= 10, < 12"
+odbc-api = ">= 12, < 13"
 
 
 

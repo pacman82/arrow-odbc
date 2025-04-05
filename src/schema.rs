@@ -140,6 +140,7 @@ fn arrow_field_from(
         | OdbcDataType::WChar { length: _ }
         | OdbcDataType::Char { length: _ }
         | OdbcDataType::WVarchar { length: _ }
+        | OdbcDataType::WLongVarchar { length: _ }
         | OdbcDataType::LongVarchar { length: _ }
         | OdbcDataType::Varchar { length: _ } => ArrowDataType::Utf8,
     };
