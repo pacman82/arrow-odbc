@@ -1,5 +1,11 @@
 # Changelog
 
+## [16.0.1](https://github.com/pacman82/arrow-odbc/compare/v16.0.0...v16.0.1) - 2025-04-17
+
+### Other
+
+- Support arrow 55
+
 ## [16.0.0](https://github.com/pacman82/arrow-odbc/compare/v15.1.1...v16.0.0) - 2025-04-05
 
 ### Added
