@@ -2394,27 +2394,48 @@ fn concurrent_reader_is_send() {
 }
 
 /// Test triggered by <https://github.com/pacman82/odbc-api/issues/709>
-/// 
+///
 /// In this issue the user received an error that the buffer used to fetch the data was too small.
 /// The user used a relational type "text VARCHAR(1000)" in PostgreSQL. Fetching a field with 1000
 /// letters, but with the letters containing special characters, so the binary size exceeds 1000.
 /// Usually arrow-odbc accounts for this by multiplying the size by 4 for UTF-8 strings and 2 for
 /// UTF-16, yet it does only do so, for known text types, not unknown types, which are fetched as
 /// text.
-/// 
+///
 /// Originally the error is only reproducable with UTF-8 encoding, but not with UTF-16.
+/// 
+/// The issue tracks down to the fact that POSTGRES SQL uses [`SqlDataType::EXT_W_LONG_VARCHAR`]
+/// (at least on Windows, might the narrow variant on Linux), which is mapped to [`DataType::Other`]
+/// before the fix to `odbc-api`.
 #[test]
 fn psql_varchar() {
     // Given
     let table_name = function_name!().rsplit_once(':').unwrap().1;
-    let conn = ENV.connect_with_connection_string(POSTGRES, ConnectionOptions::default())
+    let conn = ENV
+        .connect_with_connection_string(POSTGRES, ConnectionOptions::default())
         .unwrap();
-    conn.execute(&format!("DROP TABLE IF EXISTS {table_name}"), (), None).unwrap();
-    conn.execute(&format!("CREATE TABLE {table_name} (text VARCHAR(1000));"), (), None).unwrap();
-    conn.execute(&format!("INSERT INTO {table_name} (text) VALUES('가나다라마바사아자차카타파하가나다라마바사아자차카타파하가나다라마바사아자차카타파하가나다라마바사아자차카타파하가나다라마바사아자차카타파하가나다라마바사아자차카타파하가나다라마바사아자차카파하가나다라마바사아자차카타파하가나다라마바사아자차카타파하가나다라마바사아자차카타파하가나다라마바사아자차카타파하가나다라마바사아자차카타파하가나다라마바사아자차카타파하가나다라마바사아자차카파하가나다라마바사아자차카타파하가나다라마바사아자차카타파하가나다라마바사아자차카타파하가나다라마바사아자차카타파하가나다라마바사아자차카타파하가나다라마바사아자차카타파하가나다라마바사아자차카파하가나다라마바사아자차카타파하가나다라마바사아자차카타파하가나다라마바사아자차카타파하가');"), (), None).unwrap();
+    conn.execute(&format!("DROP TABLE IF EXISTS {table_name}"), (), None)
+        .unwrap();
+    // We need a varchar type long enough to trigger use of LONG_W_VARCHAR
+    conn.execute(
+        &format!("CREATE TABLE {table_name} (text VARCHAR(1000));"),
+        (),
+        None,
+    )
+    .unwrap();
+    let long_text_with_special_characters = "가".repeat(1000);
+    conn.execute(
+        &format!("INSERT INTO {table_name} (text) VALUES(?);"),
+        &(long_text_with_special_characters.as_str()).into_parameter(),
+        None,
+    )
+    .unwrap();
 
     // When
-    let cursor = conn.into_cursor(&format!("SELECT text FROM {table_name}"), (), None).unwrap().unwrap();
+    let cursor = conn
+        .into_cursor(&format!("SELECT text FROM {table_name}"), (), None)
+        .unwrap()
+        .unwrap();
     let mut reader = OdbcReaderBuilder::new()
         .with_max_num_rows_per_batch(1)
         .with_payload_text_encoding(TextEncoding::Utf8)
@@ -2426,7 +2447,7 @@ fn psql_varchar() {
     let array_any = record_batch.column(0).clone();
     let array_vals = array_any.as_any().downcast_ref::<StringArray>().unwrap();
     assert_eq!(1, array_vals.len());
-    assert_eq!("가나다라마바사아자차카타파하가나다라마바사아자차카타파하가나다라마바사아자차카타파하가나다라마바사아자차카타파하가나다라마바사아자차카타파하가나다라마바사아자차카타파하가나다라마바사아자차카파하가나다라마바사아자차카타파하가나다라마바사아자차카타파하가나다라마바사아자차카타파하가나다라마바사아자차카타파하가나다라마바사아자차카타파하가나다라마바사아자차카타파하가나다라마바사아자차카파하가나다라마바사아자차카타파하가나다라마바사아자차카타파하가나다라마바사아자차카타파하가나다라마바사아자차카타파하가나다라마바사아자차카타파하가나다라마바사아자차카타파하가나다라마바사아자차카파하가나다라마바사아자차카타파하가나다라마바사아자차카타파하가나다라마바사아자차카타파하가", array_vals.value(0));
+    assert_eq!(long_text_with_special_characters, array_vals.value(0));
 }
 
 /// Creates the table and assures it is empty. Columns are named a,b,c, etc.
