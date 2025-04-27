@@ -2398,9 +2398,11 @@ fn concurrent_reader_is_send() {
 /// In this issue the user received an error that the buffer used to fetch the data was too small.
 /// The user used a relational type "text VARCHAR(1000)" in PostgreSQL. Fetching a field with 1000
 /// letters, but with the letters containing special characters, so the binary size exceeds 1000.
-/// Usually arrow-odbc accounts for this by multiplying the size by 4 for UTF-8 strings and 3 for
+/// Usually arrow-odbc accounts for this by multiplying the size by 4 for UTF-8 strings and 2 for
 /// UTF-16, yet it does only do so, for known text types, not unknown types, which are fetched as
 /// text.
+/// 
+/// Originally the error is only reproducable with UTF-8 encoding, but not with UTF-16.
 #[test]
 fn psql_varchar() {
     // Given
@@ -2415,6 +2417,7 @@ fn psql_varchar() {
     let cursor = conn.into_cursor(&format!("SELECT text FROM {table_name}"), (), None).unwrap().unwrap();
     let mut reader = OdbcReaderBuilder::new()
         .with_max_num_rows_per_batch(1)
+        .with_payload_text_encoding(TextEncoding::Utf8)
         .build(cursor)
         .unwrap();
     let record_batch = reader.next().unwrap().unwrap();
