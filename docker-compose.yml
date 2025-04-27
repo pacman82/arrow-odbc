@@ -1,6 +1,15 @@
 # Docker compose file used for local development
 
 services:
+  postgres:
+    image: postgres:17
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: test
+      POSTGRES_USER: test
+      POSTGRES_PASSWORD: test
+
   # Microsoft SQL database used for testing
   mssql:
     image: mcr.microsoft.com/mssql/server:2019-CU5-ubuntu-18.04
