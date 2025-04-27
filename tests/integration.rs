@@ -2401,14 +2401,14 @@ fn concurrent_reader_is_send() {
 /// Usually arrow-odbc accounts for this by multiplying the size by 4 for UTF-8 strings and 2 for
 /// UTF-16, yet it does only do so, for known text types, not unknown types, which are fetched as
 /// text.
-///
-/// Originally the error is only reproducable with UTF-8 encoding, but not with UTF-16.
 /// 
 /// The issue tracks down to the fact that POSTGRES SQL uses [`SqlDataType::EXT_W_LONG_VARCHAR`]
 /// (at least on Windows, might the narrow variant on Linux), which is mapped to [`DataType::Other`]
-/// before the fix to `odbc-api`.
+/// before the fix to `odbc-api`. Another fix which had to applied to `odbc-api` is that
+/// `DataType::LongVarchar` and `DataType::WLongVarchar` have their size adjusted accoringly to
+/// account for special characters.
 #[test]
-fn psql_varchar() {
+fn psql_varchar_1000() {
     // Given
     let table_name = function_name!().rsplit_once(':').unwrap().1;
     let conn = ENV
@@ -2438,7 +2438,6 @@ fn psql_varchar() {
         .unwrap();
     let mut reader = OdbcReaderBuilder::new()
         .with_max_num_rows_per_batch(1)
-        .with_payload_text_encoding(TextEncoding::Utf8)
         .build(cursor)
         .unwrap();
     let record_batch = reader.next().unwrap().unwrap();
