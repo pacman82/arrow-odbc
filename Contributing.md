@@ -14,6 +14,7 @@ Running local tests currently requires:
 You can install these requirements from here:
 
 * Install Rust compiler and Cargo. Follow the instructions on [this site](https://www.rust-lang.org/en-US/install.html).
+* Install PostgreSQL ODBC drivers
 * [Microsoft ODBC Driver 18 for SQL Server](https://docs.microsoft.com/en-us/sql/connect/odbc/download-odbc-driver-for-sql-server?view=sql-server-ver15).
 * An ODBC Driver manager if you are not on windows: <http://www.unixodbc.org/>
 
@@ -23,7 +24,7 @@ With docker installed run:
 docker-compose up
 ```
 
-This starts the Microsoft SQL Server used for testing.
+This starts the Relational Databases used for testing.
 
 We now can execute the tests in Rust typical fashion using:
 
