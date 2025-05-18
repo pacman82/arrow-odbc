@@ -1,5 +1,16 @@
 # Changelog
 
+## [16.0.2](https://github.com/pacman82/arrow-odbc/compare/v16.0.1...v16.0.2) - 2025-05-18
+
+### Other
+
+- Support odbc-api 13
+- Integration test for fetching VARCHAR(1000) from PostgreSQL with special characters
+- Elaborate on bug cause
+- psql_varchar test now also reproduces behaviour then run in Windows
+- Trying to reproduce too large value for buffer.
+- Add PostgreSQL to test pipeline
+
 ## [16.0.1](https://github.com/pacman82/arrow-odbc/compare/v16.0.0...v16.0.1) - 2025-04-17
 
 ### Other
