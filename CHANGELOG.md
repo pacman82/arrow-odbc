@@ -1,5 +1,11 @@
 # Changelog
 
+## [16.0.3](https://github.com/pacman82/arrow-odbc/compare/v16.0.2...v16.0.3) - 2025-05-24
+
+### Other
+
+- Test for fetching time
+
 ## [16.0.2](https://github.com/pacman82/arrow-odbc/compare/v16.0.1...v16.0.2) - 2025-05-18
 
 ### Other
