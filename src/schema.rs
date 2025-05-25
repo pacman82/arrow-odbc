@@ -128,6 +128,7 @@ fn arrow_field_from(
         OdbcDataType::LongVarbinary { length: _ } | OdbcDataType::Varbinary { length: _ } => {
             ArrowDataType::Binary
         }
+        OdbcDataType::Time { precision: 0 } => ArrowDataType::Time32(TimeUnit::Second),
         OdbcDataType::Unknown
         | OdbcDataType::Time { precision: _ }
         | OdbcDataType::Numeric { .. }

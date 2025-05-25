@@ -867,9 +867,9 @@ fn fetch_time_psql() {
     let array_vals = arrow_batch
         .column(0)
         .as_any()
-        .downcast_ref::<StringArray>()
+        .downcast_ref::<Time32SecondArray>()
         .unwrap();
-    assert_eq!("12:34:56", array_vals.value(0));
+    assert_eq!(45_296, array_vals.value(0));
 }
 
 /// Like [`fetch_32bit_floating_point`], but utilizing a prepared query instead of a one shot.
@@ -2473,7 +2473,7 @@ fn concurrent_reader_is_send() {
 /// Usually arrow-odbc accounts for this by multiplying the size by 4 for UTF-8 strings and 2 for
 /// UTF-16, yet it does only do so, for known text types, not unknown types, which are fetched as
 /// text.
-/// 
+///
 /// The issue tracks down to the fact that POSTGRES SQL uses [`SqlDataType::EXT_W_LONG_VARCHAR`]
 /// (at least on Windows, might the narrow variant on Linux), which is mapped to [`DataType::Other`]
 /// before the fix to `odbc-api`. Another fix which had to applied to `odbc-api` is that
