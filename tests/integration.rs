@@ -836,6 +836,42 @@ fn fetch_time() {
     assert_eq!("12:34:56.0000000", array_vals.value(0));
 }
 
+#[test]
+fn fetch_time_psql() {
+    let table_name = function_name!().rsplit_once(':').unwrap().1;
+
+    // Setup a table on the database with some values (so we can fetch them)
+    let conn = ENV
+        .connect_with_connection_string(MSSQL, Default::default())
+        .unwrap();
+    setup_empty_table::<PostgreSql>(&conn, table_name, &["TIME NOT NULL"]).unwrap();
+    let sql = format!("INSERT INTO {table_name} (a) VALUES ('12:34:56')");
+    conn.execute(&sql, (), None).unwrap();
+
+    // Query column with values to get a cursor
+    let sql = format!("SELECT a FROM {table_name} ORDER BY id");
+    let cursor = conn.execute(&sql, (), None).unwrap().unwrap();
+
+    // Now that we have a cursor, we want to iterate over its rows and fill an arrow batch with it.
+    let mut reader = OdbcReaderBuilder::new()
+        // Batches will contain at most 100 entries.
+        .with_max_num_rows_per_batch(100)
+        // Instantiate reader with Arrow schema and ODBC cursor
+        .build(cursor)
+        .unwrap();
+
+    // Batch for batch copy values from ODBC buffer into arrow batches
+    let arrow_batch = reader.next().unwrap().unwrap();
+
+    // Assert that the correct values are found within the arrow batch
+    let array_vals = arrow_batch
+        .column(0)
+        .as_any()
+        .downcast_ref::<StringArray>()
+        .unwrap();
+    assert_eq!("12:34:56", array_vals.value(0));
+}
+
 /// Like [`fetch_32bit_floating_point`], but utilizing a prepared query instead of a one shot.
 #[test]
 fn prepared_query() {
