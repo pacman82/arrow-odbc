@@ -2491,6 +2491,15 @@ fn setup_empty_table(
     table_name: &str,
     column_types: &[&str],
 ) -> Result<(), odbc_api::Error> {
+    setup_empty_table_impl::<MsSql>(conn, table_name, column_types)
+}
+
+/// Creates the table and assures it is empty. Columns are named a,b,c, etc.
+fn setup_empty_table_impl<D: Dbms>(
+    conn: &Connection,
+    table_name: &str,
+    column_types: &[&str],
+) -> Result<(), odbc_api::Error> {
     let drop_table = &format!("DROP TABLE IF EXISTS {table_name}");
 
     let column_names = &["a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l"];
@@ -2501,10 +2510,26 @@ fn setup_empty_table(
         .collect::<Vec<_>>()
         .join(", ");
 
-    let create_table = format!("CREATE TABLE {table_name} (id int IDENTITY(1,1),{cols});");
+    let identity = D::identity_column();
+    let create_table = format!("CREATE TABLE {table_name} ({identity},{cols});");
     conn.execute(drop_table, (), None)?;
     conn.execute(&create_table, (), None)?;
     Ok(())
+}
+
+/// Database management system (ODBC lingo). We use this trait to treat PostgreSQL and Microsoft SQL
+/// Server the same in our test helpers.
+trait Dbms {
+    /// Text for an autoincremented identity column called id in a create table statement.
+    fn identity_column() -> &'static str;
+}
+
+struct MsSql;
+
+impl Dbms for MsSql {
+    fn identity_column() -> &'static str {
+        "id int IDENTITY(1,1)"
+    }
 }
 
 /// Query the table and prints it contents to a string
