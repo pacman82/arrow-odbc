@@ -124,7 +124,7 @@ fn fetch_8bit_unsigned_integer_explicit_schema() {
     let conn = ENV
         .connect_with_connection_string(MSSQL, Default::default())
         .unwrap();
-    setup_empty_table(&conn, table_name, &["TINYINT NOT NULL"]).unwrap();
+    setup_empty_table_mssql(&conn, table_name, &["TINYINT NOT NULL"]).unwrap();
     let sql = format!("INSERT INTO {table_name} (a) VALUES (1),(2),(3)");
     conn.execute(&sql, (), None).unwrap();
 
@@ -164,7 +164,7 @@ fn fetch_decimal128_negative_scale_unsupported() {
     let conn = ENV
         .connect_with_connection_string(MSSQL, Default::default())
         .unwrap();
-    setup_empty_table(&conn, table_name, &["NUMERIC(5,0) NOT NULL"]).unwrap();
+    setup_empty_table_mssql(&conn, table_name, &["NUMERIC(5,0) NOT NULL"]).unwrap();
     let sql = format!("INSERT INTO {table_name} (a) VALUES (12300)");
     conn.execute(&sql, (), None).unwrap();
 
@@ -200,7 +200,7 @@ fn unsupported_16bit_unsigned_integer() {
     let conn = ENV
         .connect_with_connection_string(MSSQL, Default::default())
         .unwrap();
-    setup_empty_table(&conn, table_name, &["SMALLINT NOT NULL"]).unwrap();
+    setup_empty_table_mssql(&conn, table_name, &["SMALLINT NOT NULL"]).unwrap();
     let sql = format!("INSERT INTO {table_name} (a) VALUES (1),(2),(3)");
     conn.execute(&sql, (), None).unwrap();
 
@@ -725,7 +725,7 @@ fn fetch_varbinary_data() {
     let conn = ENV
         .connect_with_connection_string(MSSQL, Default::default())
         .unwrap();
-    setup_empty_table(&conn, table_name, &["VARBINARY(30) NOT NULL"]).unwrap();
+    setup_empty_table_mssql(&conn, table_name, &["VARBINARY(30) NOT NULL"]).unwrap();
     let sql = format!("INSERT INTO {table_name} (a) VALUES (?)");
     // Use prepared query and arguments for insertion, since literal representation depends a lot
     // on the DB under test.
@@ -767,7 +767,7 @@ fn fetch_fixed_sized_binary_data() {
     let conn = ENV
         .connect_with_connection_string(MSSQL, Default::default())
         .unwrap();
-    setup_empty_table(&conn, table_name, &["BINARY(5) NOT NULL"]).unwrap();
+    setup_empty_table_mssql(&conn, table_name, &["BINARY(5) NOT NULL"]).unwrap();
     let sql = format!("INSERT INTO {table_name} (a) VALUES (?)");
     // Use prepared query and arguments for insertion, since literal representation depends a lot
     // on the DB under test.
@@ -808,7 +808,7 @@ fn fetch_time() {
     let conn = ENV
         .connect_with_connection_string(MSSQL, Default::default())
         .unwrap();
-    setup_empty_table(&conn, table_name, &["TIME NOT NULL"]).unwrap();
+    setup_empty_table_mssql(&conn, table_name, &["TIME NOT NULL"]).unwrap();
     let sql = format!("INSERT INTO {table_name} (a) VALUES ('12:34:56')");
     conn.execute(&sql, (), None).unwrap();
 
@@ -845,7 +845,7 @@ fn prepared_query() {
     let conn = ENV
         .connect_with_connection_string(MSSQL, Default::default())
         .unwrap();
-    setup_empty_table(&conn, table_name, &["REAL NOT NULL"]).unwrap();
+    setup_empty_table_mssql(&conn, table_name, &["REAL NOT NULL"]).unwrap();
     let sql = format!("INSERT INTO {table_name} (a) VALUES (1),(2),(3)");
     conn.execute(&sql, (), None).unwrap();
 
@@ -882,7 +882,7 @@ fn infer_schema() {
     let conn = ENV
         .connect_with_connection_string(MSSQL, Default::default())
         .unwrap();
-    setup_empty_table(&conn, table_name, &["REAL NOT NULL"]).unwrap();
+    setup_empty_table_mssql(&conn, table_name, &["REAL NOT NULL"]).unwrap();
 
     // Prepare query to get metadata
     let sql = format!("SELECT a FROM {table_name}");
@@ -909,7 +909,7 @@ fn fetch_schema_for_table() {
     let conn = ENV
         .connect_with_connection_string(MSSQL, Default::default())
         .unwrap();
-    setup_empty_table(&conn, table_name, &["REAL NOT NULL"]).unwrap();
+    setup_empty_table_mssql(&conn, table_name, &["REAL NOT NULL"]).unwrap();
 
     // Prepare query to get metadata
     let sql = format!("SELECT a FROM {table_name}");
@@ -994,7 +994,7 @@ fn should_allow_to_fetch_from_varchar_max() {
     let conn = ENV
         .connect_with_connection_string(MSSQL, Default::default())
         .unwrap();
-    setup_empty_table(&conn, table_name, &["VARCHAR(MAX)"]).unwrap();
+    setup_empty_table_mssql(&conn, table_name, &["VARCHAR(MAX)"]).unwrap();
     let sql = format!("SELECT a FROM {table_name}");
     let cursor = conn.execute(&sql, (), None).unwrap().unwrap();
 
@@ -1017,7 +1017,7 @@ fn should_error_for_truncation() {
     let conn = ENV
         .connect_with_connection_string(MSSQL, Default::default())
         .unwrap();
-    setup_empty_table(&conn, table_name, &["VARCHAR(MAX)"]).unwrap();
+    setup_empty_table_mssql(&conn, table_name, &["VARCHAR(MAX)"]).unwrap();
     let sql = format!("INSERT INTO {table_name} (a) VALUES ('123456789')");
     conn.execute(&sql, (), None).unwrap();
     let sql = format!("SELECT a FROM {table_name}");
@@ -1042,7 +1042,7 @@ fn should_allow_to_fetch_from_varbinary_max() {
     let conn = ENV
         .connect_with_connection_string(MSSQL, Default::default())
         .unwrap();
-    setup_empty_table(&conn, table_name, &["VARBINARY(MAX)"]).unwrap();
+    setup_empty_table_mssql(&conn, table_name, &["VARBINARY(MAX)"]).unwrap();
     let sql = format!("SELECT a FROM {table_name}");
     let cursor = conn.execute(&sql, (), None).unwrap().unwrap();
 
@@ -1064,7 +1064,7 @@ fn fallibale_allocations() {
     let conn = ENV
         .connect_with_connection_string(MSSQL, Default::default())
         .unwrap();
-    setup_empty_table(&conn, table_name, &["VARBINARY(4096)"]).unwrap();
+    setup_empty_table_mssql(&conn, table_name, &["VARBINARY(4096)"]).unwrap();
     let sql = format!("SELECT a FROM {table_name}");
     let cursor = conn.execute(&sql, (), None).unwrap().unwrap();
 
@@ -1299,7 +1299,7 @@ fn insert_does_not_support_list_type() {
     let conn = ENV
         .connect_with_connection_string(MSSQL, Default::default())
         .unwrap();
-    setup_empty_table(&conn, table_name, &["VARCHAR(4096)"]).unwrap();
+    setup_empty_table_mssql(&conn, table_name, &["VARCHAR(4096)"]).unwrap();
 
     // When we try to create an OdbcWriter inserting an Arrow List
     let schema = Arc::new(Schema::new(vec![Field::new(
@@ -1326,7 +1326,7 @@ fn insert_text() {
     let conn = ENV
         .connect_with_connection_string(MSSQL, Default::default())
         .unwrap();
-    setup_empty_table(&conn, table_name, &["VARCHAR(4096)"]).unwrap();
+    setup_empty_table_mssql(&conn, table_name, &["VARCHAR(4096)"]).unwrap();
     let array = StringArray::from(vec![Some("Hello"), None, Some("World")]);
     let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Utf8, true)]));
     let batch = RecordBatch::try_new(schema.clone(), vec![Arc::new(array)]).unwrap();
@@ -1355,7 +1355,7 @@ fn insert_multiple_small_batches() {
     let conn = ENV
         .connect_with_connection_string(MSSQL, Default::default())
         .unwrap();
-    setup_empty_table(&conn, table_name, &["VARCHAR(10)"]).unwrap();
+    setup_empty_table_mssql(&conn, table_name, &["VARCHAR(10)"]).unwrap();
     let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Utf8, true)]));
     let first_string = StringArray::from(vec![Some("a")]);
     let first_batch = RecordBatch::try_new(schema.clone(), vec![Arc::new(first_string)]).unwrap();
@@ -1381,7 +1381,7 @@ fn insert_non_ascii_text() {
     let conn = ENV
         .connect_with_connection_string(MSSQL, Default::default())
         .unwrap();
-    setup_empty_table(&conn, table_name, &["VARCHAR(50)"]).unwrap();
+    setup_empty_table_mssql(&conn, table_name, &["VARCHAR(50)"]).unwrap();
     let array = StringArray::from(vec![Some("Frühstück µ")]);
     let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Utf8, true)]));
     let batch = RecordBatch::try_new(schema.clone(), vec![Arc::new(array)]).unwrap();
@@ -1403,7 +1403,7 @@ fn insert_nullable_booleans() {
     let conn = ENV
         .connect_with_connection_string(MSSQL, Default::default())
         .unwrap();
-    setup_empty_table(&conn, table_name, &["BIT"]).unwrap();
+    setup_empty_table_mssql(&conn, table_name, &["BIT"]).unwrap();
     let array = BooleanArray::from(vec![Some(true), None, Some(false)]);
     let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Boolean, true)]));
     let batch = RecordBatch::try_new(schema.clone(), vec![Arc::new(array)]).unwrap();
@@ -1425,7 +1425,7 @@ fn insert_non_nullable_booleans() {
     let conn = ENV
         .connect_with_connection_string(MSSQL, Default::default())
         .unwrap();
-    setup_empty_table(&conn, table_name, &["BIT"]).unwrap();
+    setup_empty_table_mssql(&conn, table_name, &["BIT"]).unwrap();
     let array = BooleanArray::from(vec![Some(true), Some(false), Some(false)]);
     let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Boolean, false)]));
     let batch = RecordBatch::try_new(schema.clone(), vec![Arc::new(array)]).unwrap();
@@ -1447,7 +1447,7 @@ fn insert_nullable_int8() {
     let conn = ENV
         .connect_with_connection_string(MSSQL, Default::default())
         .unwrap();
-    setup_empty_table(&conn, table_name, &["TINYINT"]).unwrap();
+    setup_empty_table_mssql(&conn, table_name, &["TINYINT"]).unwrap();
     let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Int8, true)]));
     let array1 = Int8Array::from(vec![Some(1), None, Some(3)]);
     let batch1 = RecordBatch::try_new(schema.clone(), vec![Arc::new(array1)]).unwrap();
@@ -1471,7 +1471,7 @@ fn insert_non_nullable_int8() {
     let conn = ENV
         .connect_with_connection_string(MSSQL, Default::default())
         .unwrap();
-    setup_empty_table(&conn, table_name, &["TINYINT"]).unwrap();
+    setup_empty_table_mssql(&conn, table_name, &["TINYINT"]).unwrap();
     let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Int8, false)]));
     let array1 = Int8Array::from(vec![Some(1), Some(2), Some(3)]);
     let batch1 = RecordBatch::try_new(schema.clone(), vec![Arc::new(array1)]).unwrap();
@@ -1495,7 +1495,7 @@ fn insert_nullable_int16() {
     let conn = ENV
         .connect_with_connection_string(MSSQL, Default::default())
         .unwrap();
-    setup_empty_table(&conn, table_name, &["SMALLINT"]).unwrap();
+    setup_empty_table_mssql(&conn, table_name, &["SMALLINT"]).unwrap();
     let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Int16, true)]));
     let array1 = Int16Array::from(vec![Some(1), None, Some(3)]);
     let batch1 = RecordBatch::try_new(schema.clone(), vec![Arc::new(array1)]).unwrap();
@@ -1517,7 +1517,7 @@ fn insert_nullable_int32() {
     let conn = ENV
         .connect_with_connection_string(MSSQL, Default::default())
         .unwrap();
-    setup_empty_table(&conn, table_name, &["INTEGER"]).unwrap();
+    setup_empty_table_mssql(&conn, table_name, &["INTEGER"]).unwrap();
     let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Int32, true)]));
     let array1 = Int32Array::from(vec![Some(1), None, Some(3)]);
     let batch1 = RecordBatch::try_new(schema.clone(), vec![Arc::new(array1)]).unwrap();
@@ -1539,7 +1539,7 @@ fn insert_nullable_int64() {
     let conn = ENV
         .connect_with_connection_string(MSSQL, Default::default())
         .unwrap();
-    setup_empty_table(&conn, table_name, &["BIGINT"]).unwrap();
+    setup_empty_table_mssql(&conn, table_name, &["BIGINT"]).unwrap();
     let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Int64, true)]));
     let array1 = Int64Array::from(vec![Some(1), None, Some(3)]);
     let batch1 = RecordBatch::try_new(schema.clone(), vec![Arc::new(array1)]).unwrap();
@@ -1561,7 +1561,7 @@ fn insert_non_nullable_unsigned_int8() {
     let conn = ENV
         .connect_with_connection_string(MSSQL, Default::default())
         .unwrap();
-    setup_empty_table(&conn, table_name, &["SMALLINT"]).unwrap();
+    setup_empty_table_mssql(&conn, table_name, &["SMALLINT"]).unwrap();
     let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::UInt8, false)]));
     let array1 = UInt8Array::from(vec![Some(1), Some(2), Some(3)]);
     let batch1 = RecordBatch::try_new(schema.clone(), vec![Arc::new(array1)]).unwrap();
@@ -1583,7 +1583,7 @@ fn insert_nullable_f32() {
     let conn = ENV
         .connect_with_connection_string(MSSQL, Default::default())
         .unwrap();
-    setup_empty_table(&conn, table_name, &["REAL"]).unwrap();
+    setup_empty_table_mssql(&conn, table_name, &["REAL"]).unwrap();
     let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Float32, true)]));
     let array1 = Float32Array::from(vec![Some(1.), None, Some(3.)]);
     let batch1 = RecordBatch::try_new(schema.clone(), vec![Arc::new(array1)]).unwrap();
@@ -1605,7 +1605,7 @@ fn insert_nullable_f64() {
     let conn = ENV
         .connect_with_connection_string(MSSQL, Default::default())
         .unwrap();
-    setup_empty_table(&conn, table_name, &["FLOAT(25)"]).unwrap();
+    setup_empty_table_mssql(&conn, table_name, &["FLOAT(25)"]).unwrap();
     let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Float64, true)]));
     let array1 = Float64Array::from(vec![Some(1.), None, Some(3.)]);
     let batch1 = RecordBatch::try_new(schema.clone(), vec![Arc::new(array1)]).unwrap();
@@ -1627,7 +1627,7 @@ fn insert_nullable_f16() {
     let conn = ENV
         .connect_with_connection_string(MSSQL, Default::default())
         .unwrap();
-    setup_empty_table(&conn, table_name, &["REAL"]).unwrap();
+    setup_empty_table_mssql(&conn, table_name, &["REAL"]).unwrap();
     let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Float16, true)]));
     let array1: Float16Array = [Some(F16::from_f32(1.0)), None, Some(F16::from_f32(3.0))]
         .into_iter()
@@ -1651,7 +1651,7 @@ fn insert_non_nullable_f16() {
     let conn = ENV
         .connect_with_connection_string(MSSQL, Default::default())
         .unwrap();
-    setup_empty_table(&conn, table_name, &["REAL"]).unwrap();
+    setup_empty_table_mssql(&conn, table_name, &["REAL"]).unwrap();
     let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Float16, false)]));
     let array1: Float16Array = [
         Some(F16::from_f32(1.0)),
@@ -1679,7 +1679,7 @@ fn insert_timestamp_with_seconds_precisions() {
     let conn = ENV
         .connect_with_connection_string(MSSQL, Default::default())
         .unwrap();
-    setup_empty_table(&conn, table_name, &["DATETIME2(0)"]).unwrap();
+    setup_empty_table_mssql(&conn, table_name, &["DATETIME2(0)"]).unwrap();
     let schema = Arc::new(Schema::new(vec![Field::new(
         "a",
         DataType::Timestamp(TimeUnit::Second, None),
@@ -1706,7 +1706,7 @@ fn insert_timestamp_with_milliseconds_precisions() {
     let conn = ENV
         .connect_with_connection_string(MSSQL, Default::default())
         .unwrap();
-    setup_empty_table(&conn, table_name, &["DATETIME2(3)"]).unwrap();
+    setup_empty_table_mssql(&conn, table_name, &["DATETIME2(3)"]).unwrap();
     let schema = Arc::new(Schema::new(vec![Field::new(
         "a",
         DataType::Timestamp(TimeUnit::Millisecond, None),
@@ -1738,7 +1738,7 @@ fn insert_timestamp_with_milliseconds_precisions_which_is_not_representable_as_i
     let conn = ENV
         .connect_with_connection_string(MSSQL, Default::default())
         .unwrap();
-    setup_empty_table(&conn, table_name, &["DATETIME2(3)"]).unwrap();
+    setup_empty_table_mssql(&conn, table_name, &["DATETIME2(3)"]).unwrap();
     let schema = Arc::new(Schema::new(vec![Field::new(
         "a",
         DataType::Timestamp(TimeUnit::Millisecond, None),
@@ -1770,7 +1770,7 @@ fn insert_timestamp_with_microseconds_precisions() {
     let conn = ENV
         .connect_with_connection_string(MSSQL, Default::default())
         .unwrap();
-    setup_empty_table(&conn, table_name, &["DATETIME2(6)"]).unwrap();
+    setup_empty_table_mssql(&conn, table_name, &["DATETIME2(6)"]).unwrap();
     let schema = Arc::new(Schema::new(vec![Field::new(
         "a",
         DataType::Timestamp(TimeUnit::Microsecond, None),
@@ -1797,7 +1797,7 @@ fn insert_timestamp_with_nanoseconds_precisions() {
     let conn = ENV
         .connect_with_connection_string(MSSQL, Default::default())
         .unwrap();
-    setup_empty_table(&conn, table_name, &["DATETIME2(7)"]).unwrap();
+    setup_empty_table_mssql(&conn, table_name, &["DATETIME2(7)"]).unwrap();
     let schema = Arc::new(Schema::new(vec![Field::new(
         "a",
         DataType::Timestamp(TimeUnit::Nanosecond, None),
@@ -1824,7 +1824,7 @@ fn insert_date32_array() {
     let conn = ENV
         .connect_with_connection_string(MSSQL, Default::default())
         .unwrap();
-    setup_empty_table(&conn, table_name, &["DATE"]).unwrap();
+    setup_empty_table_mssql(&conn, table_name, &["DATE"]).unwrap();
     let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Date32, false)]));
     // Corresponds to single element array with entry 1970-01-01
     let array: Date32Array = [Some(0)].into_iter().collect();
@@ -1847,7 +1847,7 @@ fn insert_date64_array() {
     let conn = ENV
         .connect_with_connection_string(MSSQL, Default::default())
         .unwrap();
-    setup_empty_table(&conn, table_name, &["DATE"]).unwrap();
+    setup_empty_table_mssql(&conn, table_name, &["DATE"]).unwrap();
     let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Date64, false)]));
     // Corresponds to single element array with entry 1970-01-01
     let array: Date64Array = [Some(0)].into_iter().collect();
@@ -1870,7 +1870,7 @@ fn insert_time32_second_array() {
     let conn = ENV
         .connect_with_connection_string(MSSQL, Default::default())
         .unwrap();
-    setup_empty_table(&conn, table_name, &["TIME(0)"]).unwrap();
+    setup_empty_table_mssql(&conn, table_name, &["TIME(0)"]).unwrap();
     let schema = Arc::new(Schema::new(vec![Field::new(
         "a",
         DataType::Time32(TimeUnit::Second),
@@ -1897,7 +1897,7 @@ fn insert_time32_ms_array() {
     let conn = ENV
         .connect_with_connection_string(MSSQL, Default::default())
         .unwrap();
-    setup_empty_table(&conn, table_name, &["TIME(3)"]).unwrap();
+    setup_empty_table_mssql(&conn, table_name, &["TIME(3)"]).unwrap();
     let schema = Arc::new(Schema::new(vec![Field::new(
         "a",
         DataType::Time32(TimeUnit::Millisecond),
@@ -1924,7 +1924,7 @@ fn insert_time64_us_array() {
     let conn = ENV
         .connect_with_connection_string(MSSQL, Default::default())
         .unwrap();
-    setup_empty_table(&conn, table_name, &["TIME(6)"]).unwrap();
+    setup_empty_table_mssql(&conn, table_name, &["TIME(6)"]).unwrap();
     let schema = Arc::new(Schema::new(vec![Field::new(
         "a",
         DataType::Time64(TimeUnit::Microsecond),
@@ -1951,7 +1951,7 @@ fn insert_time64_ns_array() {
     let conn = ENV
         .connect_with_connection_string(MSSQL, Default::default())
         .unwrap();
-    setup_empty_table(&conn, table_name, &["TIME(7)"]).unwrap();
+    setup_empty_table_mssql(&conn, table_name, &["TIME(7)"]).unwrap();
     let schema = Arc::new(Schema::new(vec![Field::new(
         "a",
         DataType::Time64(TimeUnit::Nanosecond),
@@ -1979,7 +1979,7 @@ fn insert_binary() {
     let conn = ENV
         .connect_with_connection_string(MSSQL, Default::default())
         .unwrap();
-    setup_empty_table(&conn, table_name, &["VARBINARY(4096)"]).unwrap();
+    setup_empty_table_mssql(&conn, table_name, &["VARBINARY(4096)"]).unwrap();
     let array = BinaryArray::from(vec![
         Some([1, 2].as_slice()),
         None,
@@ -2005,7 +2005,7 @@ fn insert_fixed_binary() {
     let conn = ENV
         .connect_with_connection_string(MSSQL, Default::default())
         .unwrap();
-    setup_empty_table(&conn, table_name, &["VARBINARY(4096)"]).unwrap();
+    setup_empty_table_mssql(&conn, table_name, &["VARBINARY(4096)"]).unwrap();
     let array = BinaryArray::from(vec![
         Some([1, 2].as_slice()),
         None,
@@ -2031,7 +2031,7 @@ fn insert_decimal_128() {
     let conn = ENV
         .connect_with_connection_string(MSSQL, Default::default())
         .unwrap();
-    setup_empty_table(&conn, table_name, &["NUMERIC(5,3)"]).unwrap();
+    setup_empty_table_mssql(&conn, table_name, &["NUMERIC(5,3)"]).unwrap();
     let array: Decimal128Array = [Some(12345), None, Some(67891), Some(1), Some(1000)]
         .into_iter()
         .collect();
@@ -2060,7 +2060,7 @@ fn insert_decimal_256() {
     let conn = ENV
         .connect_with_connection_string(MSSQL, Default::default())
         .unwrap();
-    setup_empty_table(&conn, table_name, &["NUMERIC(5,3)"]).unwrap();
+    setup_empty_table_mssql(&conn, table_name, &["NUMERIC(5,3)"]).unwrap();
     let mut builder = Decimal256Builder::new();
     let mut bytes = [0u8; 32];
     type I256 = <Decimal256Type as ArrowPrimitiveType>::Native;
@@ -2092,7 +2092,7 @@ fn insert_decimal_128_with_negative_scale() {
     let conn = ENV
         .connect_with_connection_string(MSSQL, Default::default())
         .unwrap();
-    setup_empty_table(&conn, table_name, &["NUMERIC(5,0)"]).unwrap();
+    setup_empty_table_mssql(&conn, table_name, &["NUMERIC(5,0)"]).unwrap();
     let array: Decimal128Array = [Some(123), None, Some(456), Some(1), Some(10)]
         .into_iter()
         .collect();
@@ -2121,7 +2121,7 @@ fn insert_decimal_256_with_negative_scale() {
     let conn = ENV
         .connect_with_connection_string(MSSQL, Default::default())
         .unwrap();
-    setup_empty_table(&conn, table_name, &["NUMERIC(5,0)"]).unwrap();
+    setup_empty_table_mssql(&conn, table_name, &["NUMERIC(5,0)"]).unwrap();
     let mut builder = Decimal256Builder::new();
     let mut bytes = [0u8; 32];
     type I256 = <Decimal256Type as ArrowPrimitiveType>::Native;
@@ -2153,7 +2153,7 @@ fn insert_taking_ownership_of_connection() {
     let conn = ENV
         .connect_with_connection_string(MSSQL, Default::default())
         .unwrap();
-    setup_empty_table(&conn, table_name, &["VARCHAR(4096)"]).unwrap();
+    setup_empty_table_mssql(&conn, table_name, &["VARCHAR(4096)"]).unwrap();
     let array = StringArray::from(vec![Some("Hello"), None, Some("World")]);
     let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Utf8, true)]));
     let batch = RecordBatch::try_new(schema.clone(), vec![Arc::new(array)]).unwrap();
@@ -2182,7 +2182,7 @@ fn insert_large_text() {
     let conn = ENV
         .connect_with_connection_string(MSSQL, Default::default())
         .unwrap();
-    setup_empty_table(&conn, table_name, &["VARCHAR(4096)"]).unwrap();
+    setup_empty_table_mssql(&conn, table_name, &["VARCHAR(4096)"]).unwrap();
     let array = LargeStringArray::from(vec![Some("Hello"), None, Some("World")]);
     let schema = Arc::new(Schema::new(vec![Field::new(
         "a",
@@ -2444,24 +2444,16 @@ fn concurrent_reader_is_send() {
 /// `DataType::LongVarchar` and `DataType::WLongVarchar` have their size adjusted accoringly to
 /// account for special characters.
 #[test]
-fn psql_varchar_1000() {
+fn varchar_1000_psql() {
     // Given
     let table_name = function_name!().rsplit_once(':').unwrap().1;
     let conn = ENV
         .connect_with_connection_string(POSTGRES, ConnectionOptions::default())
         .unwrap();
-    conn.execute(&format!("DROP TABLE IF EXISTS {table_name}"), (), None)
-        .unwrap();
-    // We need a varchar type long enough to trigger use of LONG_W_VARCHAR
-    conn.execute(
-        &format!("CREATE TABLE {table_name} (text VARCHAR(1000));"),
-        (),
-        None,
-    )
-    .unwrap();
+    setup_empty_table::<PostgreSql>(&conn, table_name, &["VARCHAR(1000)"]).unwrap();
     let long_text_with_special_characters = "가".repeat(1000);
     conn.execute(
-        &format!("INSERT INTO {table_name} (text) VALUES(?);"),
+        &format!("INSERT INTO {table_name} (a) VALUES(?);"),
         &(long_text_with_special_characters.as_str()).into_parameter(),
         None,
     )
@@ -2469,7 +2461,7 @@ fn psql_varchar_1000() {
 
     // When
     let cursor = conn
-        .into_cursor(&format!("SELECT text FROM {table_name}"), (), None)
+        .into_cursor(&format!("SELECT a FROM {table_name}"), (), None)
         .unwrap()
         .unwrap();
     let mut reader = OdbcReaderBuilder::new()
@@ -2486,16 +2478,16 @@ fn psql_varchar_1000() {
 }
 
 /// Creates the table and assures it is empty. Columns are named a,b,c, etc.
-fn setup_empty_table(
+fn setup_empty_table_mssql(
     conn: &Connection,
     table_name: &str,
     column_types: &[&str],
 ) -> Result<(), odbc_api::Error> {
-    setup_empty_table_impl::<MsSql>(conn, table_name, column_types)
+    setup_empty_table::<MsSql>(conn, table_name, column_types)
 }
 
 /// Creates the table and assures it is empty. Columns are named a,b,c, etc.
-fn setup_empty_table_impl<D: Dbms>(
+fn setup_empty_table<D: Dbms>(
     conn: &Connection,
     table_name: &str,
     column_types: &[&str],
@@ -2529,6 +2521,14 @@ struct MsSql;
 impl Dbms for MsSql {
     fn identity_column() -> &'static str {
         "id int IDENTITY(1,1)"
+    }
+}
+
+struct PostgreSql;
+
+impl Dbms for PostgreSql {
+    fn identity_column() -> &'static str {
+        "id INTEGER PRIMARY KEY GENERATED ALWAYS AS IDENTITY"
     }
 }
 
@@ -2599,7 +2599,7 @@ fn cursor_over_literals(
     let conn = ENV
         .connect_with_connection_string(MSSQL, ConnectionOptions::default())
         .unwrap();
-    setup_empty_table(&conn, table_name, &[column_type]).unwrap();
+    setup_empty_table_mssql(&conn, table_name, &[column_type]).unwrap();
     // Insert values using literals
     let sql = format!("INSERT INTO {table_name} (a) VALUES {literal}");
     conn.execute(&sql, (), None).unwrap();
@@ -2618,7 +2618,7 @@ fn cursor_over_value(
     let conn = ENV
         .connect_with_connection_string(MSSQL, ConnectionOptions::default())
         .unwrap();
-    setup_empty_table(&conn, table_name, &[column_type]).unwrap();
+    setup_empty_table_mssql(&conn, table_name, &[column_type]).unwrap();
     // Insert values using literals
     let sql = format!("INSERT INTO {table_name} (a) VALUES (?)");
     conn.execute(&sql, &value.into_parameter(), None).unwrap();
@@ -2633,7 +2633,7 @@ fn empty_cursor(table_name: &str, column_type: &str) -> CursorImpl<StatementConn
     let conn = ENV
         .connect_with_connection_string(MSSQL, ConnectionOptions::default())
         .unwrap();
-    setup_empty_table(&conn, table_name, &[column_type]).unwrap();
+    setup_empty_table_mssql(&conn, table_name, &[column_type]).unwrap();
     // Query column with values to get a cursor
     let sql = format!("SELECT a FROM {table_name}");
     let cursor = conn.into_cursor(&sql, (), None).unwrap().unwrap();
@@ -2649,7 +2649,7 @@ fn query_single_value(
     let conn = ENV
         .connect_with_connection_string(MSSQL, Default::default())
         .unwrap();
-    setup_empty_table(&conn, table_name, &[column_type]).unwrap();
+    setup_empty_table_mssql(&conn, table_name, &[column_type]).unwrap();
     // Insert values using literals
     let sql = format!("INSERT INTO {table_name} (a) VALUES (?)");
     conn.execute(&sql, &value.into_parameter(), None).unwrap();
