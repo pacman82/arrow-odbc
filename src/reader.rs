@@ -4,7 +4,7 @@ use arrow::{
     array::{ArrayRef, BooleanBuilder},
     datatypes::{
         DataType as ArrowDataType, Date32Type, Field, Float32Type, Float64Type, Int8Type,
-        Int16Type, Int32Type, Int64Type, TimeUnit, TimestampMicrosecondType,
+        Int16Type, Int32Type, Int64Type, Time32SecondType, TimeUnit, TimestampMicrosecondType,
         TimestampMillisecondType, TimestampNanosecondType, TimestampSecondType, UInt8Type,
     },
 };
@@ -15,6 +15,7 @@ use odbc_api::{
     buffers::{AnySlice, BufferDesc, Item},
 };
 use thiserror::Error;
+use time::seconds_since_midnight;
 
 mod binary;
 mod concurrent_odbc_reader;
@@ -22,6 +23,7 @@ mod decimal;
 mod map_odbc_to_arrow;
 mod odbc_reader;
 mod text;
+mod time;
 mod to_record_batch;
 
 use crate::date_time::{
@@ -138,6 +140,9 @@ pub fn choose_column_strategy(
         ArrowDataType::Float32 => Float32Type::identical(field.is_nullable()),
         ArrowDataType::Float64 => Float64Type::identical(field.is_nullable()),
         ArrowDataType::Date32 => Date32Type::map_infalliable(field.is_nullable(), days_since_epoch),
+        ArrowDataType::Time32(TimeUnit::Second) => {
+            Time32SecondType::map_infalliable(field.is_nullable(), seconds_since_midnight)
+        }
         ArrowDataType::Utf8 => {
             let sql_type = query_metadata
                 .col_data_type(col_index)
