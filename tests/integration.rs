@@ -842,7 +842,7 @@ fn fetch_time_psql() {
 
     // Setup a table on the database with some values (so we can fetch them)
     let conn = ENV
-        .connect_with_connection_string(MSSQL, Default::default())
+        .connect_with_connection_string(POSTGRES, Default::default())
         .unwrap();
     setup_empty_table::<PostgreSql>(&conn, table_name, &["TIME NOT NULL"]).unwrap();
     let sql = format!("INSERT INTO {table_name} (a) VALUES ('12:34:56')");
