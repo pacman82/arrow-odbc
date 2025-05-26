@@ -903,9 +903,9 @@ fn fetch_time_1_psql() {
     let array_vals = arrow_batch
         .column(0)
         .as_any()
-        .downcast_ref::<StringArray>()
+        .downcast_ref::<Time32MillisecondArray>()
         .unwrap();
-    assert_eq!("12:34:56.7", array_vals.value(0));
+    assert_eq!(45_296_700, array_vals.value(0));
 }
 
 /// Like [`fetch_32bit_floating_point`], but utilizing a prepared query instead of a one shot.
