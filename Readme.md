@@ -79,6 +79,7 @@ fn main() -> Result<(), anyhow::Error> {
 | Date                     | Date32               |
 | LongVarbinary            | Binary               |
 | Time(p = 0)              | Time32Second         |
+| Time(p = 1..3)           | Time32Millisecond    |
 | Timestamp(p = 0)         | TimestampSecond      |
 | Timestamp(p: 1..3)       | TimestampMilliSecond |
 | Timestamp(p: 4..6)       | TimestampMicroSecond |

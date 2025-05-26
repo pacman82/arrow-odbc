@@ -15,7 +15,7 @@ use odbc_api::{
     buffers::{AnySlice, BufferDesc, Item},
 };
 use thiserror::Error;
-use time::seconds_since_midnight;
+use time::{TimeMsI32, seconds_since_midnight};
 
 mod binary;
 mod concurrent_odbc_reader;
@@ -143,6 +143,7 @@ pub fn choose_column_strategy(
         ArrowDataType::Time32(TimeUnit::Second) => {
             Time32SecondType::map_infalliable(field.is_nullable(), seconds_since_midnight)
         }
+        ArrowDataType::Time32(TimeUnit::Millisecond) => Box::new(TimeMsI32),
         ArrowDataType::Utf8 => {
             let sql_type = query_metadata
                 .col_data_type(col_index)
