@@ -13,6 +13,8 @@ pub fn seconds_since_midnight(time: &Time) -> i32 {
     (time.hour as i32 * 60 + time.minute as i32) * 60 + time.second as i32
 }
 
+/// Strategy for fetching the time as text and parsing it into an `i32` which represents
+/// milliseconds after midnight.
 pub struct TimeMsI32;
 
 impl ReadStrategy for TimeMsI32 {
@@ -41,8 +43,8 @@ impl ReadStrategy for TimeMsI32 {
 }
 
 fn time_text_i32(text: &[u8]) -> i32 {
-    // HH:MM:SS.ffffff
-    // 012345678901234
+    // HH:MM:SS.fff
+    // 012345678901
     let (hours, hours_digits) = i32::from_radix_10(&text[0..2]);
     debug_assert_eq!(2, hours_digits);
     debug_assert_eq!(b':', text[2]);

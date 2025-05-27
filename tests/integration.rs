@@ -16,7 +16,7 @@ use arrow::{
     error::ArrowError,
     record_batch::{RecordBatch, RecordBatchReader},
 };
-use chrono::NaiveDate;
+use chrono::{NaiveDate, NaiveTime};
 use float_eq::assert_float_eq;
 use lazy_static::lazy_static;
 
@@ -905,7 +905,11 @@ fn fetch_time_1_psql() {
         .as_any()
         .downcast_ref::<Time32MillisecondArray>()
         .unwrap();
-    assert_eq!(45_296_700, array_vals.value(0));
+    let ms_since_midnight = array_vals.value(0) as u32;
+    let sec = ms_since_midnight / 1000;
+    let nano = (ms_since_midnight % 1000) * 1_000_000;
+    let naive_time = NaiveTime::from_num_seconds_from_midnight_opt(sec, nano).unwrap();
+    assert_eq!("12:34:56.700", naive_time.to_string());
 }
 
 /// Like [`fetch_32bit_floating_point`], but utilizing a prepared query instead of a one shot.
