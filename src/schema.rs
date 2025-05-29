@@ -130,6 +130,8 @@ fn arrow_field_from(
         }
         OdbcDataType::Time { precision: 0 } => ArrowDataType::Time32(TimeUnit::Second),
         OdbcDataType::Time { precision: 1..=3 } => ArrowDataType::Time32(TimeUnit::Millisecond),
+        OdbcDataType::Time { precision: 4..=6 } => ArrowDataType::Time64(TimeUnit::Microsecond),
+        OdbcDataType::Time { precision: 7..=9 } => ArrowDataType::Time64(TimeUnit::Nanosecond),
         OdbcDataType::Unknown
         | OdbcDataType::Time { precision: _ }
         | OdbcDataType::Numeric { .. }

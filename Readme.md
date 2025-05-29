@@ -80,6 +80,8 @@ fn main() -> Result<(), anyhow::Error> {
 | LongVarbinary            | Binary               |
 | Time(p = 0)              | Time32Second         |
 | Time(p = 1..3)           | Time32Millisecond    |
+| Time(p = 4..6)           | Time64Microsecond    |
+| Time(p = 7..9)           | Time64Nanosecond     |
 | Timestamp(p = 0)         | TimestampSecond      |
 | Timestamp(p: 1..3)       | TimestampMilliSecond |
 | Timestamp(p: 4..6)       | TimestampMicroSecond |
