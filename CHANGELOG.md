@@ -1,5 +1,27 @@
 # Changelog
 
+## [17.0.0](https://github.com/pacman82/arrow-odbc/compare/v16.0.2...v17.0.0) - 2025-05-30
+
+### Added
+
+- [**breaking**] Provide possibility to provide dbms name, in order to autodetect time columns for MSSQL databases
+- [**breaking**] Support for Times64 Nanoseconds
+- [**breaking**] Support for wallclock time with milliseconds precision
+- [**breaking**] Support for time32 second
+
+### Other
+
+- fix typos
+- time with precision 2 & 3
+- Human readable test assertion for fetch_time_1_psql
+- fetch_time_1_psql
+- change pssql time test to use Time(0)
+- replaced mssql connection string with psql in _psql test
+- Fetching time column from PostgreSQL
+- Use setup empty table with PostgreSQL
+- Introduce Dbms trait
+- Test for fetching time
+
 ## [16.0.2](https://github.com/pacman82/arrow-odbc/compare/v16.0.1...v16.0.2) - 2025-05-18
 
 ### Other
