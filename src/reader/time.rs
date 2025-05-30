@@ -109,7 +109,6 @@ fn ticks_since_midnights_from_text<I>(text: &[u8], precision: u32) -> I
 where
     I: Tick,
 {
-    eprintln!("Parsing time from text: {}", String::from_utf8_lossy(text));
     // HH:MM:SS.fff
     // 012345678901
     let (hours, hours_digits) = I::from_radix_10(&text[0..2]);
