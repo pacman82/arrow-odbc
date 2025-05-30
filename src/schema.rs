@@ -6,7 +6,7 @@ use std::convert::TryInto;
 use crate::{ColumnFailure, Error};
 
 /// Query the metadata to create an arrow schema. This method is invoked automatically for you by
-/// [`crate::OdbcReaderBuilder::build`]. You may want to call this method in situtation there you
+/// [`crate::OdbcReaderBuilder::build`]. You may want to call this method in situation there you
 /// want to create an arrow schema without creating the reader yet.
 ///
 /// # Parameters
@@ -42,11 +42,11 @@ use crate::{ColumnFailure, Error};
 /// }
 /// ```
 pub fn arrow_schema_from(
-    resut_set_metadata: &mut impl ResultSetMetadata,
+    result_set_metadata: &mut impl ResultSetMetadata,
     dbms_name: Option<&str>,
     map_value_errors_to_null: bool,
 ) -> Result<Schema, Error> {
-    let num_cols: u16 = resut_set_metadata
+    let num_cols: u16 = result_set_metadata
         .num_result_cols()
         .map_err(Error::UnableToRetrieveNumCols)?
         .try_into()
@@ -54,7 +54,7 @@ pub fn arrow_schema_from(
     let mut fields = Vec::new();
     for index in 0..num_cols {
         let field = arrow_field_from(
-            resut_set_metadata,
+            result_set_metadata,
             dbms_name,
             index,
             map_value_errors_to_null,
