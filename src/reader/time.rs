@@ -3,7 +3,9 @@ use std::{
     sync::Arc,
 };
 
-use arrow::array::{ArrayRef, Time32MillisecondBuilder, Time64MicrosecondBuilder, Time64NanosecondBuilder};
+use arrow::array::{
+    ArrayRef, Time32MillisecondBuilder, Time64MicrosecondBuilder, Time64NanosecondBuilder,
+};
 use atoi::FromRadix10;
 use odbc_api::{
     buffers::{AnySlice, BufferDesc},

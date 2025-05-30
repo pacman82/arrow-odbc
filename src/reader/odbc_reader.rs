@@ -214,6 +214,7 @@ pub struct OdbcReaderBuilder {
     max_text_size: Option<usize>,
     max_binary_size: Option<usize>,
     map_value_errors_to_null: bool,
+    dbms_name: Option<String>,
     fallibale_allocations: bool,
     trim_fixed_sized_character_strings: bool,
     text_encoding: TextEncoding,
@@ -238,6 +239,7 @@ impl OdbcReaderBuilder {
             max_binary_size: None,
             fallibale_allocations: false,
             map_value_errors_to_null: false,
+            dbms_name: None,
             trim_fixed_sized_character_strings: false,
             text_encoding: TextEncoding::Auto,
         }
@@ -350,6 +352,16 @@ impl OdbcReaderBuilder {
         self
     }
 
+    /// If provided the name of the database management system (DBMS) is used to account for
+    /// database specific behavior when determining the arrow schema.
+    /// 
+    /// To deterimne the name of the dbms you can call
+    /// [`odbc_api::Connection::database_management_system_name`].
+    pub fn with_dbms_name(&mut self, dbms_name: String) -> &mut Self {
+        self.dbms_name = Some(dbms_name);
+        self
+    }
+
     /// No matter if the user explicitly specified a limit in row size, a memory limit, both or
     /// neither. In order to construct a reader we need to decide on the buffer size in rows.
     fn buffer_size_in_rows(&self, bytes_per_row: usize) -> Result<usize, Error> {
@@ -392,6 +404,7 @@ impl OdbcReaderBuilder {
             self.schema.clone(),
             buffer_allocation_options,
             self.map_value_errors_to_null,
+            self.dbms_name.as_deref(),
             self.trim_fixed_sized_character_strings,
             self.text_encoding,
         )?;
