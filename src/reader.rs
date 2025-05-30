@@ -15,7 +15,7 @@ use odbc_api::{
     buffers::{AnySlice, BufferDesc, Item},
 };
 use thiserror::Error;
-use time::{seconds_since_midnight, TimeMsI32, TimeNsI64, TimeUsI64};
+use time::{TimeMsI32, TimeNsI64, TimeUsI64, seconds_since_midnight};
 
 mod binary;
 mod concurrent_odbc_reader;

@@ -1048,14 +1048,12 @@ fn fetch_time_7_msql() {
     let sql = format!("SELECT a FROM {table_name} ORDER BY id");
     let cursor = conn.execute(&sql, (), None).unwrap().unwrap();
 
-
-    // Microsoft wont report timestamp as such, so for now we have to use a custom schema
-    let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Time64(TimeUnit::Nanosecond), false)]));
+    let dbms_name = conn.database_management_system_name().unwrap();
     // Now that we have a cursor, we want to iterate over its rows and fill an arrow batch with it.
     let mut reader = OdbcReaderBuilder::new()
         // Batches will contain at most 100 entries.
         .with_max_num_rows_per_batch(100)
-        .with_schema(schema)
+        .with_dbms_name(dbms_name)
         // Instantiate reader with Arrow schema and ODBC cursor
         .build(cursor)
         .unwrap();
@@ -1156,7 +1154,7 @@ fn fetch_schema_for_table() {
     let mut prepared = conn.prepare(&sql).unwrap();
 
     // Now that we have prepared statement, we want to use it to query metadata.
-    let schema = arrow_schema_from(&mut prepared, false).unwrap();
+    let schema = arrow_schema_from(&mut prepared, None, false).unwrap();
 
     assert_eq!(
         "Field { \

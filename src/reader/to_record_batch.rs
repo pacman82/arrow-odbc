@@ -28,6 +28,7 @@ impl ToRecordBatch {
         schema: Option<SchemaRef>,
         buffer_allocation_options: BufferAllocationOptions,
         map_value_errors_to_null: bool,
+        dbms_name: Option<&str>,
         trim_fixed_sized_character_strings: bool,
         text_encoding: TextEncoding,
     ) -> Result<Self, Error> {
@@ -35,7 +36,11 @@ impl ToRecordBatch {
         let schema = if let Some(schema) = schema {
             schema
         } else {
-            Arc::new(arrow_schema_from(cursor, map_value_errors_to_null)?)
+            Arc::new(arrow_schema_from(
+                cursor,
+                dbms_name,
+                map_value_errors_to_null,
+            )?)
         };
 
         let column_strategies: Vec<Box<dyn ReadStrategy + Send>> = schema

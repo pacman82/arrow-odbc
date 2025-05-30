@@ -1,13 +1,23 @@
 use arrow::datatypes::{DataType as ArrowDataType, Field, Schema, TimeUnit};
 use log::debug;
-use odbc_api::{ColumnDescription, DataType as OdbcDataType, ResultSetMetadata};
+use odbc_api::{ColumnDescription, DataType as OdbcDataType, ResultSetMetadata, sys::SqlDataType};
 use std::convert::TryInto;
 
 use crate::{ColumnFailure, Error};
 
 /// Query the metadata to create an arrow schema. This method is invoked automatically for you by
-/// [`crate::OdbcReaderBuilder::build`]. You may want to call this method in situtation ther you want
-/// to create an arrow schema without creating the reader yet.
+/// [`crate::OdbcReaderBuilder::build`]. You may want to call this method in situtation there you
+/// want to create an arrow schema without creating the reader yet.
+///
+/// # Parameters
+///
+/// * `result_set_metadata`: Used to query metadata about the columns in the result set, which is
+///   used to determine the arrow schema.
+/// * `dbms_name`: If provided, it is used to account for Database specific behavior than mapping
+///   types. Currently it is used to map `TIME` types from 'Microsoft SQL Server' to `Time32` or
+///   `Time64`
+/// * `map_value_errors_to_null`: In case falliable conversions should result in `NULL` the arrow
+///   field must be nullable, even if the source column on the database is not nullable.
 ///
 /// # Example
 ///
@@ -26,12 +36,14 @@ use crate::{ColumnFailure, Error};
 ///     
 ///     // Now that we have prepared statement, we want to use it to query metadata.
 ///     let map_errors_to_null = false;
-///     let schema = arrow_schema_from(&mut prepared, map_errors_to_null)?;
+///     let dbms_name = None;
+///     let schema = arrow_schema_from(&mut prepared, dbms_name, map_errors_to_null)?;
 ///     Ok(schema)
 /// }
 /// ```
 pub fn arrow_schema_from(
     resut_set_metadata: &mut impl ResultSetMetadata,
+    dbms_name: Option<&str>,
     map_value_errors_to_null: bool,
 ) -> Result<Schema, Error> {
     let num_cols: u16 = resut_set_metadata
@@ -41,7 +53,12 @@ pub fn arrow_schema_from(
         .unwrap();
     let mut fields = Vec::new();
     for index in 0..num_cols {
-        let field = arrow_field_from(resut_set_metadata, index, map_value_errors_to_null)?;
+        let field = arrow_field_from(
+            resut_set_metadata,
+            dbms_name,
+            index,
+            map_value_errors_to_null,
+        )?;
 
         fields.push(field)
     }
@@ -50,6 +67,7 @@ pub fn arrow_schema_from(
 
 fn arrow_field_from(
     resut_set_metadata: &mut impl ResultSetMetadata,
+    dbms_name: Option<&str>,
     index: u16,
     map_value_errors_to_null: bool,
 ) -> Result<Field, Error> {
@@ -128,12 +146,22 @@ fn arrow_field_from(
         OdbcDataType::LongVarbinary { length: _ } | OdbcDataType::Varbinary { length: _ } => {
             ArrowDataType::Binary
         }
-        OdbcDataType::Time { precision: 0 } => ArrowDataType::Time32(TimeUnit::Second),
-        OdbcDataType::Time { precision: 1..=3 } => ArrowDataType::Time32(TimeUnit::Millisecond),
-        OdbcDataType::Time { precision: 4..=6 } => ArrowDataType::Time64(TimeUnit::Microsecond),
-        OdbcDataType::Time { precision: 7..=9 } => ArrowDataType::Time64(TimeUnit::Nanosecond),
+        OdbcDataType::Time { precision } => precision_to_time(precision),
+        OdbcDataType::Other {
+            data_type: SqlDataType(-154),
+            column_size: _,
+            decimal_digits,
+        } => {
+            if dbms_name.is_some_and(|name| name == "Microsoft SQL Server") {
+                // SQL Server's -154 is used by Microsoft SQL Server for Timestamps without a time
+                // zone.
+                precision_to_time(decimal_digits)
+            } else {
+                // Other databases may use -154 for other purposes, so we treat it as a string.
+                ArrowDataType::Utf8
+            }
+        }
         OdbcDataType::Unknown
-        | OdbcDataType::Time { precision: _ }
         | OdbcDataType::Numeric { .. }
         | OdbcDataType::Decimal { .. }
         | OdbcDataType::Other {
@@ -153,4 +181,14 @@ fn arrow_field_from(
         column_description.could_be_nullable() || (is_falliable && map_value_errors_to_null);
     let field = Field::new(name, data_type, nullable);
     Ok(field)
+}
+
+fn precision_to_time(precision: i16) -> ArrowDataType {
+    match precision {
+        0 => ArrowDataType::Time32(TimeUnit::Second),
+        1..=3 => ArrowDataType::Time32(TimeUnit::Millisecond),
+        4..=6 => ArrowDataType::Time64(TimeUnit::Microsecond),
+        7..=9 => ArrowDataType::Time64(TimeUnit::Nanosecond),
+        _ => ArrowDataType::Utf8,
+    }
 }
