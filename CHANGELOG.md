@@ -1,5 +1,11 @@
 # Changelog
 
+## [17.0.1](https://github.com/pacman82/arrow-odbc/compare/v17.0.0...v17.0.1) - 2025-05-30
+
+### Fixed
+
+- Remove eprintln statement, which had been left over from debugging
+
 ## [17.0.0](https://github.com/pacman82/arrow-odbc/compare/v16.0.2...v17.0.0) - 2025-05-30
 
 ### Added
