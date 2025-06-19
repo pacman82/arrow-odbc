@@ -1,4 +1,4 @@
-use std::{borrow::Cow, cmp::min};
+use std::{borrow::Cow, cmp::min, time};
 
 use thiserror::Error;
 
@@ -363,6 +363,9 @@ fn field_to_write_strategy(field: &Field) -> Result<Box<dyn WriteStrategy>, Writ
                 // Drop the last to digits of precision, since we bind it with precision 7 and not 9.
                 epoch_to_timestamp_ns((ns / 100) * 100)
             })
+        }
+        DataType::Timestamp(TimeUnit::Second, Some(tz)) => {
+            todo!()
         }
         DataType::Date32 => Date32Type::map_with(is_nullable, epoch_to_date),
         DataType::Date64 => Date64Type::map_with(is_nullable, |days_since_epoch| {

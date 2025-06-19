@@ -2,13 +2,14 @@ use std::{sync::Arc, thread};
 
 use arrow::{
     array::{
-        Array, ArrayRef, BinaryArray, BooleanArray, Date32Array, Date64Array, Decimal128Array,
-        Decimal256Builder, FixedSizeBinaryArray, Float16Array, Float32Array, Int8Array, Int16Array,
-        Int32Array, Int64Array, LargeStringArray, StringArray, Time32MillisecondArray,
-        Time32SecondArray, Time64MicrosecondArray, Time64NanosecondArray,
+        Array, ArrayData, ArrayRef, BinaryArray, BooleanArray, Date32Array, Date64Array,
+        Decimal128Array, Decimal256Builder, FixedSizeBinaryArray, Float16Array, Float32Array,
+        Int8Array, Int16Array, Int32Array, Int64Array, LargeStringArray, StringArray,
+        Time32MillisecondArray, Time32SecondArray, Time64MicrosecondArray, Time64NanosecondArray,
         TimestampMicrosecondArray, TimestampMillisecondArray, TimestampNanosecondArray,
         TimestampSecondArray, UInt8Array,
     },
+    buffer::Buffer,
     datatypes::{
         ArrowPrimitiveType, DataType, Decimal256Type, Field, Float16Type, Schema, SchemaRef,
         TimeUnit,
@@ -1934,6 +1935,43 @@ fn insert_timestamp_with_seconds_precisions() {
     // Then
     let actual = table_to_string(&conn, table_name, &["a"]);
     let expected = "1970-05-09 14:25:11";
+    assert_eq!(expected, actual);
+}
+
+#[test]
+fn insert_timestamp_with_seconds_precisions_and_timezone() {
+    // Given a table and a record batch reader returning a batch with a text column.
+    let table_name = function_name!().rsplit_once(':').unwrap().1;
+    let conn = ENV
+        .connect_with_connection_string(MSSQL, Default::default())
+        .unwrap();
+    setup_empty_table_mssql(&conn, table_name, &["DATETIMEOFFSET(0)"]).unwrap();
+    let schema = Arc::new(Schema::new(vec![Field::new(
+        "a",
+        DataType::Timestamp(TimeUnit::Second, Some(Arc::from("CEST"))),
+        false,
+    )]));
+    // Corresponds to single element array with entry 1970-05-09T14:25:11+2:00
+    let timestamp = [11111111i64];
+    let buffer = Buffer::from_slice_ref(&timestamp);
+    let data = ArrayData::builder(DataType::Timestamp(
+        TimeUnit::Second,
+        Some(Arc::from("CEST")),
+    ))
+    .len(1)
+    .add_buffer(buffer)
+    .build()
+    .unwrap();
+    let array = TimestampSecondArray::from(data);
+    let batch = RecordBatch::try_new(schema.clone(), vec![Arc::new(array)]).unwrap();
+    let mut reader = StubBatchReader::new(schema, vec![batch]);
+
+    // When
+    insert_into_table(&conn, &mut reader, table_name, 5).unwrap();
+
+    // Then
+    let actual = table_to_string(&conn, table_name, &["a"]);
+    let expected = "1970-05-09 14:25:11 +02:00";
     assert_eq!(expected, actual);
 }
 
