@@ -354,7 +354,7 @@ impl OdbcReaderBuilder {
 
     /// If provided the name of the database management system (DBMS) is used to account for
     /// database specific behavior when determining the arrow schema.
-    /// 
+    ///
     /// To deterimne the name of the dbms you can call
     /// [`odbc_api::Connection::database_management_system_name`].
     pub fn with_dbms_name(&mut self, dbms_name: String) -> &mut Self {
