@@ -1,12 +1,13 @@
-use std::{convert::TryInto, io::Write, marker::PhantomData};
+use std::{convert::TryInto, io::Write, marker::PhantomData, sync::Arc};
 
 use arrow::{
     array::{Array, PrimitiveArray},
     datatypes::{
         ArrowPrimitiveType, Time32MillisecondType, Time64MicrosecondType, Time64NanosecondType,
+        TimestampSecondType,
     },
 };
-use chrono::{DateTime, Datelike, NaiveDate, Timelike};
+use chrono::{DateTime, Datelike, FixedOffset, NaiveDate, TimeZone, Timelike};
 use odbc_api::{
     buffers::{AnySliceMut, BufferDesc, TextColumnSliceMut},
     sys::{Date, Time, Timestamp},
@@ -239,6 +240,69 @@ where
         for (index, elapsed_since_midnight) in from.iter().enumerate() {
             if let Some(from) = elapsed_since_midnight {
                 P::insert_at(index + param_offset, from, &mut to)
+            } else {
+                to.set_cell(index + param_offset, None)
+            }
+        }
+        Ok(())
+    }
+}
+
+/// Strategy for writing a timestamp with timezone as text into the database. Microsoft SQL Server
+/// supports this via `SQL_SS_TIMESTAMPOFFSET`, yet this is an extension of the ODBC standard. So
+/// maybe for now we are safer just to write it as a string literal.
+pub struct TimestampTzToText<P> {
+    tz: Arc<str>,
+    _phantom: PhantomData<P>,
+}
+
+impl<P> TimestampTzToText<P> {
+    pub fn new(tz: Arc<str>) -> Self {
+        Self {
+            tz,
+            _phantom: PhantomData,
+        }
+    }
+}
+
+impl WriteStrategy for TimestampTzToText<TimestampSecondType> {
+    fn buffer_desc(&self) -> BufferDesc {
+        BufferDesc::Text {
+            max_str_len: 25, // YYYY-MM-DD HH:MM:SS+00:00
+        }
+    }
+
+    fn write_rows(
+        &self,
+        param_offset: usize,
+        column_buf: AnySliceMut<'_>,
+        array: &dyn Array,
+    ) -> Result<(), WriterError> {
+        let from = array
+            .as_any()
+            .downcast_ref::<PrimitiveArray<TimestampSecondType>>()
+            .unwrap();
+        let mut to = column_buf.as_text_view().unwrap();
+        for (index, timestamp) in from.iter().enumerate() {
+            if let Some(timestamp) = timestamp {
+                let ndt = DateTime::from_timestamp_millis(timestamp * 1_000)
+                    .expect("Timestamp must be in range for milliseconds");
+                let dt = FixedOffset::east_opt(2 * 3600)
+                    .expect("Timezone offset must be valid")
+                    .with_ymd_and_hms(
+                        ndt.year(),
+                        ndt.month(),
+                        ndt.day(),
+                        ndt.hour(),
+                        ndt.minute(),
+                        ndt.second(),
+                    ).unwrap();
+                write!(
+                    to.set_mut(index + param_offset, 25),
+                    "{}",
+                    dt.format("%Y-%m-%d %H:%M:%S%Z"),
+                )
+                .unwrap();
             } else {
                 to.set_cell(index + param_offset, None)
             }
