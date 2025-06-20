@@ -21,8 +21,7 @@ use odbc_api::{
 
 use crate::{
     date_time::{
-        NullableTimeAsText, epoch_to_date, epoch_to_timestamp_ms, epoch_to_timestamp_ns,
-        epoch_to_timestamp_s, epoch_to_timestamp_us, sec_since_midnight_to_time,
+        epoch_to_date, epoch_to_timestamp_ms, epoch_to_timestamp_ns, epoch_to_timestamp_s, epoch_to_timestamp_us, sec_since_midnight_to_time, NullableTimeAsText, TimestampTzToText
     },
     decimal::{NullableDecimal128AsText, NullableDecimal256AsText},
 };
@@ -365,7 +364,7 @@ fn field_to_write_strategy(field: &Field) -> Result<Box<dyn WriteStrategy>, Writ
             })
         }
         DataType::Timestamp(TimeUnit::Second, Some(tz)) => {
-            todo!()
+            Box::new(TimestampTzToText::<TimestampSecondType>::new(tz.clone()))
         }
         DataType::Date32 => Date32Type::map_with(is_nullable, epoch_to_date),
         DataType::Date64 => Date64Type::map_with(is_nullable, |days_since_epoch| {
