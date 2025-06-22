@@ -1,4 +1,4 @@
-use std::{borrow::Cow, cmp::min};
+use std::{borrow::Cow, cmp::min, sync::Arc};
 
 use thiserror::Error;
 
@@ -146,6 +146,8 @@ pub enum WriterError {
     UnsupportedArrowDataType(DataType),
     #[error("An error occured extracting a record batch from an error reader.\n{0}")]
     ReadingRecordBatch(#[source] ArrowError),
+    #[error("Unable to parse '{time_zone}' into a valid IANA time zone.")]
+    InvalidTimeZone{time_zone: Arc<str>},
     #[error("An error occurred preparing SQL statement. SQL:\n{sql}\n{source}")]
     PreparingInsertStatement {
         #[source]

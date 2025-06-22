@@ -2007,12 +2007,16 @@ fn insert_timestamp_with_foobar_timezone() {
     let mut reader = StubBatchReader::new(schema, vec![batch]);
 
     // When
-    insert_into_table(&conn, &mut reader, table_name, 5).unwrap();
+    let result = insert_into_table(&conn, &mut reader, table_name, 5);
 
     // Then
-    let actual = table_to_string(&conn, table_name, &["a"]);
-    let expected = "2025-06-22 12:00:00 +02:00\n2025-02-01 12:00:00 +01:00";
-    assert_eq!(expected, actual);
+    assert!(result.is_err());
+    let error = result.unwrap_err();
+    assert!(matches!(
+        error,
+        WriterError::InvalidTimeZone { time_zone: _ }
+    ));
+    assert_eq!("Unable to parse 'Foobar' into a valid IANA time zone.", error.to_string());
 }
 
 #[test]
