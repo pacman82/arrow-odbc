@@ -366,7 +366,7 @@ fn field_to_write_strategy(field: &Field) -> Result<Box<dyn WriteStrategy>, Writ
             })
         }
         DataType::Timestamp(TimeUnit::Second, Some(tz)) => {
-            Box::new(TimestampTzToText::<TimestampSecondType>::new(tz.clone()))
+            Box::new(TimestampTzToText::<TimestampSecondType>::new(tz.clone())?)
         }
         DataType::Date32 => Date32Type::map_with(is_nullable, epoch_to_date),
         DataType::Date64 => Date64Type::map_with(is_nullable, |days_since_epoch| {

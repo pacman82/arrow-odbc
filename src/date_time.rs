@@ -257,12 +257,12 @@ pub struct TimestampTzToText<P> {
 }
 
 impl<P> TimestampTzToText<P> {
-    pub fn new(tz: Arc<str>) -> Self {
-        let tz = tz.parse().unwrap();
-        Self {
+    pub fn new(tz: Arc<str>) -> Result<Self, WriterError> {
+        let tz = tz.parse().map_err(|e| todo!())?;
+        Ok(Self {
             tz,
             _phantom: PhantomData,
-        }
+        })
     }
 }
 

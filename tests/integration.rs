@@ -1980,6 +1980,42 @@ fn insert_berlin_time_to_daytime_offset_sec_precision() {
 }
 
 #[test]
+fn insert_timestamp_with_foobar_timezone() {
+    // Given a table and a record batch reader returning a batch with a text column.
+    let table_name = function_name!().rsplit_once(':').unwrap().1;
+    let conn = ENV
+        .connect_with_connection_string(MSSQL, Default::default())
+        .unwrap();
+    setup_empty_table_mssql(&conn, table_name, &["DATETIMEOFFSET(0)"]).unwrap();
+    let schema = Arc::new(Schema::new(vec![Field::new(
+        "a",
+        DataType::Timestamp(TimeUnit::Second, Some(Arc::from("Foobar"))),
+        false,
+    )]));
+    let timestamp = [11111111i64];
+    let buffer = Buffer::from_slice_ref(&timestamp);
+    let data = ArrayData::builder(DataType::Timestamp(
+        TimeUnit::Second,
+        Some(Arc::from("Foobar")),
+    ))
+    .len(1)
+    .add_buffer(buffer)
+    .build()
+    .unwrap();
+    let array = TimestampSecondArray::from(data);
+    let batch = RecordBatch::try_new(schema.clone(), vec![Arc::new(array)]).unwrap();
+    let mut reader = StubBatchReader::new(schema, vec![batch]);
+
+    // When
+    insert_into_table(&conn, &mut reader, table_name, 5).unwrap();
+
+    // Then
+    let actual = table_to_string(&conn, table_name, &["a"]);
+    let expected = "2025-06-22 12:00:00 +02:00\n2025-02-01 12:00:00 +01:00";
+    assert_eq!(expected, actual);
+}
+
+#[test]
 fn insert_timestamp_with_milliseconds_precisions() {
     // Given a table and a record batch reader returning a batch with a text column.
     let table_name = function_name!().rsplit_once(':').unwrap().1;
