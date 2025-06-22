@@ -4,16 +4,8 @@
 
 ### Added
 
-- support for timestamp with timezones of all precisions
-- [**breaking**] Add error InvalidTimeZone
-- inserting timestamp with timezone now respects time zone name
-- Insert timestamps with timezones and seconds precision. Incomplete for now as timezone is not parsed
-
-### Other
-
-- Mark place to handle unsupported timezones
-- Support for timestamp with timezones and seconds precisions
-- Insert a timestamp with timezone
+- Inserting timestamps with timezones
+- [**breaking**] Add variant `WriterError::InvalidTimeZone`
 
 ## [17.0.1](https://github.com/pacman82/arrow-odbc/compare/v17.0.0...v17.0.1) - 2025-05-30
 
