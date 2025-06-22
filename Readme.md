@@ -118,6 +118,9 @@ fn main() -> Result<(), anyhow::Error> {
 | Timestamp us          | Timestamp(7)       |
 | Timestamp ns          | Timestamp(7)       |
 | Timestamp with Tz s   | VarChar(25)        |
+| Timestamp with Tz ms  | VarChar(29)        |
+| Timestamp with Tz us  | VarChar(32)        |
+| Timestamp with Tz ns  | VarChar(35)        |
 | Date32                | Date               |
 | Date64                | Date               |
 | Time32 s              | Time               |

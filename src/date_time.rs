@@ -1,14 +1,12 @@
-use std::{convert::TryInto, io::Write, marker::PhantomData, sync::Arc};
+use std::{convert::TryInto, io::Write, marker::PhantomData};
 
 use arrow::{
-    array::{Array, PrimitiveArray, timezone::Tz},
+    array::{Array, PrimitiveArray},
     datatypes::{
         ArrowPrimitiveType, Time32MillisecondType, Time64MicrosecondType, Time64NanosecondType,
-        TimestampSecondType,
     },
 };
-use chrono::{DateTime, Datelike, NaiveDate, TimeZone, Timelike};
-use log::debug;
+use chrono::{Datelike, NaiveDate};
 use odbc_api::{
     buffers::{AnySliceMut, BufferDesc, TextColumnSliceMut},
     sys::{Date, Time, Timestamp},
@@ -75,43 +73,6 @@ pub fn ns_since_epoch(from: &Timestamp) -> Result<i64, MappingError> {
     ndt.and_utc()
         .timestamp_nanos_opt()
         .ok_or(MappingError::OutOfRangeTimestampNs { value: ndt })
-}
-
-pub fn epoch_to_timestamp_ns(from: i64) -> Timestamp {
-    let ndt = DateTime::from_timestamp_nanos(from);
-    datetime_to_timestamp(ndt)
-}
-
-pub fn epoch_to_timestamp_us(from: i64) -> Timestamp {
-    let ndt =
-        DateTime::from_timestamp_micros(from).expect("Timestamp must be in range for microseconds");
-    datetime_to_timestamp(ndt)
-}
-
-pub fn epoch_to_timestamp_ms(from: i64) -> Timestamp {
-    let ndt =
-        DateTime::from_timestamp_millis(from).expect("Timestamp must be in range for milliseconds");
-    datetime_to_timestamp(ndt)
-}
-
-pub fn epoch_to_timestamp_s(from: i64) -> Timestamp {
-    let ndt = DateTime::from_timestamp_millis(from * 1_000)
-        .expect("Timestamp must be in range for milliseconds");
-    datetime_to_timestamp(ndt)
-}
-
-fn datetime_to_timestamp(ndt: DateTime<chrono::Utc>) -> Timestamp {
-    let date = ndt.date_naive();
-    let time = ndt.time();
-    Timestamp {
-        year: date.year().try_into().unwrap(),
-        month: date.month().try_into().unwrap(),
-        day: date.day().try_into().unwrap(),
-        hour: time.hour().try_into().unwrap(),
-        minute: time.minute().try_into().unwrap(),
-        second: time.second().try_into().unwrap(),
-        fraction: time.nanosecond(),
-    }
 }
 
 pub fn epoch_to_date(from: i32) -> Date {
@@ -241,66 +202,6 @@ where
         for (index, elapsed_since_midnight) in from.iter().enumerate() {
             if let Some(from) = elapsed_since_midnight {
                 P::insert_at(index + param_offset, from, &mut to)
-            } else {
-                to.set_cell(index + param_offset, None)
-            }
-        }
-        Ok(())
-    }
-}
-
-/// Strategy for writing a timestamp with timezone as text into the database. Microsoft SQL Server
-/// supports this via `SQL_SS_TIMESTAMPOFFSET`, yet this is an extension of the ODBC standard. So
-/// maybe for now we are safer just to write it as a string literal.
-pub struct TimestampTzToText<P> {
-    time_zone: Tz,
-    _phantom: PhantomData<P>,
-}
-
-impl<P> TimestampTzToText<P> {
-    pub fn new(time_zone: Arc<str>) -> Result<Self, WriterError> {
-        let tz = time_zone.parse().map_err(|e| {
-            debug!("Failed to parse time zone '{time_zone}'. Original error: {e}");
-            WriterError::InvalidTimeZone { time_zone }
-        })?;
-        Ok(Self {
-            time_zone: tz,
-            _phantom: PhantomData,
-        })
-    }
-}
-
-impl WriteStrategy for TimestampTzToText<TimestampSecondType> {
-    fn buffer_desc(&self) -> BufferDesc {
-        BufferDesc::Text {
-            max_str_len: 25, // YYYY-MM-DD HH:MM:SS+00:00
-        }
-    }
-
-    fn write_rows(
-        &self,
-        param_offset: usize,
-        column_buf: AnySliceMut<'_>,
-        array: &dyn Array,
-    ) -> Result<(), WriterError> {
-        let from = array
-            .as_any()
-            .downcast_ref::<PrimitiveArray<TimestampSecondType>>()
-            .unwrap();
-        let mut to = column_buf.as_text_view().unwrap();
-        for (index, timestamp) in from.iter().enumerate() {
-            if let Some(timestamp) = timestamp {
-                let dt = self
-                    .time_zone
-                    .timestamp_opt(timestamp, 0)
-                    .earliest()
-                    .expect("Timestamp must be in range for the timezone");
-                write!(
-                    to.set_mut(index + param_offset, 25),
-                    "{}",
-                    dt.format("%Y-%m-%d %H:%M:%S%Z"),
-                )
-                .unwrap();
             } else {
                 to.set_cell(index + param_offset, None)
             }

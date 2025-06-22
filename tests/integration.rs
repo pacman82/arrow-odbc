@@ -1940,7 +1940,7 @@ fn insert_timestamp_with_seconds_precisions() {
 
 #[test]
 fn insert_berlin_time_to_daytime_offset_sec_precision() {
-    // Given a table and a record batch reader returning a batch with a text column.
+    // Given
     let table_name = function_name!().rsplit_once(':').unwrap().1;
     let conn = ENV
         .connect_with_connection_string(MSSQL, Default::default())
@@ -1976,6 +1976,121 @@ fn insert_berlin_time_to_daytime_offset_sec_precision() {
     // Then
     let actual = table_to_string(&conn, table_name, &["a"]);
     let expected = "2025-06-22 12:00:00 +02:00\n2025-02-01 12:00:00 +01:00";
+    assert_eq!(expected, actual);
+}
+
+#[test]
+fn insert_berlin_time_to_daytime_offset_ms_precision() {
+    // Given
+    let table_name = function_name!().rsplit_once(':').unwrap().1;
+    let conn = ENV
+        .connect_with_connection_string(MSSQL, Default::default())
+        .unwrap();
+    setup_empty_table_mssql(&conn, table_name, &["DATETIMEOFFSET(3)"]).unwrap();
+    let schema = Arc::new(Schema::new(vec![Field::new(
+        "a",
+        DataType::Timestamp(TimeUnit::Millisecond, Some(Arc::from("Europe/Berlin"))),
+        false,
+    )]));
+    let tz: Tz = "Europe/Berlin".parse().unwrap();
+    let dt = tz.with_ymd_and_hms(2025, 6, 22, 12, 0, 0).single().unwrap();
+    let timestamp = [dt.timestamp() * 1000i64 + 123i64];
+    let buffer = Buffer::from_slice_ref(&timestamp);
+    let data = ArrayData::builder(DataType::Timestamp(
+        TimeUnit::Millisecond,
+        Some(Arc::from("Europe/Berlin")),
+    ))
+    .len(1)
+    .add_buffer(buffer)
+    .build()
+    .unwrap();
+    let array = TimestampMillisecondArray::from(data);
+    let batch = RecordBatch::try_new(schema.clone(), vec![Arc::new(array)]).unwrap();
+    let mut reader = StubBatchReader::new(schema, vec![batch]);
+
+    // When
+    insert_into_table(&conn, &mut reader, table_name, 5).unwrap();
+
+    // Then
+    let actual = table_to_string(&conn, table_name, &["a"]);
+    let expected = "2025-06-22 12:00:00.123 +02:00";
+    assert_eq!(expected, actual);
+}
+
+#[test]
+fn insert_berlin_time_to_daytime_offset_us_precision() {
+    // Given
+    let table_name = function_name!().rsplit_once(':').unwrap().1;
+    let conn = ENV
+        .connect_with_connection_string(MSSQL, Default::default())
+        .unwrap();
+    setup_empty_table_mssql(&conn, table_name, &["DATETIMEOFFSET(6)"]).unwrap();
+    let schema = Arc::new(Schema::new(vec![Field::new(
+        "a",
+        DataType::Timestamp(TimeUnit::Microsecond, Some(Arc::from("Europe/Berlin"))),
+        false,
+    )]));
+    let tz: Tz = "Europe/Berlin".parse().unwrap();
+    let dt = tz.with_ymd_and_hms(2025, 6, 22, 12, 0, 0).single().unwrap();
+    let timestamp = [dt.timestamp() * 1_000_000i64 + 123456i64];
+    let buffer = Buffer::from_slice_ref(&timestamp);
+    let data = ArrayData::builder(DataType::Timestamp(
+        TimeUnit::Microsecond,
+        Some(Arc::from("Europe/Berlin")),
+    ))
+    .len(1)
+    .add_buffer(buffer)
+    .build()
+    .unwrap();
+    let array = TimestampMicrosecondArray::from(data);
+    let batch = RecordBatch::try_new(schema.clone(), vec![Arc::new(array)]).unwrap();
+    let mut reader = StubBatchReader::new(schema, vec![batch]);
+
+    // When
+    insert_into_table(&conn, &mut reader, table_name, 5).unwrap();
+
+    // Then
+    let actual = table_to_string(&conn, table_name, &["a"]);
+    let expected = "2025-06-22 12:00:00.123456 +02:00";
+    assert_eq!(expected, actual);
+}
+
+// We insert nanosecond timestamps with a scale of 7, which is the maximum scale supported by MSSQL.
+#[test]
+fn insert_berlin_time_to_daytime_offset_ns_precision() {
+    // Given
+    let table_name = function_name!().rsplit_once(':').unwrap().1;
+    let conn = ENV
+        .connect_with_connection_string(MSSQL, Default::default())
+        .unwrap();
+    setup_empty_table_mssql(&conn, table_name, &["DATETIMEOFFSET(7)"]).unwrap();
+    let schema = Arc::new(Schema::new(vec![Field::new(
+        "a",
+        DataType::Timestamp(TimeUnit::Nanosecond, Some(Arc::from("Europe/Berlin"))),
+        false,
+    )]));
+    let tz: Tz = "Europe/Berlin".parse().unwrap();
+    let dt = tz.with_ymd_and_hms(2025, 6, 22, 12, 0, 0).single().unwrap();
+    let timestamp = [dt.timestamp() * 1_000_000_000i64 + 123456789i64];
+    let buffer = Buffer::from_slice_ref(&timestamp);
+    let data = ArrayData::builder(DataType::Timestamp(
+        TimeUnit::Nanosecond,
+        Some(Arc::from("Europe/Berlin")),
+    ))
+    .len(1)
+    .add_buffer(buffer)
+    .build()
+    .unwrap();
+    let array = TimestampNanosecondArray::from(data);
+    let batch = RecordBatch::try_new(schema.clone(), vec![Arc::new(array)]).unwrap();
+    let mut reader = StubBatchReader::new(schema, vec![batch]);
+
+    // When
+    insert_into_table(&conn, &mut reader, table_name, 5).unwrap();
+
+    // Then
+    let actual = table_to_string(&conn, table_name, &["a"]);
+    let expected = "2025-06-22 12:00:00.1234568 +02:00";
     assert_eq!(expected, actual);
 }
 
@@ -2016,7 +2131,10 @@ fn insert_timestamp_with_foobar_timezone() {
         error,
         WriterError::InvalidTimeZone { time_zone: _ }
     ));
-    assert_eq!("Unable to parse 'Foobar' into a valid IANA time zone.", error.to_string());
+    assert_eq!(
+        "Unable to parse 'Foobar' into a valid IANA time zone.",
+        error.to_string()
+    );
 }
 
 #[test]
