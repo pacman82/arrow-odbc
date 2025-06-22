@@ -1,13 +1,14 @@
 use std::{convert::TryInto, io::Write, marker::PhantomData, sync::Arc};
 
 use arrow::{
-    array::{timezone::Tz, Array, PrimitiveArray},
+    array::{Array, PrimitiveArray, timezone::Tz},
     datatypes::{
         ArrowPrimitiveType, Time32MillisecondType, Time64MicrosecondType, Time64NanosecondType,
         TimestampSecondType,
     },
 };
 use chrono::{DateTime, Datelike, NaiveDate, TimeZone, Timelike};
+use log::debug;
 use odbc_api::{
     buffers::{AnySliceMut, BufferDesc, TextColumnSliceMut},
     sys::{Date, Time, Timestamp},
@@ -252,15 +253,18 @@ where
 /// supports this via `SQL_SS_TIMESTAMPOFFSET`, yet this is an extension of the ODBC standard. So
 /// maybe for now we are safer just to write it as a string literal.
 pub struct TimestampTzToText<P> {
-    tz: Tz,
+    time_zone: Tz,
     _phantom: PhantomData<P>,
 }
 
 impl<P> TimestampTzToText<P> {
-    pub fn new(tz: Arc<str>) -> Result<Self, WriterError> {
-        let tz = tz.parse().map_err(|e| todo!())?;
+    pub fn new(time_zone: Arc<str>) -> Result<Self, WriterError> {
+        let tz = time_zone.parse().map_err(|e| {
+            debug!("Failed to parse time zone '{time_zone}'. Original error: {e}");
+            WriterError::InvalidTimeZone { time_zone }
+        })?;
         Ok(Self {
-            tz,
+            time_zone: tz,
             _phantom: PhantomData,
         })
     }
@@ -286,7 +290,10 @@ impl WriteStrategy for TimestampTzToText<TimestampSecondType> {
         let mut to = column_buf.as_text_view().unwrap();
         for (index, timestamp) in from.iter().enumerate() {
             if let Some(timestamp) = timestamp {
-                let dt = self.tz.timestamp_opt(timestamp, 0).earliest()
+                let dt = self
+                    .time_zone
+                    .timestamp_opt(timestamp, 0)
+                    .earliest()
                     .expect("Timestamp must be in range for the timezone");
                 write!(
                     to.set_mut(index + param_offset, 25),
