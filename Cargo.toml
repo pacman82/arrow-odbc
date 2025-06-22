@@ -29,7 +29,7 @@ readme = "Readme.md"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-arrow = { version = ">= 29, < 56", default-features = false }
+arrow = { version = ">= 29, < 56", default-features = false, features = ["chrono-tz"]}
 # We use chrono for date conversions.
 chrono = "0.4.39"
 log = "0.4.27"

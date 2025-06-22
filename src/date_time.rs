@@ -1,13 +1,13 @@
 use std::{convert::TryInto, io::Write, marker::PhantomData, sync::Arc};
 
 use arrow::{
-    array::{Array, PrimitiveArray},
+    array::{timezone::Tz, Array, PrimitiveArray},
     datatypes::{
         ArrowPrimitiveType, Time32MillisecondType, Time64MicrosecondType, Time64NanosecondType,
         TimestampSecondType,
     },
 };
-use chrono::{DateTime, Datelike, FixedOffset, NaiveDate, TimeZone, Timelike};
+use chrono::{DateTime, Datelike, NaiveDate, TimeZone, Timelike};
 use odbc_api::{
     buffers::{AnySliceMut, BufferDesc, TextColumnSliceMut},
     sys::{Date, Time, Timestamp},
@@ -252,12 +252,13 @@ where
 /// supports this via `SQL_SS_TIMESTAMPOFFSET`, yet this is an extension of the ODBC standard. So
 /// maybe for now we are safer just to write it as a string literal.
 pub struct TimestampTzToText<P> {
-    tz: Arc<str>,
+    tz: Tz,
     _phantom: PhantomData<P>,
 }
 
 impl<P> TimestampTzToText<P> {
     pub fn new(tz: Arc<str>) -> Self {
+        let tz = tz.parse().unwrap();
         Self {
             tz,
             _phantom: PhantomData,
@@ -285,18 +286,8 @@ impl WriteStrategy for TimestampTzToText<TimestampSecondType> {
         let mut to = column_buf.as_text_view().unwrap();
         for (index, timestamp) in from.iter().enumerate() {
             if let Some(timestamp) = timestamp {
-                let ndt = DateTime::from_timestamp_millis(timestamp * 1_000)
-                    .expect("Timestamp must be in range for milliseconds");
-                let dt = FixedOffset::east_opt(2 * 3600)
-                    .expect("Timezone offset must be valid")
-                    .with_ymd_and_hms(
-                        ndt.year(),
-                        ndt.month(),
-                        ndt.day(),
-                        ndt.hour(),
-                        ndt.minute(),
-                        ndt.second(),
-                    ).unwrap();
+                let dt = self.tz.timestamp_opt(timestamp, 0).earliest()
+                    .expect("Timestamp must be in range for the timezone");
                 write!(
                     to.set_mut(index + param_offset, 25),
                     "{}",

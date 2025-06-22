@@ -2,12 +2,7 @@ use std::{sync::Arc, thread};
 
 use arrow::{
     array::{
-        Array, ArrayData, ArrayRef, BinaryArray, BooleanArray, Date32Array, Date64Array,
-        Decimal128Array, Decimal256Builder, FixedSizeBinaryArray, Float16Array, Float32Array,
-        Int8Array, Int16Array, Int32Array, Int64Array, LargeStringArray, StringArray,
-        Time32MillisecondArray, Time32SecondArray, Time64MicrosecondArray, Time64NanosecondArray,
-        TimestampMicrosecondArray, TimestampMillisecondArray, TimestampNanosecondArray,
-        TimestampSecondArray, UInt8Array,
+        timezone::Tz, Array, ArrayData, ArrayRef, BinaryArray, BooleanArray, Date32Array, Date64Array, Decimal128Array, Decimal256Builder, FixedSizeBinaryArray, Float16Array, Float32Array, Int16Array, Int32Array, Int64Array, Int8Array, LargeStringArray, StringArray, Time32MillisecondArray, Time32SecondArray, Time64MicrosecondArray, Time64NanosecondArray, TimestampMicrosecondArray, TimestampMillisecondArray, TimestampNanosecondArray, TimestampSecondArray, UInt8Array
     },
     buffer::Buffer,
     datatypes::{
@@ -17,7 +12,7 @@ use arrow::{
     error::ArrowError,
     record_batch::{RecordBatch, RecordBatchReader},
 };
-use chrono::{NaiveDate, NaiveTime};
+use chrono::{NaiveDate, NaiveTime, TimeZone};
 use float_eq::assert_float_eq;
 use lazy_static::lazy_static;
 
@@ -1939,7 +1934,7 @@ fn insert_timestamp_with_seconds_precisions() {
 }
 
 #[test]
-fn insert_timestamp_with_seconds_precisions_and_timezone() {
+fn insert_berlin_time_to_daytime_offset_sec_precision() {
     // Given a table and a record batch reader returning a batch with a text column.
     let table_name = function_name!().rsplit_once(':').unwrap().1;
     let conn = ENV
@@ -1948,17 +1943,22 @@ fn insert_timestamp_with_seconds_precisions_and_timezone() {
     setup_empty_table_mssql(&conn, table_name, &["DATETIMEOFFSET(0)"]).unwrap();
     let schema = Arc::new(Schema::new(vec![Field::new(
         "a",
-        DataType::Timestamp(TimeUnit::Second, Some(Arc::from("CEST"))),
+        DataType::Timestamp(TimeUnit::Second, Some(Arc::from("Europe/Berlin"))),
         false,
     )]));
-    // Corresponds to single element array with entry 1970-05-09T14:25:11+2:00
-    let timestamp = [11111111i64];
+    let tz: Tz = "Europe/Berlin".parse().unwrap();
+    // For this timestamp daylight saving time is active
+    let dt = tz.with_ymd_and_hms(2025, 6, 22, 12, 0, 0)
+        .single().unwrap();
+    // For this timestamp daylight saving time is inactive
+    let dt2 = tz.with_ymd_and_hms(2025, 2, 1, 12, 0, 0).single().unwrap();
+    let timestamp = [dt.timestamp(), dt2.timestamp()];
     let buffer = Buffer::from_slice_ref(&timestamp);
     let data = ArrayData::builder(DataType::Timestamp(
         TimeUnit::Second,
-        Some(Arc::from("CEST")),
+        Some(Arc::from("Europe/Berlin")),
     ))
-    .len(1)
+    .len(2)
     .add_buffer(buffer)
     .build()
     .unwrap();
@@ -1971,7 +1971,7 @@ fn insert_timestamp_with_seconds_precisions_and_timezone() {
 
     // Then
     let actual = table_to_string(&conn, table_name, &["a"]);
-    let expected = "1970-05-09 14:25:11 +02:00";
+    let expected = "2025-06-22 12:00:00 +02:00\n2025-02-01 12:00:00 +01:00";
     assert_eq!(expected, actual);
 }
 
