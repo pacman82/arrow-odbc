@@ -1,4 +1,4 @@
-use std::{borrow::Cow, cmp::min, time};
+use std::{borrow::Cow, cmp::min};
 
 use thiserror::Error;
 
@@ -21,7 +21,9 @@ use odbc_api::{
 
 use crate::{
     date_time::{
-        epoch_to_date, epoch_to_timestamp_ms, epoch_to_timestamp_ns, epoch_to_timestamp_s, epoch_to_timestamp_us, sec_since_midnight_to_time, NullableTimeAsText, TimestampTzToText
+        NullableTimeAsText, TimestampTzToText, epoch_to_date, epoch_to_timestamp_ms,
+        epoch_to_timestamp_ns, epoch_to_timestamp_s, epoch_to_timestamp_us,
+        sec_since_midnight_to_time,
     },
     decimal::{NullableDecimal128AsText, NullableDecimal256AsText},
 };
