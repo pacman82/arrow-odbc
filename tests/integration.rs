@@ -2,7 +2,12 @@ use std::{sync::Arc, thread};
 
 use arrow::{
     array::{
-        timezone::Tz, Array, ArrayData, ArrayRef, BinaryArray, BooleanArray, Date32Array, Date64Array, Decimal128Array, Decimal256Builder, FixedSizeBinaryArray, Float16Array, Float32Array, Int16Array, Int32Array, Int64Array, Int8Array, LargeStringArray, StringArray, Time32MillisecondArray, Time32SecondArray, Time64MicrosecondArray, Time64NanosecondArray, TimestampMicrosecondArray, TimestampMillisecondArray, TimestampNanosecondArray, TimestampSecondArray, UInt8Array
+        Array, ArrayData, ArrayRef, BinaryArray, BooleanArray, Date32Array, Date64Array,
+        Decimal128Array, Decimal256Builder, FixedSizeBinaryArray, Float16Array, Float32Array,
+        Int8Array, Int16Array, Int32Array, Int64Array, LargeStringArray, StringArray,
+        Time32MillisecondArray, Time32SecondArray, Time64MicrosecondArray, Time64NanosecondArray,
+        TimestampMicrosecondArray, TimestampMillisecondArray, TimestampNanosecondArray,
+        TimestampSecondArray, UInt8Array, timezone::Tz,
     },
     buffer::Buffer,
     datatypes::{
@@ -1948,8 +1953,7 @@ fn insert_berlin_time_to_daytime_offset_sec_precision() {
     )]));
     let tz: Tz = "Europe/Berlin".parse().unwrap();
     // For this timestamp daylight saving time is active
-    let dt = tz.with_ymd_and_hms(2025, 6, 22, 12, 0, 0)
-        .single().unwrap();
+    let dt = tz.with_ymd_and_hms(2025, 6, 22, 12, 0, 0).single().unwrap();
     // For this timestamp daylight saving time is inactive
     let dt2 = tz.with_ymd_and_hms(2025, 2, 1, 12, 0, 0).single().unwrap();
     let timestamp = [dt.timestamp(), dt2.timestamp()];
