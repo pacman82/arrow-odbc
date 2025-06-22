@@ -7,8 +7,7 @@ use arrow::{
     datatypes::{
         DataType, Date32Type, Date64Type, Field, Float16Type, Float32Type, Float64Type, Int8Type,
         Int16Type, Int32Type, Int64Type, Schema, Time32MillisecondType, Time32SecondType,
-        Time64MicrosecondType, Time64NanosecondType, TimeUnit, TimestampMicrosecondType,
-        TimestampMillisecondType, TimestampNanosecondType, TimestampSecondType, UInt8Type,
+        Time64MicrosecondType, Time64NanosecondType, TimeUnit, UInt8Type,
     },
     error::ArrowError,
     record_batch::{RecordBatch, RecordBatchReader},
@@ -20,12 +19,9 @@ use odbc_api::{
 };
 
 use crate::{
-    date_time::{
-        NullableTimeAsText, TimestampTzToText, epoch_to_date, epoch_to_timestamp_ms,
-        epoch_to_timestamp_ns, epoch_to_timestamp_s, epoch_to_timestamp_us,
-        sec_since_midnight_to_time,
-    },
+    date_time::{NullableTimeAsText, epoch_to_date, sec_since_midnight_to_time},
     decimal::{NullableDecimal128AsText, NullableDecimal256AsText},
+    odbc_writer::timestamp::insert_timestamp_strategy,
 };
 
 use self::{
@@ -39,6 +35,7 @@ mod binary;
 mod boolean;
 mod map_arrow_to_odbc;
 mod text;
+mod timestamp;
 
 /// Fastest and most convinient way to stream the contents of arrow record batches into a database
 /// table. For usecase there you want to insert repeatedly into the same table from different
@@ -147,7 +144,7 @@ pub enum WriterError {
     #[error("An error occured extracting a record batch from an error reader.\n{0}")]
     ReadingRecordBatch(#[source] ArrowError),
     #[error("Unable to parse '{time_zone}' into a valid IANA time zone.")]
-    InvalidTimeZone{time_zone: Arc<str>},
+    InvalidTimeZone { time_zone: Arc<str> },
     #[error("An error occurred preparing SQL statement. SQL:\n{sql}\n{source}")]
     PreparingInsertStatement {
         #[source]
@@ -352,23 +349,8 @@ fn field_to_write_strategy(field: &Field) -> Result<Box<dyn WriteStrategy>, Writ
         DataType::Float16 => Float16Type::map_with(is_nullable, |half| half.to_f32()),
         DataType::Float32 => Float32Type::identical(is_nullable),
         DataType::Float64 => Float64Type::identical(is_nullable),
-        DataType::Timestamp(TimeUnit::Second, None) => {
-            TimestampSecondType::map_with(is_nullable, epoch_to_timestamp_s)
-        }
-        DataType::Timestamp(TimeUnit::Millisecond, None) => {
-            TimestampMillisecondType::map_with(is_nullable, epoch_to_timestamp_ms)
-        }
-        DataType::Timestamp(TimeUnit::Microsecond, None) => {
-            TimestampMicrosecondType::map_with(is_nullable, epoch_to_timestamp_us)
-        }
-        DataType::Timestamp(TimeUnit::Nanosecond, None) => {
-            TimestampNanosecondType::map_with(is_nullable, |ns| {
-                // Drop the last to digits of precision, since we bind it with precision 7 and not 9.
-                epoch_to_timestamp_ns((ns / 100) * 100)
-            })
-        }
-        DataType::Timestamp(TimeUnit::Second, Some(tz)) => {
-            Box::new(TimestampTzToText::<TimestampSecondType>::new(tz.clone())?)
+        DataType::Timestamp(time_unit, time_zone) => {
+            insert_timestamp_strategy(is_nullable, &time_unit, time_zone.clone())?
         }
         DataType::Date32 => Date32Type::map_with(is_nullable, epoch_to_date),
         DataType::Date64 => Date64Type::map_with(is_nullable, |days_since_epoch| {
