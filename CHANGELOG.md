@@ -1,5 +1,11 @@
 # Changelog
 
+## [18.1.0](https://github.com/pacman82/arrow-odbc/compare/v18.0.0...v18.1.0) - 2025-06-24
+
+### Added
+
+- Time64 is inserted with ns precision rather than with 7 fractional digits.
+
 ## [18.0.0](https://github.com/pacman82/arrow-odbc/compare/v17.0.1...v18.0.0) - 2025-06-22
 
 ### Added
