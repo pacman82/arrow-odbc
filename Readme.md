@@ -126,7 +126,7 @@ fn main() -> Result<(), anyhow::Error> {
 | Time32 s              | Time               |
 | Time32 ms             | VarChar(12)        |
 | Time64 us             | VarChar(15)        |
-| Time64 ns             | VarChar(16)        |
+| Time64 ns             | VarChar(18)        |
 | Binary                | Varbinary          |
 | FixedBinary(l)        | Varbinary(l)       |
 | All others            | Unsupported        |

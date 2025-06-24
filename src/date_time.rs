@@ -1,4 +1,10 @@
-use std::{convert::TryInto, io::Write, marker::PhantomData};
+use std::{
+    convert::TryInto,
+    fmt::Display,
+    io::Write,
+    marker::PhantomData,
+    ops::{Div, Mul, Rem},
+};
 
 use arrow::{
     array::{Array, PrimitiveArray},
@@ -111,79 +117,63 @@ impl<P> NullableTimeAsText<P> {
     }
 }
 
-pub trait TimePrimitive: ArrowPrimitiveType {
-    const PRECISION_FACTOR: Self::Native;
+pub trait TimePrimitive {
+    type Integer: From<i32>
+        + Copy
+        + Mul<Output = Self::Integer>
+        + Div<Output = Self::Integer>
+        + Rem<Output = Self::Integer>
+        + Display;
+    const SCALE: usize;
+    const PRECISION_FACTOR: Self::Integer;
     const STR_LEN: usize;
 
-    fn insert_at(index: usize, from: Self::Native, to: &mut TextColumnSliceMut<u8>);
+    fn insert_at(index: usize, from: Self::Integer, to: &mut TextColumnSliceMut<u8>) {
+        let sixty: Self::Integer = 60.into();
+        let unit_min = sixty * Self::PRECISION_FACTOR;
+        let unit_hour = unit_min * sixty;
+        let hour = from / unit_hour;
+        let minute = (from % unit_hour) / unit_min;
+        let second = (from % unit_min) / Self::PRECISION_FACTOR;
+        let fraction = from % Self::PRECISION_FACTOR;
+        write!(
+            to.set_mut(index, Self::STR_LEN),
+            "{hour:02}:{minute:02}:{second:02}.{fraction:0s$}",
+            s = Self::SCALE
+        )
+        .unwrap();
+    }
 }
 
 impl TimePrimitive for Time32MillisecondType {
+    type Integer = i32;
+    const SCALE: usize = 3;
     const PRECISION_FACTOR: i32 = 1_000;
-    // Length of text representation of time. HH:MM::SS.fff
+    // Length of text representation of time. HH:MM:SS.fff
     const STR_LEN: usize = 12;
-
-    fn insert_at(index: usize, from: Self::Native, to: &mut TextColumnSliceMut<u8>) {
-        let unit_min = 60 * Self::PRECISION_FACTOR;
-        let unit_hour = unit_min * 60;
-
-        let hour = from / unit_hour;
-        let minute = (from % unit_hour) / unit_min;
-        let second = (from % unit_min) / Self::PRECISION_FACTOR;
-        let fraction = from % Self::PRECISION_FACTOR;
-        write!(
-            to.set_mut(index, Self::STR_LEN),
-            "{hour:02}:{minute:02}:{second:02}.{fraction:03}"
-        )
-        .unwrap();
-    }
 }
 
 impl TimePrimitive for Time64MicrosecondType {
+    type Integer = i64;
+
+    const SCALE: usize = 6;
     const PRECISION_FACTOR: i64 = 1_000_000;
-    // Length of text representation of time. HH:MM::SS.ffffff
+    // Length of text representation of time. HH:MM:SS.ffffff
     const STR_LEN: usize = 15;
-
-    fn insert_at(index: usize, from: Self::Native, to: &mut TextColumnSliceMut<u8>) {
-        let unit_min = 60 * Self::PRECISION_FACTOR;
-        let unit_hour = unit_min * 60;
-
-        let hour = from / unit_hour;
-        let minute = (from % unit_hour) / unit_min;
-        let second = (from % unit_min) / Self::PRECISION_FACTOR;
-        let fraction = from % Self::PRECISION_FACTOR;
-        write!(
-            to.set_mut(index, Self::STR_LEN),
-            "{hour:02}:{minute:02}:{second:02}.{fraction:06}"
-        )
-        .unwrap();
-    }
 }
 
 impl TimePrimitive for Time64NanosecondType {
+    type Integer = i64;
+    // For now we insert nanoseconds with a precision of 7 digits rather than 9
+    const SCALE: usize = 9;
     const PRECISION_FACTOR: i64 = 1_000_000_000;
-    // Length of text representation of time. HH:MM::SS.fffffff
-    const STR_LEN: usize = 16;
-
-    fn insert_at(index: usize, from: Self::Native, to: &mut TextColumnSliceMut<u8>) {
-        let unit_min = 60 * Self::PRECISION_FACTOR;
-        let unit_hour = unit_min * 60;
-
-        let hour = from / unit_hour;
-        let minute = (from % unit_hour) / unit_min;
-        let second = (from % unit_min) / Self::PRECISION_FACTOR;
-        let fraction = (from % Self::PRECISION_FACTOR) / 100;
-        write!(
-            to.set_mut(index, Self::STR_LEN),
-            "{hour:02}:{minute:02}:{second:02}.{fraction:07}"
-        )
-        .unwrap();
-    }
+    // Length of text representation of time. HH:MM:SS.fffffffff
+    const STR_LEN: usize = 18;
 }
 
 impl<P> WriteStrategy for NullableTimeAsText<P>
 where
-    P: TimePrimitive,
+    P: ArrowPrimitiveType + TimePrimitive<Integer = <P as ArrowPrimitiveType>::Native>,
 {
     fn buffer_desc(&self) -> BufferDesc {
         BufferDesc::Text {
