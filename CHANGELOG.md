@@ -1,5 +1,21 @@
 # Changelog
 
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [Unreleased]
+
+## [18.1.2](https://github.com/pacman82/arrow-odbc/compare/v18.1.1...v18.1.2) - 2025-08-05
+
+### Other
+
+- Move automerge logic into build.yml.
+- *(deps)* update arrow requirement from >= 29, < 56 to >= 29, < 57
+- Auto merge dependabot PRs
+# Changelog
+
 ## [18.1.1](https://github.com/pacman82/arrow-odbc/compare/v18.1.0...v18.1.1) - 2025-06-27
 
 ### Other
