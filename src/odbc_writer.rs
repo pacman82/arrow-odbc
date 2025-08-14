@@ -13,9 +13,9 @@ use arrow::{
     record_batch::{RecordBatch, RecordBatchReader},
 };
 use odbc_api::{
-    ColumnarBulkInserter, Connection, Prepared, StatementConnection,
+    ColumnarBulkInserter, Connection, Prepared,
     buffers::{AnyBuffer, AnySliceMut, BufferDesc},
-    handles::{AsStatementRef, StatementImpl},
+    handles::{AsStatementRef, StatementConnection, StatementImpl},
 };
 
 use crate::{
@@ -271,7 +271,7 @@ where
     }
 }
 
-impl<'env> OdbcWriter<StatementConnection<'env>> {
+impl<'env> OdbcWriter<StatementConnection<Connection<'env>>> {
     /// A writer which takes ownership of the connection and inserts the given schema into a table
     /// with matching column names.
     ///

@@ -31,8 +31,8 @@ use arrow_odbc::{
     arrow_schema_from, insert_into_table,
     odbc_api::{
         Connection, ConnectionOptions, Cursor, CursorImpl, Environment, IntoParameter,
-        StatementConnection,
         buffers::TextRowSet,
+        handles::StatementConnection,
         sys::{AttrConnectionPooling, AttrCpMatch},
     },
 };
@@ -3032,7 +3032,7 @@ fn cursor_over_literals(
     table_name: &str,
     column_type: &str,
     literal: &str,
-) -> CursorImpl<StatementConnection<'static>> {
+) -> CursorImpl<StatementConnection<Connection<'static>>> {
     // Setup a table on the database
     let conn = ENV
         .connect_with_connection_string(MSSQL, ConnectionOptions::default())
@@ -3051,7 +3051,7 @@ fn cursor_over_value(
     table_name: &str,
     column_type: &str,
     value: impl IntoParameter,
-) -> CursorImpl<StatementConnection<'static>> {
+) -> CursorImpl<StatementConnection<Connection<'static>>> {
     // Setup a table on the database
     let conn = ENV
         .connect_with_connection_string(MSSQL, ConnectionOptions::default())
@@ -3066,7 +3066,10 @@ fn cursor_over_value(
     cursor
 }
 
-fn empty_cursor(table_name: &str, column_type: &str) -> CursorImpl<StatementConnection<'static>> {
+fn empty_cursor(
+    table_name: &str,
+    column_type: &str,
+) -> CursorImpl<StatementConnection<Connection<'static>>> {
     // Setup a table on the database
     let conn = ENV
         .connect_with_connection_string(MSSQL, ConnectionOptions::default())
