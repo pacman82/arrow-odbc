@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [19.0.0](https://github.com/pacman82/arrow-odbc/compare/v18.1.2...v19.0.0) - 2025-08-14
+
+- [**breaking**] Support for `odbc-api 15`. Dropped support for older versions.
+
 ## [18.1.2](https://github.com/pacman82/arrow-odbc/compare/v18.1.1...v18.1.2) - 2025-08-05
 
 ### Other
