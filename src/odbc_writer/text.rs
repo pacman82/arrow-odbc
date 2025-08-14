@@ -15,6 +15,7 @@ pub type LargeUtf8ToNativeText = LargeUtf8ToNarrow;
 #[cfg(target_os = "windows")]
 pub type LargeUtf8ToNativeText = LargeUtf8ToWide;
 
+#[cfg_attr(target_os = "windows", allow(dead_code))]
 pub struct Utf8ToNarrow;
 
 impl WriteStrategy for Utf8ToNarrow {
@@ -35,6 +36,7 @@ impl WriteStrategy for Utf8ToNarrow {
     }
 }
 
+#[cfg_attr(target_os = "windows", allow(dead_code))]
 pub struct LargeUtf8ToNarrow;
 
 impl WriteStrategy for LargeUtf8ToNarrow {
@@ -55,6 +57,7 @@ impl WriteStrategy for LargeUtf8ToNarrow {
     }
 }
 
+#[cfg_attr(target_os = "windows", allow(dead_code))]
 fn insert_into_narrow_slice<'a>(
     from: impl Iterator<Item = Option<&'a str>>,
     mut to: TextColumnSliceMut<u8>,
