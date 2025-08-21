@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [20.0.0](https://github.com/pacman82/arrow-odbc/compare/v19.1.1...v20.0.0) - 2025-08-21
+
+### Added
+
+- [**breaking**] Support OdbcWriter taking ownership of Arc<Mutex<Connection>>
+
 ## [19.1.1](https://github.com/pacman82/arrow-odbc/compare/v19.1.0...v19.1.1) - 2025-08-21
 
 ### Other
