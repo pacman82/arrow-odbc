@@ -3,7 +3,7 @@
 use std::{io::Write, marker::PhantomData, sync::Arc};
 
 use arrow::{
-    array::{timezone::Tz, Array, ArrowPrimitiveType, PrimitiveArray},
+    array::{Array, ArrowPrimitiveType, PrimitiveArray, timezone::Tz},
     datatypes::{
         TimeUnit, TimestampMicrosecondType, TimestampMillisecondType, TimestampNanosecondType,
         TimestampSecondType,
@@ -113,7 +113,7 @@ impl<P> TimestampTzToText<P> {
 
 impl<P> WriteStrategy for TimestampTzToText<P>
 where
-    P: ArrowPrimitiveType<Native=i64> + InserableAsTimestampWithTimeZone,
+    P: ArrowPrimitiveType<Native = i64> + InserableAsTimestampWithTimeZone,
 {
     fn buffer_desc(&self) -> BufferDesc {
         BufferDesc::Text {
@@ -127,10 +127,7 @@ where
         column_buf: AnySliceMut<'_>,
         array: &dyn Array,
     ) -> Result<(), WriterError> {
-        let from = array
-            .as_any()
-            .downcast_ref::<PrimitiveArray<P>>()
-            .unwrap();
+        let from = array.as_any().downcast_ref::<PrimitiveArray<P>>().unwrap();
         let mut to = column_buf.as_text_view().unwrap();
         for (index, timestamp) in from.iter().enumerate() {
             if let Some(timestamp) = timestamp {

@@ -1,4 +1,7 @@
-use std::{sync::Arc, thread};
+use std::{
+    sync::{Arc, Mutex},
+    thread,
+};
 
 use arrow::{
     array::{
@@ -2865,6 +2868,36 @@ fn concurrent_reader_is_send() {
     let array_any = record_batch.column(0).clone();
     let array_vals = array_any.as_any().downcast_ref::<Int32Array>().unwrap();
     assert_eq!([42], *array_vals.values());
+}
+
+#[test]
+fn support_shared_ownership_of_connections_for_writer() {
+    // Given a table and a record batch reader returning a batch with a text column.
+    let table_name = function_name!().rsplit_once(':').unwrap().1;
+    let conn = ENV
+        .connect_with_connection_string(MSSQL, Default::default())
+        .unwrap();
+    setup_empty_table_mssql(&conn, table_name, &["VARCHAR(50)"]).unwrap();
+    let array = StringArray::from(vec![Some("Hello"), None, Some("World")]);
+    let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Utf8, true)]));
+    let batch = RecordBatch::try_new(schema.clone(), vec![Arc::new(array)]).unwrap();
+    let reader = StubBatchReader::new(schema.clone(), vec![batch]);
+
+    // When
+    let mut inserter = {
+        let conn = ENV
+            .connect_with_connection_string(MSSQL, Default::default())
+            .unwrap();
+        let shared_connection = Arc::new(Mutex::new(conn));
+        let row_capacity = 50;
+        OdbcWriter::from_connection(shared_connection, &schema, table_name, row_capacity).unwrap()
+    };
+    inserter.write_all(reader).unwrap();
+
+    // Then
+    let actual = table_to_string(&conn, table_name, &["a"]);
+    let expected = "Hello\nNULL\nWorld";
+    assert_eq!(expected, actual);
 }
 
 /// Test triggered by <https://github.com/pacman82/odbc-api/issues/709>

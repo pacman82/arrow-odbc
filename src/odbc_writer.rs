@@ -13,9 +13,9 @@ use arrow::{
     record_batch::{RecordBatch, RecordBatchReader},
 };
 use odbc_api::{
-    ColumnarBulkInserter, Connection, Prepared,
+    ColumnarBulkInserter, Connection, ConnectionTransitions, Prepared,
     buffers::{AnyBuffer, AnySliceMut, BufferDesc},
-    handles::{AsStatementRef, StatementConnection, StatementImpl},
+    handles::{AsStatementRef, StatementConnection, StatementImpl, StatementParent},
 };
 
 use crate::{
@@ -271,7 +271,10 @@ where
     }
 }
 
-impl<'env> OdbcWriter<StatementConnection<Connection<'env>>> {
+impl<C> OdbcWriter<StatementConnection<C>>
+where
+    C: StatementParent,
+{
     /// A writer which takes ownership of the connection and inserts the given schema into a table
     /// with matching column names.
     ///
@@ -280,12 +283,15 @@ impl<'env> OdbcWriter<StatementConnection<Connection<'env>>> {
     /// If the column name contains any character which would make it not a valid qualifier for transact
     /// SQL it will be wrapped in double quotes (`"`) within the insert schema. Valid names consist of
     /// alpha numeric characters, `@`, `$`, `#` and `_`.
-    pub fn from_connection(
-        connection: Connection<'env>,
+    pub fn from_connection<C2>(
+        connection: C2,
         schema: &Schema,
         table_name: &str,
         row_capacity: usize,
-    ) -> Result<Self, WriterError> {
+    ) -> Result<Self, WriterError>
+    where
+        C2: ConnectionTransitions<StatementParent = C>,
+    {
         let sql = insert_statement_from_schema(schema, table_name);
         let statement = connection
             .into_prepared(&sql)
