@@ -37,7 +37,7 @@ chrono = "0.4.39"
 log = "0.4.27"
 thiserror = "2.0.12"
 
-odbc-api = ">= 17, < 18"
+odbc-api = ">= 17, < 20"
 atoi = "2.0.0"
 
 
