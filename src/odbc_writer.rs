@@ -36,7 +36,7 @@ mod boolean;
 mod map_arrow_to_odbc;
 mod text;
 mod timestamp;
-
+const PROTECTED_KEYWORDS_LOWER: &[&str] = &["index", "key", "values"];
 /// Fastest and most convinient way to stream the contents of arrow record batches into a database
 /// table. For usecase there you want to insert repeatedly into the same table from different
 /// streams it is more efficient to create an instance of [`self::OdbcWriter`] and reuse it.
@@ -80,7 +80,8 @@ fn insert_statement_text(table: &str, column_names: &[&'_ str]) -> String {
 
 /// Wraps column name in quotes, if need be
 fn quote_column_name(column_name: &str) -> Cow<'_, str> {
-    if column_name.contains(|c| !valid_in_column_name(c)) {
+    if column_name.contains(|c| !valid_in_column_name(c)) 
+        || PROTECTED_KEYWORDS_LOWER.contains(&column_name.to_lowercase().as_str()) {
         Cow::Owned(format!("\"{column_name}\""))
     } else {
         Cow::Borrowed(column_name)
