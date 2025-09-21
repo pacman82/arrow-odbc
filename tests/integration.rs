@@ -2659,7 +2659,7 @@ fn insert_into_column_named_like_a_resevered_keyword() {
 
     let array = Int32Array::from(vec![Some(42)]);
     let schema = Arc::new(Schema::new(vec![Field::new(
-        "values",
+        "\"values\"",
         DataType::Int32,
         true,
     )]));
