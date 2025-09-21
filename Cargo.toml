@@ -43,8 +43,6 @@ atoi = "2.0.0"
 
 [dev-dependencies]
 anyhow = "1.0.97"
-# Used to share one ODBC environment in tests
-lazy_static = "1.5.0"
 # Function name macro is used to ensure unique table names in test
 stdext = "0.3.3"
 float_eq = "1.0.1"

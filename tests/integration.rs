@@ -1,5 +1,5 @@
 use std::{
-    sync::{Arc, Mutex},
+    sync::{Arc, Mutex, OnceLock},
     thread,
 };
 
@@ -22,7 +22,6 @@ use arrow::{
 };
 use chrono::{NaiveDate, NaiveTime, TimeZone};
 use float_eq::assert_float_eq;
-use lazy_static::lazy_static;
 
 /// This declaration is equivalent to `use half::f16`, yet it does have the benefit, that we do not
 /// need to directly depend on the `half` crate and worry about version mismatches.
@@ -56,18 +55,22 @@ const POSTGRES: &str = "Driver={PostgreSQL UNICODE};\
     Uid=test;\
     Pwd=test;";
 
-// Rust by default executes tests in parallel. Yet only one environment is allowed at a time.
-lazy_static! {
-    static ref ENV: Environment = unsafe {
-        // Enable connection pooling. Let driver decide wether the attributes of two connection
-        // are similar enough to change the attributes of a pooled one, to fit the requested
-        // connection, or if it is cheaper to create a new Connection from scratch.
-        Environment::set_connection_pooling(AttrConnectionPooling::DriverAware).unwrap();
-        let mut env = Environment::new().unwrap();
-        // Strict is the default, and is set here to be explicit about it.
-        env.set_connection_pooling_matching(AttrCpMatch::Strict).unwrap();
-        env
-    };
+// Rust by default executes tests in parallel. Yet only one environment at a time is recommended.
+fn env() -> &'static Environment {
+    static ENV: OnceLock<Environment> = OnceLock::new();
+    ENV.get_or_init(|| {
+        unsafe {
+            // Enable connection pooling. Let driver decide wether the attributes of two connection
+            // are similar enough to change the attributes of a pooled one, to fit the requested
+            // connection, or if it is cheaper to create a new Connection from scratch.
+            Environment::set_connection_pooling(AttrConnectionPooling::DriverAware).unwrap();
+            let mut env = Environment::new().unwrap();
+            // Strict is the default, and is set here to be explicit about it.
+            env.set_connection_pooling_matching(AttrCpMatch::Strict)
+                .unwrap();
+            env
+        }
+    })
 }
 
 /// Fill a record batch with non nullable Integer 32 Bit directly from the datasource
@@ -125,7 +128,7 @@ fn fetch_8bit_unsigned_integer_explicit_schema() {
     let table_name = function_name!().rsplit_once(':').unwrap().1;
 
     // Setup a table on the database with some floats (so we can fetch them)
-    let conn = ENV
+    let conn = env()
         .connect_with_connection_string(MSSQL, Default::default())
         .unwrap();
     setup_empty_table_mssql(&conn, table_name, &["TINYINT NOT NULL"]).unwrap();
@@ -165,7 +168,7 @@ fn fetch_8bit_unsigned_integer_explicit_schema() {
 fn fetch_decimal128_negative_scale_unsupported() {
     let table_name = function_name!().rsplit_once(':').unwrap().1;
     // Setup table with dummy value, we won't be able to read it though
-    let conn = ENV
+    let conn = env()
         .connect_with_connection_string(MSSQL, Default::default())
         .unwrap();
     setup_empty_table_mssql(&conn, table_name, &["NUMERIC(5,0) NOT NULL"]).unwrap();
@@ -201,7 +204,7 @@ fn unsupported_16bit_unsigned_integer() {
     let table_name = function_name!().rsplit_once(':').unwrap().1;
 
     // Setup a table on the database with some floats (so we can fetch them)
-    let conn = ENV
+    let conn = env()
         .connect_with_connection_string(MSSQL, Default::default())
         .unwrap();
     setup_empty_table_mssql(&conn, table_name, &["SMALLINT NOT NULL"]).unwrap();
@@ -726,7 +729,7 @@ fn fetch_varbinary_data() {
     let table_name = function_name!().rsplit_once(':').unwrap().1;
 
     // Setup a table on the database with some values (so we can fetch them)
-    let conn = ENV
+    let conn = env()
         .connect_with_connection_string(MSSQL, Default::default())
         .unwrap();
     setup_empty_table_mssql(&conn, table_name, &["VARBINARY(30) NOT NULL"]).unwrap();
@@ -768,7 +771,7 @@ fn fetch_fixed_sized_binary_data() {
     let table_name = function_name!().rsplit_once(':').unwrap().1;
 
     // Setup a table on the database with some values (so we can fetch them)
-    let conn = ENV
+    let conn = env()
         .connect_with_connection_string(MSSQL, Default::default())
         .unwrap();
     setup_empty_table_mssql(&conn, table_name, &["BINARY(5) NOT NULL"]).unwrap();
@@ -809,7 +812,7 @@ fn fetch_time() {
     let table_name = function_name!().rsplit_once(':').unwrap().1;
 
     // Setup a table on the database with some values (so we can fetch them)
-    let conn = ENV
+    let conn = env()
         .connect_with_connection_string(MSSQL, Default::default())
         .unwrap();
     setup_empty_table_mssql(&conn, table_name, &["TIME NOT NULL"]).unwrap();
@@ -845,7 +848,7 @@ fn fetch_time_0_psql() {
     let table_name = function_name!().rsplit_once(':').unwrap().1;
 
     // Setup a table on the database with some values (so we can fetch them)
-    let conn = ENV
+    let conn = env()
         .connect_with_connection_string(POSTGRES, Default::default())
         .unwrap();
     setup_empty_table::<PostgreSql>(&conn, table_name, &["TIME(0) NOT NULL"]).unwrap();
@@ -881,7 +884,7 @@ fn fetch_time_1_psql() {
     let table_name = function_name!().rsplit_once(':').unwrap().1;
 
     // Setup a table on the database with some values (so we can fetch them)
-    let conn = ENV
+    let conn = env()
         .connect_with_connection_string(POSTGRES, Default::default())
         .unwrap();
     setup_empty_table::<PostgreSql>(&conn, table_name, &["TIME(1) NOT NULL"]).unwrap();
@@ -921,7 +924,7 @@ fn fetch_time_2_psql() {
     let table_name = function_name!().rsplit_once(':').unwrap().1;
 
     // Setup a table on the database with some values (so we can fetch them)
-    let conn = ENV
+    let conn = env()
         .connect_with_connection_string(POSTGRES, Default::default())
         .unwrap();
     setup_empty_table::<PostgreSql>(&conn, table_name, &["TIME(2) NOT NULL"]).unwrap();
@@ -961,7 +964,7 @@ fn fetch_time_3_psql() {
     let table_name = function_name!().rsplit_once(':').unwrap().1;
 
     // Setup a table on the database with some values (so we can fetch them)
-    let conn = ENV
+    let conn = env()
         .connect_with_connection_string(POSTGRES, Default::default())
         .unwrap();
     setup_empty_table::<PostgreSql>(&conn, table_name, &["TIME(3) NOT NULL"]).unwrap();
@@ -1001,7 +1004,7 @@ fn fetch_time_4_psql() {
     let table_name = function_name!().rsplit_once(':').unwrap().1;
 
     // Setup a table on the database with some values (so we can fetch them)
-    let conn = ENV
+    let conn = env()
         .connect_with_connection_string(POSTGRES, Default::default())
         .unwrap();
     setup_empty_table::<PostgreSql>(&conn, table_name, &["TIME(4) NOT NULL"]).unwrap();
@@ -1041,7 +1044,7 @@ fn fetch_time_7_msql() {
     let table_name = function_name!().rsplit_once(':').unwrap().1;
 
     // Setup a table on the database with some values (so we can fetch them)
-    let conn = ENV
+    let conn = env()
         .connect_with_connection_string(MSSQL, Default::default())
         .unwrap();
     setup_empty_table_mssql(&conn, table_name, &["TIME"]).unwrap();
@@ -1084,7 +1087,7 @@ fn prepared_query() {
     let table_name = function_name!().rsplit_once(':').unwrap().1;
 
     // Setup a table on the database with some floats (so we can fetch them)
-    let conn = ENV
+    let conn = env()
         .connect_with_connection_string(MSSQL, Default::default())
         .unwrap();
     setup_empty_table_mssql(&conn, table_name, &["REAL NOT NULL"]).unwrap();
@@ -1121,7 +1124,7 @@ fn infer_schema() {
     let table_name = function_name!().rsplit_once(':').unwrap().1;
 
     // Setup a table on the database with some floats (so we can fetch them)
-    let conn = ENV
+    let conn = env()
         .connect_with_connection_string(MSSQL, Default::default())
         .unwrap();
     setup_empty_table_mssql(&conn, table_name, &["REAL NOT NULL"]).unwrap();
@@ -1148,7 +1151,7 @@ fn fetch_schema_for_table() {
     let table_name = function_name!().rsplit_once(':').unwrap().1;
 
     // Setup a table on the database with some floats (so we can fetch them)
-    let conn = ENV
+    let conn = env()
         .connect_with_connection_string(MSSQL, Default::default())
         .unwrap();
     setup_empty_table_mssql(&conn, table_name, &["REAL NOT NULL"]).unwrap();
@@ -1233,7 +1236,7 @@ fn should_allocate_enough_memory_for_varchar_column_bound_to_u16() {
 fn should_allow_to_fetch_from_varchar_max() {
     // Given
     let table_name = function_name!().rsplit_once(':').unwrap().1;
-    let conn = ENV
+    let conn = env()
         .connect_with_connection_string(MSSQL, Default::default())
         .unwrap();
     setup_empty_table_mssql(&conn, table_name, &["VARCHAR(MAX)"]).unwrap();
@@ -1256,7 +1259,7 @@ fn should_allow_to_fetch_from_varchar_max() {
 fn should_error_for_truncation() {
     // Given a column with one value of length 9
     let table_name = function_name!().rsplit_once(':').unwrap().1;
-    let conn = ENV
+    let conn = env()
         .connect_with_connection_string(MSSQL, Default::default())
         .unwrap();
     setup_empty_table_mssql(&conn, table_name, &["VARCHAR(MAX)"]).unwrap();
@@ -1281,7 +1284,7 @@ fn should_error_for_truncation() {
 fn should_allow_to_fetch_from_varbinary_max() {
     // Given
     let table_name = function_name!().rsplit_once(':').unwrap().1;
-    let conn = ENV
+    let conn = env()
         .connect_with_connection_string(MSSQL, Default::default())
         .unwrap();
     setup_empty_table_mssql(&conn, table_name, &["VARBINARY(MAX)"]).unwrap();
@@ -1303,7 +1306,7 @@ fn should_allow_to_fetch_from_varbinary_max() {
 fn fallibale_allocations() {
     // Given
     let table_name = function_name!().rsplit_once(':').unwrap().1;
-    let conn = ENV
+    let conn = env()
         .connect_with_connection_string(MSSQL, Default::default())
         .unwrap();
     setup_empty_table_mssql(&conn, table_name, &["VARBINARY(4096)"]).unwrap();
@@ -1336,7 +1339,7 @@ fn fallibale_allocations() {
 #[test]
 fn read_multiple_result_sets() {
     // Given a cursor returning two result sets
-    let conn = ENV
+    let conn = env()
         .connect_with_connection_string(MSSQL, Default::default())
         .unwrap();
     let cursor = conn
@@ -1378,7 +1381,7 @@ fn read_multiple_result_sets() {
 #[test]
 fn read_multiple_result_sets_with_second_no_schema() {
     // Given a batch of three SQL statements, the second being result-free
-    let conn = ENV
+    let conn = env()
         .connect_with_connection_string(MSSQL, Default::default())
         .unwrap();
     let cursor = conn
@@ -1538,7 +1541,7 @@ fn fetch_narrow_data() {
 fn insert_does_not_support_list_type() {
     // Given a table and a db connection.
     let table_name = function_name!().rsplit_once(':').unwrap().1;
-    let conn = ENV
+    let conn = env()
         .connect_with_connection_string(MSSQL, Default::default())
         .unwrap();
     setup_empty_table_mssql(&conn, table_name, &["VARCHAR(4096)"]).unwrap();
@@ -1565,7 +1568,7 @@ fn insert_does_not_support_list_type() {
 fn insert_text() {
     // Given a table and a record batch reader returning a batch with a text column.
     let table_name = function_name!().rsplit_once(':').unwrap().1;
-    let conn = ENV
+    let conn = env()
         .connect_with_connection_string(MSSQL, Default::default())
         .unwrap();
     setup_empty_table_mssql(&conn, table_name, &["VARCHAR(4096)"]).unwrap();
@@ -1594,7 +1597,7 @@ fn insert_text() {
 fn insert_multiple_small_batches() {
     // Given
     let table_name = function_name!().rsplit_once(':').unwrap().1;
-    let conn = ENV
+    let conn = env()
         .connect_with_connection_string(MSSQL, Default::default())
         .unwrap();
     setup_empty_table_mssql(&conn, table_name, &["VARCHAR(10)"]).unwrap();
@@ -1620,7 +1623,7 @@ fn insert_multiple_small_batches() {
 fn insert_non_ascii_text() {
     // Given a table and a record batch reader returning a batch with a text column.
     let table_name = function_name!().rsplit_once(':').unwrap().1;
-    let conn = ENV
+    let conn = env()
         .connect_with_connection_string(MSSQL, Default::default())
         .unwrap();
     setup_empty_table_mssql(&conn, table_name, &["VARCHAR(50)"]).unwrap();
@@ -1642,7 +1645,7 @@ fn insert_non_ascii_text() {
 fn insert_nullable_booleans() {
     // Given a table and a record batch reader returning a batch with a text column.
     let table_name = function_name!().rsplit_once(':').unwrap().1;
-    let conn = ENV
+    let conn = env()
         .connect_with_connection_string(MSSQL, Default::default())
         .unwrap();
     setup_empty_table_mssql(&conn, table_name, &["BIT"]).unwrap();
@@ -1664,7 +1667,7 @@ fn insert_nullable_booleans() {
 fn insert_non_nullable_booleans() {
     // Given a table and a record batch reader returning a batch with a text column.
     let table_name = function_name!().rsplit_once(':').unwrap().1;
-    let conn = ENV
+    let conn = env()
         .connect_with_connection_string(MSSQL, Default::default())
         .unwrap();
     setup_empty_table_mssql(&conn, table_name, &["BIT"]).unwrap();
@@ -1686,7 +1689,7 @@ fn insert_non_nullable_booleans() {
 fn insert_nullable_int8() {
     // Given a table and a record batch reader returning a batch with a text column.
     let table_name = function_name!().rsplit_once(':').unwrap().1;
-    let conn = ENV
+    let conn = env()
         .connect_with_connection_string(MSSQL, Default::default())
         .unwrap();
     setup_empty_table_mssql(&conn, table_name, &["TINYINT"]).unwrap();
@@ -1710,7 +1713,7 @@ fn insert_nullable_int8() {
 fn insert_non_nullable_int8() {
     // Given a table and a record batch reader returning a batch with a text column.
     let table_name = function_name!().rsplit_once(':').unwrap().1;
-    let conn = ENV
+    let conn = env()
         .connect_with_connection_string(MSSQL, Default::default())
         .unwrap();
     setup_empty_table_mssql(&conn, table_name, &["TINYINT"]).unwrap();
@@ -1734,7 +1737,7 @@ fn insert_non_nullable_int8() {
 fn insert_nullable_int16() {
     // Given a table and a record batch reader returning a batch with a text column.
     let table_name = function_name!().rsplit_once(':').unwrap().1;
-    let conn = ENV
+    let conn = env()
         .connect_with_connection_string(MSSQL, Default::default())
         .unwrap();
     setup_empty_table_mssql(&conn, table_name, &["SMALLINT"]).unwrap();
@@ -1756,7 +1759,7 @@ fn insert_nullable_int16() {
 fn insert_nullable_int32() {
     // Given a table and a record batch reader returning a batch with a text column.
     let table_name = function_name!().rsplit_once(':').unwrap().1;
-    let conn = ENV
+    let conn = env()
         .connect_with_connection_string(MSSQL, Default::default())
         .unwrap();
     setup_empty_table_mssql(&conn, table_name, &["INTEGER"]).unwrap();
@@ -1778,7 +1781,7 @@ fn insert_nullable_int32() {
 fn insert_nullable_int64() {
     // Given a table and a record batch reader returning a batch with a text column.
     let table_name = function_name!().rsplit_once(':').unwrap().1;
-    let conn = ENV
+    let conn = env()
         .connect_with_connection_string(MSSQL, Default::default())
         .unwrap();
     setup_empty_table_mssql(&conn, table_name, &["BIGINT"]).unwrap();
@@ -1800,7 +1803,7 @@ fn insert_nullable_int64() {
 fn insert_non_nullable_unsigned_int8() {
     // Given a table and a record batch reader returning a batch with a text column.
     let table_name = function_name!().rsplit_once(':').unwrap().1;
-    let conn = ENV
+    let conn = env()
         .connect_with_connection_string(MSSQL, Default::default())
         .unwrap();
     setup_empty_table_mssql(&conn, table_name, &["SMALLINT"]).unwrap();
@@ -1822,7 +1825,7 @@ fn insert_non_nullable_unsigned_int8() {
 fn insert_nullable_f32() {
     // Given a table and a record batch reader returning a batch with a text column.
     let table_name = function_name!().rsplit_once(':').unwrap().1;
-    let conn = ENV
+    let conn = env()
         .connect_with_connection_string(MSSQL, Default::default())
         .unwrap();
     setup_empty_table_mssql(&conn, table_name, &["REAL"]).unwrap();
@@ -1844,7 +1847,7 @@ fn insert_nullable_f32() {
 fn insert_nullable_f64() {
     // Given a table and a record batch reader returning a batch with a text column.
     let table_name = function_name!().rsplit_once(':').unwrap().1;
-    let conn = ENV
+    let conn = env()
         .connect_with_connection_string(MSSQL, Default::default())
         .unwrap();
     setup_empty_table_mssql(&conn, table_name, &["FLOAT(25)"]).unwrap();
@@ -1866,7 +1869,7 @@ fn insert_nullable_f64() {
 fn insert_nullable_f16() {
     // Given a table and a record batch reader returning a batch with a text column.
     let table_name = function_name!().rsplit_once(':').unwrap().1;
-    let conn = ENV
+    let conn = env()
         .connect_with_connection_string(MSSQL, Default::default())
         .unwrap();
     setup_empty_table_mssql(&conn, table_name, &["REAL"]).unwrap();
@@ -1890,7 +1893,7 @@ fn insert_nullable_f16() {
 fn insert_non_nullable_f16() {
     // Given a table and a record batch reader returning a batch with a text column.
     let table_name = function_name!().rsplit_once(':').unwrap().1;
-    let conn = ENV
+    let conn = env()
         .connect_with_connection_string(MSSQL, Default::default())
         .unwrap();
     setup_empty_table_mssql(&conn, table_name, &["REAL"]).unwrap();
@@ -1918,7 +1921,7 @@ fn insert_non_nullable_f16() {
 fn insert_timestamp_with_seconds_precisions() {
     // Given a table and a record batch reader returning a batch with a text column.
     let table_name = function_name!().rsplit_once(':').unwrap().1;
-    let conn = ENV
+    let conn = env()
         .connect_with_connection_string(MSSQL, Default::default())
         .unwrap();
     setup_empty_table_mssql(&conn, table_name, &["DATETIME2(0)"]).unwrap();
@@ -1945,7 +1948,7 @@ fn insert_timestamp_with_seconds_precisions() {
 fn insert_berlin_time_to_daytime_offset_sec_precision() {
     // Given
     let table_name = function_name!().rsplit_once(':').unwrap().1;
-    let conn = ENV
+    let conn = env()
         .connect_with_connection_string(MSSQL, Default::default())
         .unwrap();
     setup_empty_table_mssql(&conn, table_name, &["DATETIMEOFFSET(0)"]).unwrap();
@@ -1986,7 +1989,7 @@ fn insert_berlin_time_to_daytime_offset_sec_precision() {
 fn insert_berlin_time_to_daytime_offset_ms_precision() {
     // Given
     let table_name = function_name!().rsplit_once(':').unwrap().1;
-    let conn = ENV
+    let conn = env()
         .connect_with_connection_string(MSSQL, Default::default())
         .unwrap();
     setup_empty_table_mssql(&conn, table_name, &["DATETIMEOFFSET(3)"]).unwrap();
@@ -2024,7 +2027,7 @@ fn insert_berlin_time_to_daytime_offset_ms_precision() {
 fn insert_berlin_time_to_daytime_offset_us_precision() {
     // Given
     let table_name = function_name!().rsplit_once(':').unwrap().1;
-    let conn = ENV
+    let conn = env()
         .connect_with_connection_string(MSSQL, Default::default())
         .unwrap();
     setup_empty_table_mssql(&conn, table_name, &["DATETIMEOFFSET(6)"]).unwrap();
@@ -2063,7 +2066,7 @@ fn insert_berlin_time_to_daytime_offset_us_precision() {
 fn insert_berlin_time_to_daytime_offset_ns_precision() {
     // Given
     let table_name = function_name!().rsplit_once(':').unwrap().1;
-    let conn = ENV
+    let conn = env()
         .connect_with_connection_string(MSSQL, Default::default())
         .unwrap();
     setup_empty_table_mssql(&conn, table_name, &["DATETIMEOFFSET(7)"]).unwrap();
@@ -2101,7 +2104,7 @@ fn insert_berlin_time_to_daytime_offset_ns_precision() {
 fn insert_timestamp_with_foobar_timezone() {
     // Given a table and a record batch reader returning a batch with a text column.
     let table_name = function_name!().rsplit_once(':').unwrap().1;
-    let conn = ENV
+    let conn = env()
         .connect_with_connection_string(MSSQL, Default::default())
         .unwrap();
     setup_empty_table_mssql(&conn, table_name, &["DATETIMEOFFSET(0)"]).unwrap();
@@ -2144,7 +2147,7 @@ fn insert_timestamp_with_foobar_timezone() {
 fn insert_timestamp_with_milliseconds_precisions() {
     // Given a table and a record batch reader returning a batch with a text column.
     let table_name = function_name!().rsplit_once(':').unwrap().1;
-    let conn = ENV
+    let conn = env()
         .connect_with_connection_string(MSSQL, Default::default())
         .unwrap();
     setup_empty_table_mssql(&conn, table_name, &["DATETIME2(3)"]).unwrap();
@@ -2176,7 +2179,7 @@ fn insert_timestamp_with_milliseconds_precisions() {
 fn insert_timestamp_with_milliseconds_precisions_which_is_not_representable_as_i64_ns() {
     // Given a table and a record batch reader returning a batch with a text column.
     let table_name = function_name!().rsplit_once(':').unwrap().1;
-    let conn = ENV
+    let conn = env()
         .connect_with_connection_string(MSSQL, Default::default())
         .unwrap();
     setup_empty_table_mssql(&conn, table_name, &["DATETIME2(3)"]).unwrap();
@@ -2208,7 +2211,7 @@ fn insert_timestamp_with_milliseconds_precisions_which_is_not_representable_as_i
 fn insert_timestamp_with_microseconds_precisions() {
     // Given a table and a record batch reader returning a batch with a text column.
     let table_name = function_name!().rsplit_once(':').unwrap().1;
-    let conn = ENV
+    let conn = env()
         .connect_with_connection_string(MSSQL, Default::default())
         .unwrap();
     setup_empty_table_mssql(&conn, table_name, &["DATETIME2(6)"]).unwrap();
@@ -2235,7 +2238,7 @@ fn insert_timestamp_with_microseconds_precisions() {
 fn insert_timestamp_with_nanoseconds_precisions() {
     // Given a table and a record batch reader returning a batch with a text column.
     let table_name = function_name!().rsplit_once(':').unwrap().1;
-    let conn = ENV
+    let conn = env()
         .connect_with_connection_string(MSSQL, Default::default())
         .unwrap();
     setup_empty_table_mssql(&conn, table_name, &["DATETIME2(7)"]).unwrap();
@@ -2262,7 +2265,7 @@ fn insert_timestamp_with_nanoseconds_precisions() {
 fn insert_date32_array() {
     // Given a table and a record batch reader returning a batch with a text column.
     let table_name = function_name!().rsplit_once(':').unwrap().1;
-    let conn = ENV
+    let conn = env()
         .connect_with_connection_string(MSSQL, Default::default())
         .unwrap();
     setup_empty_table_mssql(&conn, table_name, &["DATE"]).unwrap();
@@ -2285,7 +2288,7 @@ fn insert_date32_array() {
 fn insert_date64_array() {
     // Given a table and a record batch reader returning a batch with a text column.
     let table_name = function_name!().rsplit_once(':').unwrap().1;
-    let conn = ENV
+    let conn = env()
         .connect_with_connection_string(MSSQL, Default::default())
         .unwrap();
     setup_empty_table_mssql(&conn, table_name, &["DATE"]).unwrap();
@@ -2308,7 +2311,7 @@ fn insert_date64_array() {
 fn insert_time32_second_array() {
     // Given a table and a record batch reader returning a batch with a text column.
     let table_name = function_name!().rsplit_once(':').unwrap().1;
-    let conn = ENV
+    let conn = env()
         .connect_with_connection_string(MSSQL, Default::default())
         .unwrap();
     setup_empty_table_mssql(&conn, table_name, &["TIME(0)"]).unwrap();
@@ -2335,7 +2338,7 @@ fn insert_time32_second_array() {
 fn insert_time32_ms_array() {
     // Given a table and a record batch reader returning a batch with a text column.
     let table_name = function_name!().rsplit_once(':').unwrap().1;
-    let conn = ENV
+    let conn = env()
         .connect_with_connection_string(MSSQL, Default::default())
         .unwrap();
     setup_empty_table_mssql(&conn, table_name, &["TIME(3)"]).unwrap();
@@ -2362,7 +2365,7 @@ fn insert_time32_ms_array() {
 fn insert_time64_us_array() {
     // Given a table and a record batch reader returning a batch with a text column.
     let table_name = function_name!().rsplit_once(':').unwrap().1;
-    let conn = ENV
+    let conn = env()
         .connect_with_connection_string(MSSQL, Default::default())
         .unwrap();
     setup_empty_table_mssql(&conn, table_name, &["TIME(6)"]).unwrap();
@@ -2389,7 +2392,7 @@ fn insert_time64_us_array() {
 fn insert_time64_ns_array() {
     // Given a table and a record batch reader returning a batch with a text column.
     let table_name = function_name!().rsplit_once(':').unwrap().1;
-    let conn = ENV
+    let conn = env()
         .connect_with_connection_string(MSSQL, Default::default())
         .unwrap();
     setup_empty_table_mssql(&conn, table_name, &["TIME(7)"]).unwrap();
@@ -2417,7 +2420,7 @@ fn insert_time64_ns_array() {
 fn insert_binary() {
     // Given a table and a record batch reader returning a batch with a text column.
     let table_name = function_name!().rsplit_once(':').unwrap().1;
-    let conn = ENV
+    let conn = env()
         .connect_with_connection_string(MSSQL, Default::default())
         .unwrap();
     setup_empty_table_mssql(&conn, table_name, &["VARBINARY(4096)"]).unwrap();
@@ -2443,7 +2446,7 @@ fn insert_binary() {
 fn insert_fixed_binary() {
     // Given a table and a record batch reader returning a batch with a text column.
     let table_name = function_name!().rsplit_once(':').unwrap().1;
-    let conn = ENV
+    let conn = env()
         .connect_with_connection_string(MSSQL, Default::default())
         .unwrap();
     setup_empty_table_mssql(&conn, table_name, &["VARBINARY(4096)"]).unwrap();
@@ -2469,7 +2472,7 @@ fn insert_fixed_binary() {
 fn insert_decimal_128() {
     // Given a table and a record batch reader returning a batch with a text column.
     let table_name = function_name!().rsplit_once(':').unwrap().1;
-    let conn = ENV
+    let conn = env()
         .connect_with_connection_string(MSSQL, Default::default())
         .unwrap();
     setup_empty_table_mssql(&conn, table_name, &["NUMERIC(5,3)"]).unwrap();
@@ -2498,7 +2501,7 @@ fn insert_decimal_128() {
 fn insert_decimal_256() {
     // Given a table and a record batch reader returning a batch with a text column.
     let table_name = function_name!().rsplit_once(':').unwrap().1;
-    let conn = ENV
+    let conn = env()
         .connect_with_connection_string(MSSQL, Default::default())
         .unwrap();
     setup_empty_table_mssql(&conn, table_name, &["NUMERIC(5,3)"]).unwrap();
@@ -2530,7 +2533,7 @@ fn insert_decimal_256() {
 fn insert_decimal_128_with_negative_scale() {
     // Given a table and a record batch reader returning a batch with a text column.
     let table_name = function_name!().rsplit_once(':').unwrap().1;
-    let conn = ENV
+    let conn = env()
         .connect_with_connection_string(MSSQL, Default::default())
         .unwrap();
     setup_empty_table_mssql(&conn, table_name, &["NUMERIC(5,0)"]).unwrap();
@@ -2559,7 +2562,7 @@ fn insert_decimal_128_with_negative_scale() {
 fn insert_decimal_256_with_negative_scale() {
     // Given a table and a record batch reader returning a batch with a text column.
     let table_name = function_name!().rsplit_once(':').unwrap().1;
-    let conn = ENV
+    let conn = env()
         .connect_with_connection_string(MSSQL, Default::default())
         .unwrap();
     setup_empty_table_mssql(&conn, table_name, &["NUMERIC(5,0)"]).unwrap();
@@ -2591,7 +2594,7 @@ fn insert_decimal_256_with_negative_scale() {
 fn insert_taking_ownership_of_connection() {
     // Given a table and a record batch reader returning a batch with a text column.
     let table_name = function_name!().rsplit_once(':').unwrap().1;
-    let conn = ENV
+    let conn = env()
         .connect_with_connection_string(MSSQL, Default::default())
         .unwrap();
     setup_empty_table_mssql(&conn, table_name, &["VARCHAR(4096)"]).unwrap();
@@ -2602,7 +2605,7 @@ fn insert_taking_ownership_of_connection() {
 
     // When
     let mut inserter = {
-        let conn = ENV
+        let conn = env()
             .connect_with_connection_string(MSSQL, Default::default())
             .unwrap();
         let row_capacity = 50;
@@ -2620,7 +2623,7 @@ fn insert_taking_ownership_of_connection() {
 fn insert_large_text() {
     // Given a table and a record batch reader returning a batch with a text column.
     let table_name = function_name!().rsplit_once(':').unwrap().1;
-    let conn = ENV
+    let conn = env()
         .connect_with_connection_string(MSSQL, Default::default())
         .unwrap();
     setup_empty_table_mssql(&conn, table_name, &["VARCHAR(4096)"]).unwrap();
@@ -2646,7 +2649,7 @@ fn insert_large_text() {
 fn sanatize_column_names() {
     // Given a table with a column name containing a space ...
     let table_name = function_name!().rsplit_once(':').unwrap().1;
-    let conn = ENV
+    let conn = env()
         .connect_with_connection_string(MSSQL, Default::default())
         .unwrap();
     let drop_table = &format!("DROP TABLE IF EXISTS {table_name}");
@@ -2787,7 +2790,7 @@ fn fetch_empty_cursor_concurrently_twice() {
 #[test]
 fn read_multiple_result_sets_using_concurrent_cursor() {
     // Given a cursor returning two result sets
-    let conn = ENV
+    let conn = env()
         .connect_with_connection_string(MSSQL, Default::default())
         .unwrap();
     let cursor = conn
@@ -2874,7 +2877,7 @@ fn concurrent_reader_is_send() {
 fn support_shared_ownership_of_connections_for_writer() {
     // Given a table and a record batch reader returning a batch with a text column.
     let table_name = function_name!().rsplit_once(':').unwrap().1;
-    let conn = ENV
+    let conn = env()
         .connect_with_connection_string(MSSQL, Default::default())
         .unwrap();
     setup_empty_table_mssql(&conn, table_name, &["VARCHAR(50)"]).unwrap();
@@ -2885,7 +2888,7 @@ fn support_shared_ownership_of_connections_for_writer() {
 
     // When
     let mut inserter = {
-        let conn = ENV
+        let conn = env()
             .connect_with_connection_string(MSSQL, Default::default())
             .unwrap();
         let shared_connection = Arc::new(Mutex::new(conn));
@@ -2918,7 +2921,7 @@ fn support_shared_ownership_of_connections_for_writer() {
 fn varchar_1000_psql() {
     // Given
     let table_name = function_name!().rsplit_once(':').unwrap().1;
-    let conn = ENV
+    let conn = env()
         .connect_with_connection_string(POSTGRES, ConnectionOptions::default())
         .unwrap();
     setup_empty_table::<PostgreSql>(&conn, table_name, &["VARCHAR(1000)"]).unwrap();
@@ -3067,7 +3070,7 @@ fn cursor_over_literals(
     literal: &str,
 ) -> CursorImpl<StatementConnection<Connection<'static>>> {
     // Setup a table on the database
-    let conn = ENV
+    let conn = env()
         .connect_with_connection_string(MSSQL, ConnectionOptions::default())
         .unwrap();
     setup_empty_table_mssql(&conn, table_name, &[column_type]).unwrap();
@@ -3086,7 +3089,7 @@ fn cursor_over_value(
     value: impl IntoParameter,
 ) -> CursorImpl<StatementConnection<Connection<'static>>> {
     // Setup a table on the database
-    let conn = ENV
+    let conn = env()
         .connect_with_connection_string(MSSQL, ConnectionOptions::default())
         .unwrap();
     setup_empty_table_mssql(&conn, table_name, &[column_type]).unwrap();
@@ -3104,7 +3107,7 @@ fn empty_cursor(
     column_type: &str,
 ) -> CursorImpl<StatementConnection<Connection<'static>>> {
     // Setup a table on the database
-    let conn = ENV
+    let conn = env()
         .connect_with_connection_string(MSSQL, ConnectionOptions::default())
         .unwrap();
     setup_empty_table_mssql(&conn, table_name, &[column_type]).unwrap();
@@ -3120,7 +3123,7 @@ fn query_single_value(
     value: impl IntoParameter,
 ) -> impl Cursor {
     // Setup a table on the database
-    let conn = ENV
+    let conn = env()
         .connect_with_connection_string(MSSQL, Default::default())
         .unwrap();
     setup_empty_table_mssql(&conn, table_name, &[column_type]).unwrap();
