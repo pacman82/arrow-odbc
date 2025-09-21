@@ -80,6 +80,8 @@ fn insert_statement_text(table: &str, column_names: &[&'_ str]) -> String {
 
 /// Wraps column name in quotes, if need be.
 fn quote_column_name(column_name: &str) -> Cow<'_, str> {
+    // We do not want to apply quoting in case the string is already quoted. See:
+    // <https://github.com/pacman82/arrow-odbc-py/issues/162>
     let is_already_quoted = || {
         (column_name.starts_with('"') && column_name.ends_with('"'))
             || column_name.starts_with('[') && column_name.ends_with(']')
