@@ -2645,6 +2645,39 @@ fn insert_large_text() {
     assert_eq!(expected, actual);
 }
 
+// Not implemented yet
+#[test]
+#[should_panic(expected = "Incorrect syntax near the keyword 'values'.")]
+fn insert_into_column_named_like_a_resevered_keyword() {
+    // Given a table with a column named "values" which is a reserved keyword in MSSQL
+    let table_name = function_name!().rsplit_once(':').unwrap().1;
+    let conn = env()
+        .connect_with_connection_string(MSSQL, Default::default())
+        .unwrap();
+    let drop_table = &format!("DROP TABLE IF EXISTS {table_name}");
+    conn.execute(drop_table, (), None).unwrap();
+    let create_table = format!("CREATE TABLE {table_name} (id int IDENTITY(1,1),values: int);");
+    conn.execute(&create_table, (), None).unwrap();
+
+    let array = Int32Array::from(vec![Some(42)]);
+    let schema = Arc::new(Schema::new(vec![Field::new(
+        "values",
+        DataType::Int32,
+        true,
+    )]));
+    let batch = RecordBatch::try_new(schema.clone(), vec![Arc::new(array)]).unwrap();
+    let mut reader = StubBatchReader::new(schema, vec![batch]);
+
+    // When inserting from a dataframe with a column named "values"
+    let result = insert_into_table(&conn, &mut reader, table_name, 1);
+
+    // Then it still works without throwing a syntax error
+    result.unwrap();
+    let actual = table_to_string(&conn, table_name, &["a"]);
+    let expected = "42\n";
+    assert_eq!(expected, actual);
+}
+
 #[test]
 fn sanatize_column_names() {
     // Given a table with a column name containing a space ...
