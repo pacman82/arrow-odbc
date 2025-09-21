@@ -11,8 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Do not apply quoting to column names which are already quoted
-- column names which are equal to the reserved keywords "values",
+
+- Then auto generating the insert statement into a table, column names which are already quoted, i.e. are enclosed in either rectangular brackets (`[`, `]`), double quotes (`"`) or backticks (`````) will not be quoted. This way if a column is named after a reserved keyword e.g. `values` or `from`, users could rename the column in the source to their quoted representation in order to avoid syntax errors in the statement.
 
 ### Other
 
