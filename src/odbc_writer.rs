@@ -80,7 +80,16 @@ fn insert_statement_text(table: &str, column_names: &[&'_ str]) -> String {
 
 /// Wraps column name in quotes, if need be
 fn quote_column_name(column_name: &str) -> Cow<'_, str> {
-    if column_name.contains(|c| !valid_in_column_name(c)) {
+    // Incomplete list of reserved keywords in SQL. Maybe not feasable to maintain that list and
+    // perform quoting reliably. Quick fix though, until downstream "arrow-odbc-py" allows for
+    // passing user defined statments.
+    // See: <https://github.com/pacman82/arrow-odbc-py/issues/162>
+    const RESERVED_KEYWORDS: &[&str] = &["values", "index", "key", "from"].as_slice();
+    let needs_quotes = column_name.contains(|c| !valid_in_column_name(c))
+        || RESERVED_KEYWORDS
+            .iter()
+            .any(|kw| kw.eq_ignore_ascii_case(column_name));
+    if needs_quotes {
         Cow::Owned(format!("\"{column_name}\""))
     } else {
         Cow::Borrowed(column_name)

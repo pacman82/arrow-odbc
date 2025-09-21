@@ -2645,9 +2645,7 @@ fn insert_large_text() {
     assert_eq!(expected, actual);
 }
 
-// Not implemented yet
 #[test]
-#[should_panic(expected = "Incorrect syntax near the keyword 'values'.")]
 fn insert_into_column_named_like_a_resevered_keyword() {
     // Given a table with a column named "values" which is a reserved keyword in MSSQL
     let table_name = function_name!().rsplit_once(':').unwrap().1;
@@ -2656,7 +2654,7 @@ fn insert_into_column_named_like_a_resevered_keyword() {
         .unwrap();
     let drop_table = &format!("DROP TABLE IF EXISTS {table_name}");
     conn.execute(drop_table, (), None).unwrap();
-    let create_table = format!("CREATE TABLE {table_name} (id int IDENTITY(1,1),values: int);");
+    let create_table = format!("CREATE TABLE {table_name} (id int IDENTITY(1,1),\"values\" int);");
     conn.execute(&create_table, (), None).unwrap();
 
     let array = Int32Array::from(vec![Some(42)]);
@@ -2673,8 +2671,8 @@ fn insert_into_column_named_like_a_resevered_keyword() {
 
     // Then it still works without throwing a syntax error
     result.unwrap();
-    let actual = table_to_string(&conn, table_name, &["a"]);
-    let expected = "42\n";
+    let actual = table_to_string(&conn, table_name, &["\"values\""]);
+    let expected = "42";
     assert_eq!(expected, actual);
 }
 
