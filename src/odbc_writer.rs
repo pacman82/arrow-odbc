@@ -82,6 +82,12 @@ fn insert_statement_text(table: &str, column_names: &[&'_ str]) -> String {
 fn quote_column_name(column_name: &str) -> Cow<'_, str> {
     // We do not want to apply quoting in case the string is already quoted. See:
     // <https://github.com/pacman82/arrow-odbc-py/issues/162>
+    //
+    // Another approach would have been to apply quoting after detecting keywords. Yet the list of
+    // reserved keywords is large. There is also the issue with different databases having different
+    // quoting rules. So the strategy choosen here is to apply quoting in less situations and not
+    // more, so the user has more control over the final statement. This crate is about arrow and
+    // odbc, less so about SQL dialects and statement construction.
     let is_already_quoted = || {
         (column_name.starts_with('"') && column_name.ends_with('"'))
             || column_name.starts_with('[') && column_name.ends_with(']')
