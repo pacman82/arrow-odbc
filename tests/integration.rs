@@ -1163,17 +1163,7 @@ fn fetch_schema_for_table() {
     // Now that we have prepared statement, we want to use it to query metadata.
     let schema = arrow_schema_from(&mut prepared, None, false).unwrap();
 
-    assert_eq!(
-        "Field { \
-            name: \"a\", \
-            data_type: Float32, \
-            nullable: false, \
-            dict_id: 0, \
-            dict_is_ordered: false, \
-            metadata: {} \
-        }",
-        schema.to_string()
-    )
+    assert_eq!(r#"Field { "a": Float32 }"#, schema.to_string())
 }
 
 /// Allocating octet length bytes is not enough if the column on the database is encoded in UTF-16
