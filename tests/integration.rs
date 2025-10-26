@@ -2998,6 +2998,8 @@ fn blob_on_db2() {
         None,
     )
     .unwrap();
+    let dbms_name = conn.database_management_system_name().unwrap();
+    eprintln!("DB2 DBMS Name: {dbms_name}");
 
     // When fetching the blob column as arrow array
     let cursor = conn
@@ -3006,15 +3008,16 @@ fn blob_on_db2() {
         .unwrap();
     let mut reader = OdbcReaderBuilder::new()
         .with_max_num_rows_per_batch(1)
+        .with_dbms_name(dbms_name)
         .build(cursor)
         .unwrap();
     let record_batch = reader.next().unwrap().unwrap();
 
-    // Then
+    // Then we fetch the blob as binary data, not text.
     let array_any = record_batch.column(0).clone();
-    let array_vals = array_any.as_any().downcast_ref::<StringArray>().unwrap();
+    let array_vals = array_any.as_any().downcast_ref::<BinaryArray>().unwrap();
     assert_eq!(1, array_vals.len());
-    // assert_eq!(long_text_with_special_characters, array_vals.value(0));
+    assert_eq!(&blob_data, array_vals.value(0));
 }
 
 /// Creates the table and assures it is empty. Columns are named a,b,c, etc.
