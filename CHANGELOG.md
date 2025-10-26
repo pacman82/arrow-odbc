@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [21.0.0](https://github.com/pacman82/arrow-odbc/compare/v20.1.1...v21.0.0) - 2025-10-26
+
+### Added
+
+- [**breaking**] Fetch Db2 Blobs as binary data and not text
+
+### Other
+
+- introduce blob_on_db2 for local development
+
 ## [20.1.1](https://github.com/pacman82/arrow-odbc/compare/v20.1.0...v20.1.1) - 2025-10-25
 
 ### Other
