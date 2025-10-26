@@ -55,6 +55,14 @@ const POSTGRES: &str = "Driver={PostgreSQL UNICODE};\
     Uid=test;\
     Pwd=test;";
 
+const DB2: &str = "Driver={IBM DB2 ODBC DRIVER};\
+    Database=testdb;\
+    Hostname=localhost;\
+    Port=50000;\
+    Protocol=TCPIP;\
+    Uid=db2inst1;\
+    Pwd=password;";
+
 // Rust by default executes tests in parallel. Yet only one environment at a time is recommended.
 fn env() -> &'static Environment {
     static ENV: OnceLock<Environment> = OnceLock::new();
@@ -1293,6 +1301,7 @@ fn should_allow_to_fetch_from_varbinary_max() {
 }
 
 #[test]
+#[ignore = "This tests allocates too much memory under WSL"]
 fn fallibale_allocations() {
     // Given
     let table_name = function_name!().rsplit_once(':').unwrap().1;
@@ -2972,6 +2981,42 @@ fn varchar_1000_psql() {
     assert_eq!(long_text_with_special_characters, array_vals.value(0));
 }
 
+#[test]
+#[ignore = "Currently trouble with automating setting up DB2 on CI and local development"]
+fn blob_on_db2() {
+    // Given a table on DB2 with a BLOB column
+    let table_name = function_name!().rsplit_once(':').unwrap().1;
+    let conn = env()
+        .connect_with_connection_string(DB2, ConnectionOptions::default())
+        .unwrap();
+
+    setup_empty_table::<Db2>(&conn, table_name, &["BLOB"]).unwrap();
+    let blob_data: Vec<u8> = (0..=255).collect();
+    conn.execute(
+        &format!("INSERT INTO {table_name} (a) VALUES (?)"),
+        &(blob_data.as_slice()).into_parameter(),
+        None,
+    )
+    .unwrap();
+
+    // When fetching the blob column as arrow array
+    let cursor = conn
+        .into_cursor(&format!("SELECT a FROM {table_name}"), (), None)
+        .unwrap()
+        .unwrap();
+    let mut reader = OdbcReaderBuilder::new()
+        .with_max_num_rows_per_batch(1)
+        .build(cursor)
+        .unwrap();
+    let record_batch = reader.next().unwrap().unwrap();
+
+    // Then
+    let array_any = record_batch.column(0).clone();
+    let array_vals = array_any.as_any().downcast_ref::<StringArray>().unwrap();
+    assert_eq!(1, array_vals.len());
+    // assert_eq!(long_text_with_special_characters, array_vals.value(0));
+}
+
 /// Creates the table and assures it is empty. Columns are named a,b,c, etc.
 fn setup_empty_table_mssql(
     conn: &Connection,
@@ -3024,6 +3069,14 @@ struct PostgreSql;
 impl Dbms for PostgreSql {
     fn identity_column() -> &'static str {
         "id INTEGER PRIMARY KEY GENERATED ALWAYS AS IDENTITY"
+    }
+}
+
+struct Db2;
+
+impl Dbms for Db2 {
+    fn identity_column() -> &'static str {
+        "id INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY"
     }
 }
 
