@@ -33,7 +33,7 @@ use crate::{ColumnFailure, Error};
 ///     // Query column with values to get a cursor
 ///     let sql = format!("SELECT * FROM {}", table_name);
 ///     let mut prepared = connection.prepare(&sql)?;
-///     
+///
 ///     // Now that we have prepared statement, we want to use it to query metadata.
 ///     let map_errors_to_null = false;
 ///     let dbms_name = None;
@@ -158,6 +158,20 @@ fn arrow_field_from(
                 precision_to_time(decimal_digits)
             } else {
                 // Other databases may use -154 for other purposes, so we treat it as a string.
+                ArrowDataType::Utf8
+            }
+        }
+        OdbcDataType::Other {
+            data_type: SqlDataType(-98),
+            column_size: _,
+            decimal_digits: _,
+        } => {
+            // IBM DB2 names seem platform specific. E.g.; "DB2/LINUXX8664"
+            if dbms_name.is_some_and(|name| name.starts_with("DB2/")) {
+                // IBM DB2's -98 is used for binary blob types.
+                ArrowDataType::Binary
+            } else {
+                // Other databases may use -98 for other purposes, so we treat it as a string.
                 ArrowDataType::Utf8
             }
         }
