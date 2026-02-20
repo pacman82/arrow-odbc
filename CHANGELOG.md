@@ -8,11 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [21.0.1](https://github.com/pacman82/arrow-odbc/compare/v21.0.0...v21.0.1) (2026-02-20)
 
 
-* Trigger release please PR ([e559c27](https://github.com/pacman82/arrow-odbc/commit/e559c2750b02f2f8d45bcae423811d63935f0dbe))
-
-## [Unreleased]
-
-## [21.0.0](https://github.com/pacman82/arrow-odbc/compare/v20.1.1...v21.0.0) - 2025-10-26
+* Test release using release please
 
 ### Added
 
