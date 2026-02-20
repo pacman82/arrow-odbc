@@ -33,16 +33,16 @@ arrow = { version = ">= 29, < 58", default-features = false, features = [
     "chrono-tz",
 ] }
 # We use chrono for date conversions.
-chrono = "0.4.39"
-log = "0.4.27"
-thiserror = "2.0.12"
+chrono = "0.4.43"
+log = "0.4.29"
+thiserror = "2.0.18"
 
 odbc-api = ">= 17, < 21"
 atoi = "2.0.0"
 
 
 [dev-dependencies]
-anyhow = "1.0.97"
+anyhow = "1.0.102"
 # Function name macro is used to ensure unique table names in test
 stdext = "0.3.3"
 float_eq = "1.0.1"
