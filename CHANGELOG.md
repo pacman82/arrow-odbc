@@ -5,6 +5,73 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [22.0.0](https://github.com/pacman82/arrow-odbc/compare/arrow-odbc-v21.0.0...arrow-odbc-v22.0.0) (2026-02-20)
+
+
+### ⚠ BREAKING CHANGES
+
+* Fetch Db2 Blobs as binary data and not text
+* Support OdbcWriter taking ownership of Arc<Mutex<Connection>>
+* Support odbc-api 15. Drop older versions
+* Support for `odbc-api 15`. Drops support for older version
+* Add error InvalidTimeZone
+* Provide possibility to provide dbms name, in order to autodetect time columns for MSSQL databases
+* Support for Times64 Nanoseconds
+* Support for wallclock time with milliseconds precision
+* Support for time32 second
+* Update to support odbc-api 12.
+* Update to edition 2024
+* Dedicated Mapping error for InvalidUtf8
+
+* Support for `odbc-api 15`. Drops support for older version ([f165597](https://github.com/pacman82/arrow-odbc/commit/f1655971ae0e5fb5cda058bca40bab3f659e23df))
+* Update to edition 2024 ([07a7eab](https://github.com/pacman82/arrow-odbc/commit/07a7eabefc0624bfb60716a3239da3c1a9bcf0da))
+
+
+### Features
+
+* Add error InvalidTimeZone ([e90479c](https://github.com/pacman82/arrow-odbc/commit/e90479cb980df757b35f9ef15f1a8b96319b842c))
+* column names which are equal to the reserved keywords "values", ([d31a44f](https://github.com/pacman82/arrow-odbc/commit/d31a44f7e1255f839bf5d7f6e7134a982a587c9a))
+* Dedicated Mapping error for InvalidUtf8 ([f85fe1b](https://github.com/pacman82/arrow-odbc/commit/f85fe1b8bc014d56dd4f9596c6afade82d63e4da))
+* Do not apply quoting to column names which are already quoted ([3ac9f0b](https://github.com/pacman82/arrow-odbc/commit/3ac9f0b13c801357a3acb01f66e367cc967289cf))
+* Fetch Db2 Blobs as binary data and not text ([a645885](https://github.com/pacman82/arrow-odbc/commit/a645885a00a1d2e6cf392f817430bf74bb297384))
+* Insert timestamps with timezones and seconds precision. Incomplete for now as timezone is not parsed ([a27d539](https://github.com/pacman82/arrow-odbc/commit/a27d539114b3dd5a3d56eaafdb323c5ea18f23fd))
+* inserting timestamp with timezone now respects time zone name ([1794996](https://github.com/pacman82/arrow-odbc/commit/1794996a41002a45fbdb72f7f116a4d9be303122))
+* Provide possibility to provide dbms name, in order to autodetect time columns for MSSQL databases ([fb3292c](https://github.com/pacman82/arrow-odbc/commit/fb3292c84af578734cc0a07c1bd0940107cea726))
+* Support `odbc-api 16` ([9421072](https://github.com/pacman82/arrow-odbc/commit/9421072e9d6a85232d9c2ca18672186373bb9afd))
+* Support arrow 53 ([2778101](https://github.com/pacman82/arrow-odbc/commit/2778101780820b1a64758b10a149fff8746f8081))
+* Support for explicitly choosing the transfer encoding. ([566e2f9](https://github.com/pacman82/arrow-odbc/commit/566e2f9b79e5563e22228e01dc3e866f932dc7a8))
+* Support for odbc-api 17 ([dd9dde4](https://github.com/pacman82/arrow-odbc/commit/dd9dde45a0ff9a95cc43e209667379f04f9137a7))
+* Support for time32 second ([b48616e](https://github.com/pacman82/arrow-odbc/commit/b48616ea7f6ab67aafc73086494775b954d9db08))
+* Support for Times64 Nanoseconds ([b141c7e](https://github.com/pacman82/arrow-odbc/commit/b141c7eef57b5b5609317c674cc18895404745b1))
+* support for timestamp with timezones of all precisions ([b80389a](https://github.com/pacman82/arrow-odbc/commit/b80389aa1546f6e5df36ee8da7209cea0c258529))
+* Support for wallclock time with milliseconds precision ([c1ef518](https://github.com/pacman82/arrow-odbc/commit/c1ef518cac910d962e970e1eb1119b06281a20a9))
+* Support odbc-api 11 ([4dc76d0](https://github.com/pacman82/arrow-odbc/commit/4dc76d03f6ffb6d57c7710c6e2cb1159236f8251))
+* Support odbc-api 15. Drop older versions ([af6a896](https://github.com/pacman82/arrow-odbc/commit/af6a896e036051bbdfc2166187c0901bb75bfc36))
+* Support OdbcWriter taking ownership of Arc&lt;Mutex&lt;Connection&gt;&gt; ([a8ed354](https://github.com/pacman82/arrow-odbc/commit/a8ed3540193cdb0478242fbe8348a996477aa611))
+* Time64 is inserted with ns precision rather than with 7 fractional digits. ([0b03755](https://github.com/pacman82/arrow-odbc/commit/0b037555a8565243ebc9a8c52397b8f9c40fb4b9))
+* Update to support odbc-api 12. ([eef1036](https://github.com/pacman82/arrow-odbc/commit/eef103654ee5309bc2c22d564a07593c3f2e5398))
+* wide feature flag added. This supports wide function calls on non-windows systems. ([739caec](https://github.com/pacman82/arrow-odbc/commit/739caec5bdbd11f61f5f3202a617e3805bdf5805))
+
+
+### Bug Fixes
+
+* Also for non-windows platforms, inserting multiple small batches now works, even if the second batch triggers rebinding the buffer due to element size. ([ac75fc8](https://github.com/pacman82/arrow-odbc/commit/ac75fc84e0faf444d1d9e5e894447bc72883e799))
+* Inserting multiple small batches now works, even if the second batch triggers rebinding the buffer due to element size. ([4c74762](https://github.com/pacman82/arrow-odbc/commit/4c747627964736201e334acaa2343351341b652a))
+* Missing changelog entry for 19.0.0 ([57d9866](https://github.com/pacman82/arrow-odbc/commit/57d98660782924618d1372c51254399dcd236561))
+* missing other entry in Changelog ([1eac86d](https://github.com/pacman82/arrow-odbc/commit/1eac86ddf2cc6a16fc8ec5207ddc4ae67d0c6399))
+* Overflow in epoch to timestamp is fixed. It is now possible to insert 1600-06-18 23:12:44.123 into a database with ms precision ([9a9f66e](https://github.com/pacman82/arrow-odbc/commit/9a9f66ef899eb23620beb7060a86b6b8404f012e))
+* Pin chrono version to 0.4.39 to fix build ([9c8b327](https://github.com/pacman82/arrow-odbc/commit/9c8b327434999798e1271a1bfffbbe1a051e7cd6))
+* Remove eprintln statement, which had been left over from debugging ([ddc0c77](https://github.com/pacman82/arrow-odbc/commit/ddc0c77ee750432bfb5804599fd7c51d301ee38f))
+* Timestamps with fractional seconds now work even if they are older than unix epoch. ([ad04dc8](https://github.com/pacman82/arrow-odbc/commit/ad04dc83e7fd2489935fd3fd456683d44a0b0f85))
+
+
+### Documentation
+
+* Fix docstrings for TextEncoding ([608158f](https://github.com/pacman82/arrow-odbc/commit/608158fb7d8eb761f2dd2a93ddb8599b6976d7aa))
+* Rewrite docs for with_max_text_size ([0942f30](https://github.com/pacman82/arrow-odbc/commit/0942f303adb2a87b2180bbeb606f5fdb004615a4))
+* Support for timestamp with timezones and seconds precisions ([5188d90](https://github.com/pacman82/arrow-odbc/commit/5188d9065162c092d40631ea90b602ab5aca28f5))
+* Update changelog ([8a15349](https://github.com/pacman82/arrow-odbc/commit/8a153492ec7d06654d09f60c57c12965cdab3c15))
+
 ## [Unreleased]
 
 ## [21.0.0](https://github.com/pacman82/arrow-odbc/compare/v20.1.1...v21.0.0) - 2025-10-26
