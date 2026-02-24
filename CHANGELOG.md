@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [21.1.0](https://github.com/pacman82/arrow-odbc/compare/v21.0.1...v21.1.0) (2026-02-24)
+
+
+### Features
+
+* Support arrow 58 ([c25f20f](https://github.com/pacman82/arrow-odbc/commit/c25f20f8b25a42ad41259fcdb1838220ddf348e2))
+
 ## [21.0.1](https://github.com/pacman82/arrow-odbc/compare/v21.0.0...v21.0.1) (2026-02-20)
 
 
