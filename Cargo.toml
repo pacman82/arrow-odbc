@@ -39,6 +39,7 @@ thiserror = "2.0.18"
 
 odbc-api = ">= 17, < 21"
 atoi = "2.0.0"
+simdutf8 = "0.1.5"
 
 
 [dev-dependencies]

@@ -180,10 +180,11 @@ impl ReadStrategy for NarrowText {
             builder.append_option(
                 value
                     .map(|bytes| {
-                        let untrimmed =
-                            std::str::from_utf8(bytes).map_err(|_| MappingError::InvalidUtf8 {
+                        let untrimmed = simdutf8::basic::from_utf8(bytes).map_err(|_| {
+                            MappingError::InvalidUtf8 {
                                 lossy_value: String::from_utf8_lossy(bytes).into_owned(),
-                            })?;
+                            }
+                        })?;
                         Ok(if self.trim {
                             untrimmed.trim()
                         } else {
