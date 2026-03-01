@@ -1,6 +1,7 @@
-use std::{char::decode_utf16, cmp::min, num::NonZeroUsize, sync::Arc};
+use std::{cmp::min, num::NonZeroUsize, sync::Arc};
 
 use arrow::array::{ArrayRef, StringBuilder};
+use encoding_rs::mem::convert_utf16_to_str;
 use odbc_api::{
     DataType as OdbcDataType,
     buffers::{AnySlice, BufferDesc},
@@ -159,11 +160,17 @@ impl Utf16ToUtf8Converter {
     }
 
     fn utf16_to_utf8(&mut self, utf16: &[u16]) -> &str {
-        self.buf_utf8.clear();
-        for c in decode_utf16(utf16.iter().cloned()) {
-            self.buf_utf8.push(c.unwrap());
+        let max_utf8_len = utf16.len() * 3;
+        // Pad buffer with up to the required size
+        if max_utf8_len > self.buf_utf8.len() {
+            let additional = max_utf8_len - self.buf_utf8.len();
+            self.buf_utf8.reserve(additional);
+            for _ in 0..additional {
+                self.buf_utf8.push('\0');
+            }
         }
-        &self.buf_utf8
+        let written = convert_utf16_to_str(utf16, &mut self.buf_utf8[..max_utf8_len]);
+        &self.buf_utf8[..written]
     }
 }
 
