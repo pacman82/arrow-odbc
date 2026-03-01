@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [21.1.1](https://github.com/pacman82/arrow-odbc/compare/v21.1.0...v21.1.1) (2026-03-01)
+
+
+### Features
+
+* use encoding-rs for converting utf16 to utf8 ([ec863d5](https://github.com/pacman82/arrow-odbc/commit/ec863d5269db3333d2dca403988e8be8ec6024e9))
+* Use simdutf8 for checking that data is valid utf-8 ([6920c8d](https://github.com/pacman82/arrow-odbc/commit/6920c8d7f84f947feef4288fa4ef4cd9c0000fc2))
+
 ## [21.1.0](https://github.com/pacman82/arrow-odbc/compare/v21.0.1...v21.1.0) (2026-02-24)
 
 
