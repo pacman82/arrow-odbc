@@ -130,19 +130,12 @@ impl ReadStrategy for WideText {
         // rather accept the reallocation in these scenarios.
         let data_capacity = self.max_str_len * item_capacity;
         let mut builder = StringBuilder::with_capacity(item_capacity, data_capacity);
-        // Buffer used to convert individual values from utf16 to utf8.
-        let mut buf_utf8 = String::new();
+
+        let mut converter = Utf16ToUtf8Converter::new();
         for value in view.iter() {
-            buf_utf8.clear();
             let opt = if let Some(utf16) = value {
-                for c in decode_utf16(utf16.as_slice().iter().cloned()) {
-                    buf_utf8.push(c.unwrap());
-                }
-                let slice = if self.trim {
-                    buf_utf8.trim()
-                } else {
-                    buf_utf8.as_str()
-                };
+                let slice = converter.utf16_to_utf8(utf16.as_slice());
+                let slice = if self.trim { slice.trim() } else { slice };
                 Some(slice)
             } else {
                 None
@@ -150,6 +143,27 @@ impl ReadStrategy for WideText {
             builder.append_option(opt);
         }
         Ok(Arc::new(builder.finish()))
+    }
+}
+
+struct Utf16ToUtf8Converter {
+    // Buffer used to convert individual values from utf16 to utf8.
+    buf_utf8: String,
+}
+
+impl Utf16ToUtf8Converter {
+    fn new() -> Self {
+        Self {
+            buf_utf8: String::new(),
+        }
+    }
+
+    fn utf16_to_utf8(&mut self, utf16: &[u16]) -> &str {
+        self.buf_utf8.clear();
+        for c in decode_utf16(utf16.iter().cloned()) {
+            self.buf_utf8.push(c.unwrap());
+        }
+        &self.buf_utf8
     }
 }
 

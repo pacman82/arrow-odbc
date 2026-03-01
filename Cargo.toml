@@ -39,7 +39,9 @@ thiserror = "2.0.18"
 
 odbc-api = ">= 17, < 21"
 atoi = "2.0.0"
+# For faster validation that narrow bytes are indeed valid UTF-8.
 simdutf8 = "0.1.5"
+encoding_rs = "0.8.35"
 
 
 [dev-dependencies]
