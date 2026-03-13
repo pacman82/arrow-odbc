@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixes
 
-* Fixes an issue that max_rows_per_batch and max_bytes_per_batch were ([5427250](https://github.com/pacman82/arrow-odbc/commit/54272503b8fc73eb4ce0d0d34bb0d35f7448d7e1))
+*  Fixes an issue that max_rows_per_batch and max_bytes_per_batch were set to zero if `OdbcReaderBuilder` had been constructed using Default instead of new. ([5427250](https://github.com/pacman82/arrow-odbc/commit/54272503b8fc73eb4ce0d0d34bb0d35f7448d7e1))
 
 ## [22.1.0](https://github.com/pacman82/arrow-odbc/compare/v22.0.0...v22.1.0) (2026-03-05)
 
