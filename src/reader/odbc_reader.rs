@@ -34,7 +34,7 @@ use super::{TextEncoding, to_record_batch::ToRecordBatch};
 /// fn main() -> Result<(), anyhow::Error> {
 ///
 ///     let odbc_environment = Environment::new()?;
-///     
+///
 ///     // Connect with database.
 ///     let connection = odbc_environment.connect_with_connection_string(
 ///         CONNECTION_STRING,
@@ -102,7 +102,7 @@ impl<C: Cursor> OdbcReader<C> {
     /// fn main() -> Result<(), anyhow::Error> {
     ///
     ///     let odbc_environment = ENV.get_or_init(|| {Environment::new().unwrap() });
-    ///     
+    ///
     ///     // Connect with database.
     ///     let connection = odbc_environment.connect_with_connection_string(
     ///         CONNECTION_STRING,
@@ -198,12 +198,21 @@ where
     }
 }
 
+// In the abscence of an explicit row limit set by the user we choose u16 MAX (65535). This
+// is a reasonable high value to allow for siginificantly reducing IO overhead as opposed to
+// row by row fetching already. Likely for many database schemas a memory limitation will
+// kick in before this limit. If not however it can still be dangerous to go beyond this
+// number. Some drivers use a 16Bit integer to count rows and you can run into overflow
+// errors if you use one of them. Once such issue occurred with SAP anywhere.
+const DEFAULT_MAX_ROWS_PER_BATCH: usize = u16::MAX as usize;
+const DEFAULT_MAX_BYTES_PER_BATCH: usize = 512 * 1024 * 1024;
+
 /// Creates instances of [`OdbcReader`] based on [`odbc_api::Cursor`].
 ///
 /// Using a builder pattern instead of passing structs with all required arguments to the
 /// constructors of [`OdbcReader`] allows `arrow_odbc` to introduce new paramters to fine tune the
 /// creation and behavior of the readers without breaking the code of downstream applications.
-#[derive(Default, Clone)]
+#[derive(Clone)]
 pub struct OdbcReaderBuilder {
     /// `Some` implies the user has set this explicitly using
     /// [`OdbcReaderBuilder::with_max_num_rows_per_batch`]. `None` implies that we have to choose
@@ -222,15 +231,6 @@ pub struct OdbcReaderBuilder {
 
 impl OdbcReaderBuilder {
     pub fn new() -> Self {
-        // In the abscence of an explicit row limit set by the user we choose u16 MAX (65535). This
-        // is a reasonable high value to allow for siginificantly reducing IO overhead as opposed to
-        // row by row fetching already. Likely for many database schemas a memory limitation will
-        // kick in before this limit. If not however it can still be dangerous to go beyond this
-        // number. Some drivers use a 16Bit integer to count rows and you can run into overflow
-        // errors if you use one of them. Once such issue occurred with SAP anywhere.
-        const DEFAULT_MAX_ROWS_PER_BATCH: usize = u16::MAX as usize;
-        const DEFAULT_MAX_BYTES_PER_BATCH: usize = 512 * 1024 * 1024;
-
         OdbcReaderBuilder {
             max_num_rows_per_batch: DEFAULT_MAX_ROWS_PER_BATCH,
             max_bytes_per_batch: DEFAULT_MAX_BYTES_PER_BATCH,
@@ -424,4 +424,22 @@ impl OdbcReaderBuilder {
 
 pub fn odbc_to_arrow_error(odbc_error: odbc_api::Error) -> ArrowError {
     ArrowError::from_external_error(Box::new(odbc_error))
+}
+
+impl Default for OdbcReaderBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{DEFAULT_MAX_BYTES_PER_BATCH, DEFAULT_MAX_ROWS_PER_BATCH, OdbcReaderBuilder};
+
+    #[test]
+    fn default_constructed_builder() {
+        let def = OdbcReaderBuilder::default();
+        assert_eq!(def.max_num_rows_per_batch, DEFAULT_MAX_ROWS_PER_BATCH);
+        assert_eq!(def.max_bytes_per_batch, DEFAULT_MAX_BYTES_PER_BATCH);
+    }
 }
