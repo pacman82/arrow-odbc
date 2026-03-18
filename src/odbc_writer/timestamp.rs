@@ -11,10 +11,7 @@ use arrow::{
 };
 use chrono::{DateTime, Datelike, TimeZone, Timelike};
 use log::debug;
-use odbc_api::{
-    buffers::{AnySliceMut, BufferDesc},
-    sys::Timestamp,
-};
+use odbc_api::{BindParamDesc, buffers::AnySliceMut, sys::Timestamp};
 
 use super::{WriteStrategy, WriterError, map_arrow_to_odbc::MapArrowToOdbc};
 
@@ -115,10 +112,8 @@ impl<P> WriteStrategy for TimestampTzToText<P>
 where
     P: ArrowPrimitiveType<Native = i64> + InserableAsTimestampWithTimeZone,
 {
-    fn buffer_desc(&self) -> BufferDesc {
-        BufferDesc::Text {
-            max_str_len: P::FORMAT_WITH_TIME_ZONE_LEN,
-        }
+    fn buffer_desc(&self) -> BindParamDesc {
+        BindParamDesc::text(P::FORMAT_WITH_TIME_ZONE_LEN)
     }
 
     fn write_rows(

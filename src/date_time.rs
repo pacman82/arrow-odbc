@@ -14,7 +14,8 @@ use arrow::{
 };
 use chrono::{Datelike, NaiveDate};
 use odbc_api::{
-    buffers::{AnySliceMut, BufferDesc, TextColumnSliceMut},
+    BindParamDesc,
+    buffers::{AnySliceMut, TextColumnSliceMut},
     sys::{Date, Time, Timestamp},
 };
 
@@ -175,10 +176,8 @@ impl<P> WriteStrategy for NullableTimeAsText<P>
 where
     P: ArrowPrimitiveType + TimePrimitive<Integer = <P as ArrowPrimitiveType>::Native>,
 {
-    fn buffer_desc(&self) -> BufferDesc {
-        BufferDesc::Text {
-            max_str_len: P::STR_LEN,
-        }
+    fn buffer_desc(&self) -> BindParamDesc {
+        BindParamDesc::text(P::STR_LEN)
     }
 
     fn write_rows(

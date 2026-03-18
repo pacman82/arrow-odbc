@@ -4,7 +4,10 @@ use arrow::{
     array::{Array, PrimitiveArray},
     datatypes::ArrowPrimitiveType,
 };
-use odbc_api::buffers::{AnySliceMut, BufferDesc, Item};
+use odbc_api::{
+    BindParamDesc,
+    buffers::{AnySliceMut, Item},
+};
 
 use crate::WriterError;
 
@@ -78,8 +81,8 @@ where
     F: Fn(P::Native) -> U,
     U: Item,
 {
-    fn buffer_desc(&self) -> BufferDesc {
-        U::buffer_desc(true)
+    fn buffer_desc(&self) -> BindParamDesc {
+        U::bind_param_desc(true)
     }
 
     fn write_rows(
@@ -118,8 +121,8 @@ where
     F: Fn(P::Native) -> U,
     U: Item,
 {
-    fn buffer_desc(&self) -> BufferDesc {
-        U::buffer_desc(false)
+    fn buffer_desc(&self) -> BindParamDesc {
+        U::bind_param_desc(false)
     }
 
     fn write_rows(
@@ -154,8 +157,8 @@ where
     P: ArrowPrimitiveType,
     P::Native: Item,
 {
-    fn buffer_desc(&self) -> BufferDesc {
-        P::Native::buffer_desc(true)
+    fn buffer_desc(&self) -> BindParamDesc {
+        P::Native::bind_param_desc(true)
     }
 
     fn write_rows(
@@ -190,8 +193,8 @@ where
     P: ArrowPrimitiveType,
     P::Native: Item,
 {
-    fn buffer_desc(&self) -> BufferDesc {
-        P::Native::buffer_desc(false)
+    fn buffer_desc(&self) -> BindParamDesc {
+        P::Native::bind_param_desc(false)
     }
 
     fn write_rows(

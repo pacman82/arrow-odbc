@@ -19,7 +19,7 @@ impl Binary {
 impl ReadStrategy for Binary {
     fn buffer_desc(&self) -> BufferDesc {
         BufferDesc::Binary {
-            length: self.max_len,
+            max_bytes: self.max_len,
         }
     }
 
@@ -51,7 +51,7 @@ impl FixedSizedBinary {
 impl ReadStrategy for FixedSizedBinary {
     fn buffer_desc(&self) -> BufferDesc {
         BufferDesc::Binary {
-            length: self.len as usize,
+            max_bytes: self.len as usize,
         }
     }
 

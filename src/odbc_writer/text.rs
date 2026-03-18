@@ -1,5 +1,8 @@
 use arrow::array::{Array, LargeStringArray, StringArray};
-use odbc_api::buffers::{AnySliceMut, BufferDesc, TextColumnSliceMut};
+use odbc_api::{
+    BindParamDesc,
+    buffers::{AnySliceMut, TextColumnSliceMut},
+};
 
 use super::{WriteStrategy, WriterError};
 
@@ -19,8 +22,10 @@ pub type LargeUtf8ToNativeText = LargeUtf8ToWide;
 pub struct Utf8ToNarrow;
 
 impl WriteStrategy for Utf8ToNarrow {
-    fn buffer_desc(&self) -> BufferDesc {
-        BufferDesc::Text { max_str_len: 1 }
+    fn buffer_desc(&self) -> BindParamDesc {
+        // This is very mindful of memory, but maybe we can look ahead and figure out how large the
+        // strings we insert are in order to avoid reallocations and rebinding.
+        BindParamDesc::text(1)
     }
 
     fn write_rows(
@@ -40,8 +45,8 @@ impl WriteStrategy for Utf8ToNarrow {
 pub struct LargeUtf8ToNarrow;
 
 impl WriteStrategy for LargeUtf8ToNarrow {
-    fn buffer_desc(&self) -> BufferDesc {
-        BufferDesc::Text { max_str_len: 1 }
+    fn buffer_desc(&self) -> BindParamDesc {
+        BindParamDesc::text(1)
     }
 
     fn write_rows(
@@ -83,8 +88,8 @@ fn insert_into_narrow_slice<'a>(
 pub struct Utf8ToWide;
 
 impl WriteStrategy for Utf8ToWide {
-    fn buffer_desc(&self) -> BufferDesc {
-        BufferDesc::WText { max_str_len: 1 }
+    fn buffer_desc(&self) -> BindParamDesc {
+        BindParamDesc::wide_text(1)
     }
 
     fn write_rows(
@@ -103,8 +108,8 @@ impl WriteStrategy for Utf8ToWide {
 pub struct LargeUtf8ToWide;
 
 impl WriteStrategy for LargeUtf8ToWide {
-    fn buffer_desc(&self) -> BufferDesc {
-        BufferDesc::WText { max_str_len: 1 }
+    fn buffer_desc(&self) -> BindParamDesc {
+        BindParamDesc::wide_text(1)
     }
 
     fn write_rows(
