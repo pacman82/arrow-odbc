@@ -1048,7 +1048,7 @@ fn fetch_time_4_psql() {
 }
 
 #[test]
-fn fetch_time_7_msql() {
+fn fetch_time_7_mssql() {
     let table_name = function_name!().rsplit_once(':').unwrap().1;
 
     // Setup a table on the database with some values (so we can fetch them)
@@ -2529,7 +2529,7 @@ fn insert_decimal_256() {
 }
 
 #[test]
-fn insert_decimal_128_with_negative_scale() {
+fn insert_decimal_128_with_negative_scale_mssql() {
     // Given a table and a record batch reader returning a batch with a text column.
     let table_name = function_name!().rsplit_once(':').unwrap().1;
     let conn = env()
@@ -2558,13 +2558,74 @@ fn insert_decimal_128_with_negative_scale() {
 }
 
 #[test]
-fn insert_decimal_256_with_negative_scale() {
+fn insert_decimal_128_with_negative_scale_psql() {
+    // Given a table and a record batch reader returning a batch with a text column.
+    let table_name = function_name!().rsplit_once(':').unwrap().1;
+    let conn = env()
+        .connect_with_connection_string(POSTGRES, Default::default())
+        .unwrap();
+    setup_empty_table::<PostgreSql>(&conn, table_name, &["NUMERIC(5,-2)"]).unwrap();
+    let array: Decimal128Array = [Some(123), None, Some(456), Some(1), Some(10)]
+        .into_iter()
+        .collect();
+    let array = array.with_precision_and_scale(3, -2).unwrap();
+    let schema = Arc::new(Schema::new(vec![Field::new(
+        "a",
+        DataType::Decimal128(3, -2),
+        true,
+    )]));
+    let batch = RecordBatch::try_new(schema.clone(), vec![Arc::new(array)]).unwrap();
+    let mut reader = StubBatchReader::new(schema, vec![batch]);
+
+    // When
+    insert_into_table(&conn, &mut reader, table_name, 2).unwrap();
+
+    // Then
+    let actual = table_to_string(&conn, table_name, &["a"]);
+    let expected = "12300\nNULL\n45600\n100\n1000";
+    assert_eq!(expected, actual);
+}
+
+#[test]
+fn insert_decimal_256_with_negative_scale_mssql() {
     // Given a table and a record batch reader returning a batch with a text column.
     let table_name = function_name!().rsplit_once(':').unwrap().1;
     let conn = env()
         .connect_with_connection_string(MSSQL, Default::default())
         .unwrap();
     setup_empty_table_mssql(&conn, table_name, &["NUMERIC(5,0)"]).unwrap();
+    let mut builder = Decimal256Builder::new();
+    let mut bytes = [0u8; 32];
+    type I256 = <Decimal256Type as ArrowPrimitiveType>::Native;
+    bytes[0..4].copy_from_slice(123i32.to_le_bytes().as_slice());
+    builder.append_value(I256::from_le_bytes(bytes));
+    builder.append_null();
+    let array = builder.finish().with_precision_and_scale(3, -2).unwrap();
+    let schema = Arc::new(Schema::new(vec![Field::new(
+        "a",
+        DataType::Decimal256(3, -2),
+        true,
+    )]));
+    let batch = RecordBatch::try_new(schema.clone(), vec![Arc::new(array)]).unwrap();
+    let mut reader = StubBatchReader::new(schema, vec![batch]);
+
+    // When
+    insert_into_table(&conn, &mut reader, table_name, 5).unwrap();
+
+    // Then
+    let actual = table_to_string(&conn, table_name, &["a"]);
+    let expected = "12300\nNULL";
+    assert_eq!(expected, actual);
+}
+
+#[test]
+fn insert_decimal_256_with_negative_scale_psql() {
+    // Given a table and a record batch reader returning a batch with a text column.
+    let table_name = function_name!().rsplit_once(':').unwrap().1;
+    let conn = env()
+        .connect_with_connection_string(POSTGRES, Default::default())
+        .unwrap();
+    setup_empty_table::<PostgreSql>(&conn, table_name, &["NUMERIC(5,-2)"]).unwrap();
     let mut builder = Decimal256Builder::new();
     let mut bytes = [0u8; 32];
     type I256 = <Decimal256Type as ArrowPrimitiveType>::Native;
