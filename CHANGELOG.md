@@ -10,12 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### ⚠ BREAKING CHANGES
 
-* Arrow decimals now map to DECIMAL on the database during
-* Upgrade to odbc-api 23. Support for older versions dropped.
-
-### Features
-
-* Arrow decimals now map to DECIMAL on the database during ([2458641](https://github.com/pacman82/arrow-odbc/commit/245864164b74847414c22e5ac5075aea40a55e68))
+* Arrow decimals now maps to DECIMAL instead of VARCHAR during insertion. ([2458641](https://github.com/pacman82/arrow-odbc/commit/245864164b74847414c22e5ac5075aea40a55e68))
 * Upgrade to odbc-api 23. Support for older versions dropped. ([72cac8d](https://github.com/pacman82/arrow-odbc/commit/72cac8d64ebfe3f76b3f09ecf92db58f865d2e0d))
 
 ## [22.1.1](https://github.com/pacman82/arrow-odbc/compare/v22.1.0...v22.1.1) (2026-03-13)
