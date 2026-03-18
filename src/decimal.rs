@@ -42,7 +42,7 @@ fn len_text(scale: i8, precision: u8) -> usize {
 
 impl WriteStrategy for NullableDecimal128AsText {
     fn buffer_desc(&self) -> BindParamDesc {
-        BindParamDesc::text(len_text(self.scale, self.precision))
+        BindParamDesc::decimal_as_text(self.precision, self.scale)
     }
 
     fn write_rows(
@@ -70,7 +70,7 @@ impl WriteStrategy for NullableDecimal128AsText {
 
 impl WriteStrategy for NullableDecimal256AsText {
     fn buffer_desc(&self) -> BindParamDesc {
-        BindParamDesc::text(len_text(self.scale, self.precision))
+        BindParamDesc::decimal_as_text(self.precision, self.scale)
     }
 
     fn write_rows(
