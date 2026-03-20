@@ -161,15 +161,14 @@ impl Utf16ToUtf8Converter {
 
     fn utf16_to_utf8(&mut self, utf16: &[u16]) -> &str {
         let max_utf8_len = utf16.len() * 3;
-        // Pad buffer with up to the required size
-        if max_utf8_len > self.buf_utf8.len() {
-            let additional = max_utf8_len - self.buf_utf8.len();
-            self.buf_utf8.reserve(additional);
-            for _ in 0..additional {
-                self.buf_utf8.push('\0');
-            }
+        // Clearing is necessary. Otherwise we may slice the stream in between two bytes of
+        // a multi-byte character which would violate the invariant of String and cause a
+        // panic.
+        self.buf_utf8.clear();
+        for _ in 0..max_utf8_len {
+            self.buf_utf8.push('\0');
         }
-        let written = convert_utf16_to_str(utf16, &mut self.buf_utf8[..max_utf8_len]);
+        let written = convert_utf16_to_str(utf16, &mut self.buf_utf8);
         &self.buf_utf8[..written]
     }
 }
@@ -223,9 +222,40 @@ impl ReadStrategy for NarrowText {
 mod tests {
     use odbc_api::buffers::{AnySlice, ColumnBuffer, TextColumn};
 
-    use crate::reader::{MappingError, ReadStrategy as _};
+    use crate::reader::{MappingError, ReadStrategy as _, text::Utf16ToUtf8Converter};
 
     use super::NarrowText;
+
+    /// Then querying under windows (implying UTF-16 encoding) a column with value
+    /// "Colt Telecom España S.A." was followed by a column if max_length with 18 bytes in UTF-8
+    /// encoding. This let to a panic due to a violation of the String invariant, because that would
+    /// split the reused buffer in the middle of the UTF-8 character "ñ" (which is 2 bytes in
+    /// UTF-8).
+    ///
+    /// See: <https://github.com/pacman82/arrow-odbc/issues/177>
+    ///
+    /// And also a similar issue in odbc2parquet:
+    /// <https://github.com/pacman82/odbc2parquet/issues/862>
+    #[test]
+    fn do_not_split_buffer_accross_char_boundaries() {
+        // Given a string with a multibyte character at position 18 then encoded in UTF-8.
+        let utf_16_with_multibyte = "Colt Telecom España S.A."
+            .encode_utf16()
+            .collect::<Vec<u16>>();
+        // And a string value with 6 characters. A maximum length of a character in UTF-8 is 3
+        // bytes. 3 x 6 = 18, so this would cause the multibyte character in the previous string to
+        // be splitted if we reuse the same buffer for both strings.
+        let six = "123456".encode_utf16().collect::<Vec<u16>>();
+
+        // When convertig both values in succession to UTF-8
+        let mut converter = Utf16ToUtf8Converter::new();
+        let first = converter.utf16_to_utf8(&utf_16_with_multibyte).to_owned();
+        let second = converter.utf16_to_utf8(&six);
+
+        // Then both strings should be correct and no panic occurred (implied by reaching this line
+        assert_eq!(first, "Colt Telecom España S.A.");
+        assert_eq!(second, "123456");
+    }
 
     #[test]
     fn must_return_error_for_invalid_utf8() {
