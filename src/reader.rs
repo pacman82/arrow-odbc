@@ -12,7 +12,7 @@ use arrow::{
 use log::debug;
 use odbc_api::{
     Bit, DataType as OdbcDataType, ResultSetMetadata,
-    buffers::{AnySlice, BufferDesc, Item},
+    buffers::{AnyColumnBufferSlice, BufferDesc},
 };
 use thiserror::Error;
 use time::{TimeMsI32, TimeNsI64, TimeUsI64, seconds_since_midnight};
@@ -45,7 +45,8 @@ pub trait ReadStrategy {
     fn buffer_desc(&self) -> BufferDesc;
 
     /// Create an arrow array from an ODBC buffer described in [`Self::buffer_description`].
-    fn fill_arrow_array(&self, column_view: AnySlice) -> Result<ArrayRef, MappingError>;
+    fn fill_arrow_array(&self, column_view: AnyColumnBufferSlice)
+    -> Result<ArrayRef, MappingError>;
 }
 
 pub struct NonNullableBoolean;
@@ -55,8 +56,11 @@ impl ReadStrategy for NonNullableBoolean {
         BufferDesc::Bit { nullable: false }
     }
 
-    fn fill_arrow_array(&self, column_view: AnySlice) -> Result<ArrayRef, MappingError> {
-        let values = Bit::as_slice(column_view).unwrap();
+    fn fill_arrow_array(
+        &self,
+        column_view: AnyColumnBufferSlice,
+    ) -> Result<ArrayRef, MappingError> {
+        let values = column_view.as_slice::<Bit>().unwrap();
         let mut builder = BooleanBuilder::new();
         for bit in values {
             builder.append_value(bit.as_bool());
@@ -72,8 +76,11 @@ impl ReadStrategy for NullableBoolean {
         BufferDesc::Bit { nullable: true }
     }
 
-    fn fill_arrow_array(&self, column_view: AnySlice) -> Result<ArrayRef, MappingError> {
-        let values = Bit::as_nullable_slice(column_view).unwrap();
+    fn fill_arrow_array(
+        &self,
+        column_view: AnyColumnBufferSlice,
+    ) -> Result<ArrayRef, MappingError> {
+        let values = column_view.as_nullable_slice().unwrap();
         let mut builder = BooleanBuilder::new();
         for bit in values {
             builder.append_option(bit.copied().map(Bit::as_bool))

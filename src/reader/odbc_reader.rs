@@ -5,7 +5,7 @@ use arrow::{
     error::ArrowError,
     record_batch::{RecordBatch, RecordBatchReader},
 };
-use odbc_api::{BlockCursor, Cursor, buffers::ColumnarAnyBuffer};
+use odbc_api::{BlockCursor, Cursor, buffers::ColumnarDynBuffer};
 
 use crate::{BufferAllocationOptions, ConcurrentOdbcReader, Error};
 
@@ -68,7 +68,7 @@ pub struct OdbcReader<C: Cursor> {
     converter: ToRecordBatch,
     /// Fetches values from the ODBC datasource using columnar batches. Values are streamed batch
     /// by batch in order to avoid reallocation of the buffers used for tranistion.
-    batch_stream: BlockCursor<C, ColumnarAnyBuffer>,
+    batch_stream: BlockCursor<C, ColumnarDynBuffer>,
     /// We remember if the user decided to use fallibale allocations or not in case we need to
     /// allocate another buffer due to a state transition towards [`ConcurrentOdbcReader`].
     fallibale_allocations: bool,

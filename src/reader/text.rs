@@ -4,7 +4,7 @@ use arrow::array::{ArrayRef, StringBuilder};
 use encoding_rs::mem::convert_utf16_to_str;
 use odbc_api::{
     DataType as OdbcDataType,
-    buffers::{AnySlice, BufferDesc},
+    buffers::{AnyColumnBufferSlice, BufferDesc},
 };
 
 use super::{ColumnFailure, MappingError, ReadStrategy};
@@ -123,8 +123,11 @@ impl ReadStrategy for WideText {
         }
     }
 
-    fn fill_arrow_array(&self, column_view: AnySlice) -> Result<ArrayRef, MappingError> {
-        let view = column_view.as_w_text_view().unwrap();
+    fn fill_arrow_array(
+        &self,
+        column_view: AnyColumnBufferSlice,
+    ) -> Result<ArrayRef, MappingError> {
+        let view = column_view.as_wide_text().unwrap();
         let item_capacity = view.len();
         // Any utf-16 character could take up to 4 Bytes if represented as utf-8, but since mostly
         // this is 1 to one, and also not every string is likeyl to use its maximum capacity, we
@@ -193,8 +196,11 @@ impl ReadStrategy for NarrowText {
         }
     }
 
-    fn fill_arrow_array(&self, column_view: AnySlice) -> Result<ArrayRef, MappingError> {
-        let view = column_view.as_text_view().unwrap();
+    fn fill_arrow_array(
+        &self,
+        column_view: AnyColumnBufferSlice,
+    ) -> Result<ArrayRef, MappingError> {
+        let view = column_view.as_text().unwrap();
         let mut builder = StringBuilder::with_capacity(view.len(), self.max_str_len * view.len());
         for value in view.iter() {
             builder.append_option(
@@ -220,7 +226,7 @@ impl ReadStrategy for NarrowText {
 
 #[cfg(test)]
 mod tests {
-    use odbc_api::buffers::{AnySlice, Slice, TextColumn};
+    use odbc_api::buffers::{AnyColumnBuffer, Slice, TextColumn};
 
     use crate::reader::{MappingError, ReadStrategy as _, text::Utf16ToUtf8Converter};
 
@@ -262,7 +268,8 @@ mod tests {
         // Given a slice with invalid utf-8
         let mut column = TextColumn::new(1, 10);
         column.set_value(0, Some(&[b'H', b'e', b'l', b'l', b'o', 0xc3]));
-        let column_view = AnySlice::Text(column.slice(1));
+        let column: Box<dyn AnyColumnBuffer> = Box::new(column);
+        let column_view = column.slice(1);
 
         // When
         let strategy = NarrowText::new(5, false);

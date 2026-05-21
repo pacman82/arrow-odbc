@@ -3,7 +3,7 @@ use arrow::{
     error::ArrowError,
     record_batch::{RecordBatch, RecordBatchReader},
 };
-use odbc_api::{BlockCursor, ConcurrentBlockCursor, Cursor, buffers::ColumnarAnyBuffer};
+use odbc_api::{BlockCursor, ConcurrentBlockCursor, Cursor, buffers::ColumnarDynBuffer};
 
 use crate::Error;
 
@@ -73,12 +73,12 @@ pub struct ConcurrentOdbcReader<C: Cursor> {
     /// the Cursor. This is the buffer which is unbound and read by the application to fill the
     /// arrow arrays. After being read we will reuse the buffer and bind it to the cursor in order
     /// to safe allocations.
-    buffer: ColumnarAnyBuffer,
+    buffer: ColumnarDynBuffer,
     /// Converts the content of ODBC buffers into Arrow record batches
     converter: ToRecordBatch,
     /// Fetches values from the ODBC datasource using columnar batches. Values are streamed batch
     /// by batch in order to avoid reallocation of the buffers used for tranistion.
-    batch_stream: ConcurrentBlockCursor<C, ColumnarAnyBuffer>,
+    batch_stream: ConcurrentBlockCursor<C, ColumnarDynBuffer>,
 }
 
 impl<C: Cursor + Send + 'static> ConcurrentOdbcReader<C> {
@@ -86,7 +86,7 @@ impl<C: Cursor + Send + 'static> ConcurrentOdbcReader<C> {
     /// in type system, keep this constructor private to this crate. Users should use
     /// [`crate::OdbcReader::into_concurrent`] instead.
     pub(crate) fn from_block_cursor(
-        block_cursor: BlockCursor<C, ColumnarAnyBuffer>,
+        block_cursor: BlockCursor<C, ColumnarDynBuffer>,
         converter: ToRecordBatch,
         fallibale_allocations: bool,
     ) -> Result<Self, Error> {

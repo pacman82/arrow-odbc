@@ -5,7 +5,7 @@ use arrow::{
     record_batch::RecordBatch,
 };
 use log::info;
-use odbc_api::{ResultSetMetadata, buffers::ColumnarAnyBuffer};
+use odbc_api::{ResultSetMetadata, buffers::ColumnarDynBuffer};
 
 use crate::{BufferAllocationOptions, ColumnFailure, Error, arrow_schema_from};
 
@@ -86,14 +86,14 @@ impl ToRecordBatch {
         &self,
         max_batch_size: usize,
         fallibale_allocations: bool,
-    ) -> Result<ColumnarAnyBuffer, Error> {
+    ) -> Result<ColumnarDynBuffer, Error> {
         let descs = self.column_strategies.iter().map(|cs| cs.buffer_desc());
 
         let row_set_buffer = if fallibale_allocations {
-            ColumnarAnyBuffer::try_from_descs(max_batch_size, descs)
+            ColumnarDynBuffer::try_from_descs(max_batch_size, descs)
                 .map_err(|err| map_allocation_error(err, &self.schema))?
         } else {
-            ColumnarAnyBuffer::from_descs(max_batch_size, descs)
+            ColumnarDynBuffer::from_descs(max_batch_size, descs)
         };
         Ok(row_set_buffer)
     }
@@ -104,7 +104,7 @@ impl ToRecordBatch {
 
     pub fn buffer_to_record_batch(
         &self,
-        odbc_buffer: &ColumnarAnyBuffer,
+        odbc_buffer: &ColumnarDynBuffer,
     ) -> Result<RecordBatch, MappingError> {
         let arrow_columns = self
             .column_strategies

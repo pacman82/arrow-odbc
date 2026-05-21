@@ -8,7 +8,7 @@ use arrow::array::{
 };
 use atoi::FromRadix10;
 use odbc_api::{
-    buffers::{AnySlice, BufferDesc},
+    buffers::{AnyColumnBufferSlice, BufferDesc},
     sys::Time,
 };
 
@@ -30,8 +30,11 @@ impl ReadStrategy for TimeMsI32 {
         }
     }
 
-    fn fill_arrow_array(&self, column_view: AnySlice) -> Result<ArrayRef, MappingError> {
-        let view = column_view.as_text_view().unwrap();
+    fn fill_arrow_array(
+        &self,
+        column_view: AnyColumnBufferSlice,
+    ) -> Result<ArrayRef, MappingError> {
+        let view = column_view.as_text().unwrap();
         let mut builder = Time32MillisecondBuilder::new();
 
         for opt in view.iter() {
@@ -59,8 +62,11 @@ impl ReadStrategy for TimeUsI64 {
         }
     }
 
-    fn fill_arrow_array(&self, column_view: AnySlice) -> Result<ArrayRef, MappingError> {
-        let view = column_view.as_text_view().unwrap();
+    fn fill_arrow_array(
+        &self,
+        column_view: AnyColumnBufferSlice,
+    ) -> Result<ArrayRef, MappingError> {
+        let view = column_view.as_text().unwrap();
         let mut builder = Time64MicrosecondBuilder::new();
 
         for opt in view.iter() {
@@ -88,8 +94,11 @@ impl ReadStrategy for TimeNsI64 {
         }
     }
 
-    fn fill_arrow_array(&self, column_view: AnySlice) -> Result<ArrayRef, MappingError> {
-        let view = column_view.as_text_view().unwrap();
+    fn fill_arrow_array(
+        &self,
+        column_view: AnyColumnBufferSlice,
+    ) -> Result<ArrayRef, MappingError> {
+        let view = column_view.as_text().unwrap();
         let mut builder = Time64NanosecondBuilder::new();
 
         for opt in view.iter() {

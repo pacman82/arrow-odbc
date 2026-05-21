@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use arrow::array::{ArrayRef, Decimal128Builder};
 use odbc_api::{
-    buffers::{AnySlice, BufferDesc},
+    buffers::{AnyColumnBufferSlice, BufferDesc},
     decimal_text_to_i128,
 };
 
@@ -28,8 +28,11 @@ impl ReadStrategy for Decimal {
         }
     }
 
-    fn fill_arrow_array(&self, column_view: AnySlice) -> Result<ArrayRef, MappingError> {
-        let view = column_view.as_text_view().unwrap();
+    fn fill_arrow_array(
+        &self,
+        column_view: AnyColumnBufferSlice,
+    ) -> Result<ArrayRef, MappingError> {
+        let view = column_view.as_text().unwrap();
         let mut builder = Decimal128Builder::new();
         let scale = self.scale as usize;
 

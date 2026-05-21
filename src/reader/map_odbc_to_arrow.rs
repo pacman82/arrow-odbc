@@ -5,7 +5,10 @@ use arrow::{
     datatypes::ArrowPrimitiveType,
 };
 use chrono::NaiveDateTime;
-use odbc_api::buffers::{AnySlice, BufferDesc, Item};
+use odbc_api::{
+    Pod,
+    buffers::{AnyColumnBufferSlice, BufferDesc, Item},
+};
 use thiserror::Error;
 
 use super::ReadStrategy;
@@ -22,7 +25,7 @@ pub trait MapOdbcToArrow {
         odbc_to_arrow: impl Fn(&U) -> Result<Self::ArrowElement, MappingError> + 'static + Send,
     ) -> Box<dyn ReadStrategy + Send>
     where
-        U: Item + 'static + Send;
+        U: Item + Pod + 'static + Send;
 
     /// Use the infallible function provided to convert an element of an ODBC column buffer into the
     /// desired element of an arrow array.
@@ -31,13 +34,13 @@ pub trait MapOdbcToArrow {
         odbc_to_arrow: impl Fn(&U) -> Self::ArrowElement + 'static + Send,
     ) -> Box<dyn ReadStrategy + Send>
     where
-        U: Item + 'static + Send;
+        U: Item + Pod + 'static + Send;
 
     /// Should the arrow array element be identical to an item in the ODBC buffer no mapping is
     /// needed. We still need to account for nullability.
     fn identical(nullable: bool) -> Box<dyn ReadStrategy + Send>
     where
-        Self::ArrowElement: Item;
+        Self::ArrowElement: Item + Pod;
 }
 
 impl<T> MapOdbcToArrow for T
@@ -52,7 +55,7 @@ where
         odbc_to_arrow: impl Fn(&U) -> Result<Self::ArrowElement, MappingError> + 'static + Send,
     ) -> Box<dyn ReadStrategy + Send>
     where
-        U: Item + 'static + Send,
+        U: Item + Pod + 'static + Send,
     {
         if map_errors_to_null {
             return Box::new(ErrorToNullStrategy::<Self, U, _>::new(odbc_to_arrow));
@@ -70,7 +73,7 @@ where
         odbc_to_arrow: impl Fn(&U) -> Self::ArrowElement + 'static + Send,
     ) -> Box<dyn ReadStrategy + Send>
     where
-        U: Item + 'static + Send,
+        U: Item + Pod + 'static + Send,
     {
         if nullable {
             Box::new(NullableStrategy::<Self, U, _>::new(OkWrappedMapped(
@@ -85,7 +88,7 @@ where
 
     fn identical(nullable: bool) -> Box<dyn ReadStrategy + Send>
     where
-        Self::ArrowElement: Item,
+        T::Native: Item + Pod,
     {
         if nullable {
             Box::new(NullableDirectStrategy::<Self>::new())
@@ -143,14 +146,17 @@ impl<T> NonNullDirectStrategy<T> {
 impl<T> ReadStrategy for NonNullDirectStrategy<T>
 where
     T: ArrowPrimitiveType + Send,
-    T::Native: Item,
+    T::Native: Item + Pod,
 {
     fn buffer_desc(&self) -> BufferDesc {
         T::Native::buffer_desc(false)
     }
 
-    fn fill_arrow_array(&self, column_view: AnySlice) -> Result<ArrayRef, MappingError> {
-        let slice = T::Native::as_slice(column_view).unwrap();
+    fn fill_arrow_array(
+        &self,
+        column_view: AnyColumnBufferSlice,
+    ) -> Result<ArrayRef, MappingError> {
+        let slice = column_view.as_slice::<T::Native>().unwrap();
         let mut builder = PrimitiveBuilder::<T>::with_capacity(slice.len());
         builder.append_slice(slice);
         Ok(Arc::new(builder.finish()))
@@ -172,14 +178,17 @@ impl<T> NullableDirectStrategy<T> {
 impl<T> ReadStrategy for NullableDirectStrategy<T>
 where
     T: ArrowPrimitiveType + Send,
-    T::Native: Item,
+    T::Native: Item + Pod,
 {
     fn buffer_desc(&self) -> BufferDesc {
         T::Native::buffer_desc(true)
     }
 
-    fn fill_arrow_array(&self, column_view: AnySlice) -> Result<ArrayRef, MappingError> {
-        let values = T::Native::as_nullable_slice(column_view).unwrap();
+    fn fill_arrow_array(
+        &self,
+        column_view: AnyColumnBufferSlice,
+    ) -> Result<ArrayRef, MappingError> {
+        let values = column_view.as_nullable_slice().unwrap();
         let mut builder = PrimitiveBuilder::<T>::with_capacity(values.len());
         for value in values {
             builder.append_option(value.copied());
@@ -207,14 +216,17 @@ impl<P, O, F> NonNullableStrategy<P, O, F> {
 impl<P, O, F> ReadStrategy for NonNullableStrategy<P, O, F>
 where
     P: ArrowPrimitiveType + Send,
-    O: Item + Send,
+    O: Item + Pod + Send,
     F: MapElement<O, P::Native>,
 {
     fn buffer_desc(&self) -> BufferDesc {
         O::buffer_desc(false)
     }
 
-    fn fill_arrow_array(&self, column_view: AnySlice) -> Result<ArrayRef, MappingError> {
+    fn fill_arrow_array(
+        &self,
+        column_view: AnyColumnBufferSlice,
+    ) -> Result<ArrayRef, MappingError> {
         let slice = column_view.as_slice::<O>().unwrap();
         let mut builder = PrimitiveBuilder::<P>::with_capacity(slice.len());
         for odbc_value in slice {
@@ -243,14 +255,17 @@ impl<P, O, F> NullableStrategy<P, O, F> {
 impl<P, O, F> ReadStrategy for NullableStrategy<P, O, F>
 where
     P: ArrowPrimitiveType + Send,
-    O: Item + Send,
+    O: Item + Pod + Send,
     F: MapElement<O, P::Native>,
 {
     fn buffer_desc(&self) -> BufferDesc {
         O::buffer_desc(true)
     }
 
-    fn fill_arrow_array(&self, column_view: AnySlice) -> Result<ArrayRef, MappingError> {
+    fn fill_arrow_array(
+        &self,
+        column_view: AnyColumnBufferSlice,
+    ) -> Result<ArrayRef, MappingError> {
         let opts = column_view.as_nullable_slice::<O>().unwrap();
         let mut builder = PrimitiveBuilder::<P>::with_capacity(opts.len());
         for odbc_opt in opts {
@@ -284,14 +299,17 @@ impl<P, O, F> ErrorToNullStrategy<P, O, F> {
 impl<P, O, F> ReadStrategy for ErrorToNullStrategy<P, O, F>
 where
     P: ArrowPrimitiveType + Send,
-    O: Item + Send,
+    O: Item + Pod + Send,
     F: Fn(&O) -> Result<P::Native, MappingError> + Send,
 {
     fn buffer_desc(&self) -> BufferDesc {
         O::buffer_desc(true)
     }
 
-    fn fill_arrow_array(&self, column_view: AnySlice) -> Result<ArrayRef, MappingError> {
+    fn fill_arrow_array(
+        &self,
+        column_view: AnyColumnBufferSlice,
+    ) -> Result<ArrayRef, MappingError> {
         let opts = column_view.as_nullable_slice::<O>().unwrap();
         let mut builder = PrimitiveBuilder::<P>::with_capacity(opts.len());
         for odbc_opt in opts {
