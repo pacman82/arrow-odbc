@@ -127,6 +127,7 @@ impl WriteStrategy for LargeUtf8ToWide {
     }
 }
 
+#[cfg_attr(target_os = "linux", allow(dead_code))]
 fn insert_into_wide_slice<'a>(
     from: impl Iterator<Item = Option<&'a str>>,
     mut to: TextColumnSliceMut<u16>,
