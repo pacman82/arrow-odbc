@@ -85,6 +85,7 @@ fn insert_into_narrow_slice<'a>(
     Ok(())
 }
 
+#[cfg_attr(target_os = "linux", allow(dead_code))]
 pub struct Utf8ToWide;
 
 impl WriteStrategy for Utf8ToWide {
@@ -105,6 +106,7 @@ impl WriteStrategy for Utf8ToWide {
     }
 }
 
+#[cfg_attr(target_os = "linux", allow(dead_code))]
 pub struct LargeUtf8ToWide;
 
 impl WriteStrategy for LargeUtf8ToWide {
