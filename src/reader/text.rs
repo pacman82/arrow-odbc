@@ -220,7 +220,7 @@ impl ReadStrategy for NarrowText {
 
 #[cfg(test)]
 mod tests {
-    use odbc_api::buffers::{AnySlice, ColumnBuffer, TextColumn};
+    use odbc_api::buffers::{AnySlice, Slice, TextColumn};
 
     use crate::reader::{MappingError, ReadStrategy as _, text::Utf16ToUtf8Converter};
 
@@ -262,7 +262,7 @@ mod tests {
         // Given a slice with invalid utf-8
         let mut column = TextColumn::new(1, 10);
         column.set_value(0, Some(&[b'H', b'e', b'l', b'l', b'o', 0xc3]));
-        let column_view = AnySlice::Text(column.view(1));
+        let column_view = AnySlice::Text(column.slice(1));
 
         // When
         let strategy = NarrowText::new(5, false);
