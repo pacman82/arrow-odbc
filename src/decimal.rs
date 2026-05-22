@@ -2,7 +2,7 @@ use arrow::{
     array::{Array, Decimal128Array, Decimal256Array},
     datatypes::{ArrowPrimitiveType, Decimal256Type},
 };
-use odbc_api::{BindParamDesc, buffers::AnySliceMut};
+use odbc_api::{BindParamDesc, buffers::BoxColumBufferRefMut};
 
 use crate::{WriterError, odbc_writer::WriteStrategy};
 
@@ -48,13 +48,13 @@ impl WriteStrategy for NullableDecimal128AsText {
     fn write_rows(
         &self,
         param_offset: usize,
-        column_buf: AnySliceMut<'_>,
+        column_buf: BoxColumBufferRefMut<'_>,
         array: &dyn Array,
     ) -> Result<(), WriterError> {
         let length = len_text(self.scale, self.precision);
 
         let from = array.as_any().downcast_ref::<Decimal128Array>().unwrap();
-        let mut to = column_buf.as_text_view().unwrap();
+        let mut to = column_buf.as_text().unwrap();
 
         for (index, cell) in from.iter().enumerate() {
             if let Some(value) = cell {
@@ -76,11 +76,11 @@ impl WriteStrategy for NullableDecimal256AsText {
     fn write_rows(
         &self,
         param_offset: usize,
-        column_buf: AnySliceMut<'_>,
+        column_buf: BoxColumBufferRefMut<'_>,
         array: &dyn Array,
     ) -> Result<(), WriterError> {
         let from = array.as_any().downcast_ref::<Decimal256Array>().unwrap();
-        let mut to = column_buf.as_text_view().unwrap();
+        let mut to = column_buf.as_text().unwrap();
         let length = len_text(self.scale, self.precision);
 
         for (index, cell) in from.iter().enumerate() {

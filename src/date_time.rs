@@ -15,7 +15,7 @@ use arrow::{
 use chrono::{Datelike, NaiveDate};
 use odbc_api::{
     BindParamDesc,
-    buffers::{AnySliceMut, TextColumnSliceMut},
+    buffers::{BoxColumBufferRefMut, TextColumnSliceMut},
     sys::{Date, Time, Timestamp},
 };
 
@@ -183,11 +183,11 @@ where
     fn write_rows(
         &self,
         param_offset: usize,
-        column_buf: AnySliceMut<'_>,
+        column_buf: BoxColumBufferRefMut<'_>,
         array: &dyn Array,
     ) -> Result<(), WriterError> {
         let from = array.as_any().downcast_ref::<PrimitiveArray<P>>().unwrap();
-        let mut to = column_buf.as_text_view().unwrap();
+        let mut to = column_buf.as_text().unwrap();
         for (index, elapsed_since_midnight) in from.iter().enumerate() {
             if let Some(from) = elapsed_since_midnight {
                 P::insert_at(index + param_offset, from, &mut to)

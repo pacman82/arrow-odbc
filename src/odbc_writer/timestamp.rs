@@ -11,7 +11,7 @@ use arrow::{
 };
 use chrono::{DateTime, Datelike, TimeZone, Timelike};
 use log::debug;
-use odbc_api::{BindParamDesc, buffers::AnySliceMut, sys::Timestamp};
+use odbc_api::{BindParamDesc, buffers::BoxColumBufferRefMut, sys::Timestamp};
 
 use super::{WriteStrategy, WriterError, map_arrow_to_odbc::MapArrowToOdbc};
 
@@ -119,11 +119,11 @@ where
     fn write_rows(
         &self,
         param_offset: usize,
-        column_buf: AnySliceMut<'_>,
+        column_buf: BoxColumBufferRefMut<'_>,
         array: &dyn Array,
     ) -> Result<(), WriterError> {
         let from = array.as_any().downcast_ref::<PrimitiveArray<P>>().unwrap();
-        let mut to = column_buf.as_text_view().unwrap();
+        let mut to = column_buf.as_text().unwrap();
         for (index, timestamp) in from.iter().enumerate() {
             if let Some(timestamp) = timestamp {
                 let dt = P::to_regional_datetime(timestamp, &self.time_zone);

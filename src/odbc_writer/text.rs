@@ -1,7 +1,7 @@
 use arrow::array::{Array, LargeStringArray, StringArray};
 use odbc_api::{
     BindParamDesc,
-    buffers::{AnySliceMut, TextColumnSliceMut},
+    buffers::{BoxColumBufferRefMut, TextColumnSliceMut},
 };
 
 use super::{WriteStrategy, WriterError};
@@ -31,11 +31,11 @@ impl WriteStrategy for Utf8ToNarrow {
     fn write_rows(
         &self,
         param_offset: usize,
-        to: AnySliceMut<'_>,
+        to: BoxColumBufferRefMut<'_>,
         from: &dyn Array,
     ) -> Result<(), WriterError> {
         let from = from.as_any().downcast_ref::<StringArray>().unwrap();
-        let to = to.as_text_view().unwrap();
+        let to = to.as_text().unwrap();
         insert_into_narrow_slice(from.iter(), to, param_offset)?;
         Ok(())
     }
@@ -52,11 +52,11 @@ impl WriteStrategy for LargeUtf8ToNarrow {
     fn write_rows(
         &self,
         param_offset: usize,
-        to: AnySliceMut<'_>,
+        to: BoxColumBufferRefMut<'_>,
         from: &dyn Array,
     ) -> Result<(), WriterError> {
         let from = from.as_any().downcast_ref::<LargeStringArray>().unwrap();
-        let to = to.as_text_view().unwrap();
+        let to = to.as_text().unwrap();
         insert_into_narrow_slice(from.iter(), to, param_offset)?;
         Ok(())
     }
@@ -96,11 +96,11 @@ impl WriteStrategy for Utf8ToWide {
     fn write_rows(
         &self,
         param_offset: usize,
-        to: AnySliceMut<'_>,
+        to: BoxColumBufferRefMut<'_>,
         from: &dyn Array,
     ) -> Result<(), WriterError> {
         let from = from.as_any().downcast_ref::<StringArray>().unwrap();
-        let to = to.as_w_text_view().unwrap();
+        let to = to.as_wide_text().unwrap();
         insert_into_wide_slice(from.iter(), to, param_offset)?;
         Ok(())
     }
@@ -117,11 +117,11 @@ impl WriteStrategy for LargeUtf8ToWide {
     fn write_rows(
         &self,
         param_offset: usize,
-        to: AnySliceMut<'_>,
+        to: BoxColumBufferRefMut<'_>,
         from: &dyn Array,
     ) -> Result<(), WriterError> {
         let from = from.as_any().downcast_ref::<LargeStringArray>().unwrap();
-        let to = to.as_w_text_view().unwrap();
+        let to = to.as_wide_text().unwrap();
         insert_into_wide_slice(from.iter(), to, param_offset)?;
         Ok(())
     }
