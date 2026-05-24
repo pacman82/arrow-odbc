@@ -1,0 +1,59 @@
+name: Release-plz
+
+on:
+    push:
+        branches:
+            - main
+
+jobs:
+    # Release unpublished packages.
+    release-plz-release:
+        name: Release-plz release
+        runs-on: ubuntu-latest
+        permissions:
+            # Allow setting tags
+            contents: write
+            pull-requests: read
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+              with:
+                  # Fetch the complete history in order to detect previous releases.
+                  fetch-depth: 0
+            - name: Install Rust toolchain
+              uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
+            - name: Run release-plz
+              uses: MarcoIeni/release-plz-action@064f4d1e36c843611ddf013be726beaa4ad804db # v0.5
+              with:
+                  command: release
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                  CARGO_REGISTRY_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
+
+    # Create a PR with the new versions and changelog, preparing the next release.
+    release-plz-pr:
+        name: Release-plz PR
+        runs-on: ubuntu-latest
+        permissions:
+            # Write changelog, change version in Cargo.toml
+            contents: write
+            # Create PR
+            pull-requests: write
+        concurrency:
+            group: release-plz-${{ github.ref }}
+            cancel-in-progress: false
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+              with:
+                  # Fetch the complete history for changelog generation.
+                  fetch-depth: 0
+            - name: Install Rust toolchain
+              uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
+            - name: Run release-plz
+              uses: MarcoIeni/release-plz-action@064f4d1e36c843611ddf013be726beaa4ad804db # v0.5
+              with:
+                  command: release-pr
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                  CARGO_REGISTRY_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
