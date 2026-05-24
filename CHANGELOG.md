@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+## [25.1.0](https://github.com/pacman82/odbc-api/compare/25.0.0...25.1.0) - 2026-05-24
+
+### 🚀 Features
+
+- Support odbc-api 28
+
 
 ## [25.0.0](https://github.com/pacman82/arrow-odbc/compare/v24.0.0...v25.0.0) (2026-05-22)
 
