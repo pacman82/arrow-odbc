@@ -1,10 +1,14 @@
-name: Build and test
+name: Test
 
-on: [push, pull_request]
+on:
+    push:
+        branches: [main]
+    pull_request:
+        branches: [main]
 
 jobs:
     linux:
-        name: Build & Test Linux
+        name: Test
         runs-on: ubuntu-latest
 
         services:
@@ -27,9 +31,9 @@ jobs:
 
         steps:
             - name: Checkout
-              uses: actions/checkout@v6
+              uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
             - name: Install latests rust toolchain
-              uses: actions-rs/toolchain@v1
+              uses: actions-rs/toolchain@16499b5e05bf2e26879000db0c1d13f7e13fa3af # v1
               with:
                   toolchain: stable
                   profile: minimal
@@ -37,7 +41,7 @@ jobs:
             # selecting a toolchain either by action or manual `rustup` calls should happen
             # before the plugin, as the cache uses the current rustc version as its cache key
             - name: Rust build cache
-              uses: Swatinem/rust-cache@v2
+              uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
             - name: Build
               run: cargo build
             - name: Install ODBC Drivers
