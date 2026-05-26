@@ -1,4 +1,4 @@
-use arrow::array::{Array, LargeStringArray, StringArray};
+use arrow::array::{Array, GenericStringArray, LargeStringArray, OffsetSizeTrait, StringArray};
 use odbc_api::{
     BindParamDesc,
     buffers::{BoxColumBufferRefMut, TextColumnSliceMut},
@@ -36,7 +36,7 @@ impl WriteStrategy for Utf8ToNarrow {
     ) -> Result<(), WriterError> {
         let from = from.as_any().downcast_ref::<StringArray>().unwrap();
         let to = to.as_text().unwrap();
-        insert_into_narrow_slice(from.iter(), to, param_offset)?;
+        insert_into_narrow_slice(from, to, param_offset)?;
         Ok(())
     }
 }
@@ -57,26 +57,33 @@ impl WriteStrategy for LargeUtf8ToNarrow {
     ) -> Result<(), WriterError> {
         let from = from.as_any().downcast_ref::<LargeStringArray>().unwrap();
         let to = to.as_text().unwrap();
-        insert_into_narrow_slice(from.iter(), to, param_offset)?;
+        insert_into_narrow_slice(from, to, param_offset)?;
         Ok(())
     }
 }
 
 #[cfg_attr(target_os = "windows", allow(dead_code))]
-fn insert_into_narrow_slice<'a>(
-    from: impl Iterator<Item = Option<&'a str>>,
+fn insert_into_narrow_slice<'a, O>(
+    from: &GenericStringArray<O>,
     mut to: TextColumnSliceMut<u8>,
     param_offset: usize,
-) -> Result<(), WriterError> {
-    for (row_index, element) in from.enumerate() {
+) -> Result<(), WriterError>
+where
+    O: OffsetSizeTrait,
+{
+    let max_element_len = max_element_byte_len(from);
+    // Ensure the buffer is large enough to hold all elements of the current batch. In case of
+    // reallocation, we need to copy all the values from the previous batches. `param_offset`
+    // tells us how many rows are already written in the buffer from previous batches.
+    to.ensure_max_element_length(max_element_len, param_offset)
+        .map_err(WriterError::RebindBuffer)?;
+    for (row_index, element) in from.iter().enumerate() {
         // Total number of rows written into the inserter (`to`). This includes the values from the
         // current batch (`row_index`), as well as the ones from the previous batches
         // (`param_offset`). In case of reallocation, we need to copy all these values. Also, this
         // is the index of the element we currently want to write.
         let num_rows_written_so_far = param_offset + row_index;
         if let Some(text) = element {
-            to.ensure_max_element_length(text.len(), num_rows_written_so_far)
-                .map_err(WriterError::RebindBuffer)?;
             to.set_cell(num_rows_written_so_far, Some(text.as_bytes()))
         } else {
             to.set_cell(num_rows_written_so_far, None);
@@ -101,7 +108,7 @@ impl WriteStrategy for Utf8ToWide {
     ) -> Result<(), WriterError> {
         let from = from.as_any().downcast_ref::<StringArray>().unwrap();
         let to = to.as_wide_text().unwrap();
-        insert_into_wide_slice(from.iter(), to, param_offset)?;
+        insert_into_wide_slice(from, to, param_offset)?;
         Ok(())
     }
 }
@@ -122,21 +129,32 @@ impl WriteStrategy for LargeUtf8ToWide {
     ) -> Result<(), WriterError> {
         let from = from.as_any().downcast_ref::<LargeStringArray>().unwrap();
         let to = to.as_wide_text().unwrap();
-        insert_into_wide_slice(from.iter(), to, param_offset)?;
+        insert_into_wide_slice(from, to, param_offset)?;
         Ok(())
     }
 }
 
 #[cfg_attr(target_os = "linux", allow(dead_code))]
-fn insert_into_wide_slice<'a>(
-    from: impl Iterator<Item = Option<&'a str>>,
+fn insert_into_wide_slice<'a, O>(
+    from: &GenericStringArray<O>,
     mut to: TextColumnSliceMut<u16>,
     at: usize,
-) -> Result<(), WriterError> {
+) -> Result<(), WriterError>
+where
+    O: OffsetSizeTrait,
+{
     // We must first encode the utf8 input to utf16. We reuse this buffer for that in order to avoid
     // allocations.
     let mut utf_16 = Vec::new();
-    for (row_index, element) in from.enumerate() {
+    let max_utf_8_byte_len = max_element_byte_len(from);
+    // We use the fact that the size in bytes of a utf-8 encoded character is >= the code points of
+    // the same character in utf-16. We use this estimated upper bound to avoid reallocations, mid
+    // batch. `at` is the number of rows which have been written into the buffer by previous
+    // batches, but have not yet been transmitted. This value is needed to ensure they are copied
+    // into the newly allocated buffer.
+    to.ensure_max_element_length(max_utf_8_byte_len, at)
+        .map_err(WriterError::RebindBuffer)?;
+    for (row_index, element) in from.iter().enumerate() {
         // Total number of rows written into the inserter (`to`). This includes the values from the
         // current batch (`row_index`), as well as the ones from the previous batches (`at`). In
         // case of reallocation, we need to copy all these values. Also, this is the index of the
@@ -144,8 +162,6 @@ fn insert_into_wide_slice<'a>(
         let num_rows_written_so_far = at + row_index;
         if let Some(text) = element {
             utf_16.extend(text.encode_utf16());
-            to.ensure_max_element_length(utf_16.len(), num_rows_written_so_far)
-                .map_err(WriterError::RebindBuffer)?;
             to.set_cell(num_rows_written_so_far, Some(&utf_16));
             utf_16.clear();
         } else {
@@ -153,4 +169,26 @@ fn insert_into_wide_slice<'a>(
         }
     }
     Ok(())
+}
+
+#[allow(dead_code)]
+fn max_element_byte_len<O: OffsetSizeTrait>(array: &GenericStringArray<O>) -> usize {
+    array
+        .value_offsets()
+        .windows(2)
+        .map(|w| (w[1] - w[0]).as_usize())
+        .max()
+        .unwrap_or(0)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::max_element_byte_len;
+    use arrow::array::StringArray;
+
+    #[test]
+    fn max_element_byte_len_returns_longest_element_size() {
+        let array = StringArray::from(vec!["a".repeat(10), "a".repeat(15), "a".repeat(12)]);
+        assert_eq!(15, max_element_byte_len(&array));
+    }
 }
