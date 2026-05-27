@@ -8,16 +8,14 @@ use odbc_api::{
 
 use super::{MappingError, ReadStrategy};
 
-pub struct Decimal {
+pub fn decimal(precision: u8, scale: i8) -> Box<dyn ReadStrategy + Send> {
+    Box::new(Decimal{ precision, scale })
+}
+
+struct Decimal {
     precision: u8,
     /// We know scale to be non-negative, yet we can save us some conversions storing it as i8.
     scale: i8,
-}
-
-impl Decimal {
-    pub fn new(precision: u8, scale: i8) -> Self {
-        Self { precision, scale }
-    }
 }
 
 impl ReadStrategy for Decimal {

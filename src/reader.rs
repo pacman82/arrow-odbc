@@ -33,7 +33,7 @@ use crate::date_time::{
 pub use self::{
     binary::{Binary, FixedSizedBinary},
     concurrent_odbc_reader::ConcurrentOdbcReader,
-    decimal::Decimal,
+    decimal::decimal,
     map_odbc_to_arrow::{MapOdbcToArrow, MappingError},
     odbc_reader::{OdbcReader, OdbcReaderBuilder},
     text::{TextEncoding, choose_text_strategy},
@@ -171,7 +171,7 @@ pub fn choose_column_strategy(
             )?
         }
         ArrowDataType::Decimal128(precision, scale @ 0..) => {
-            Box::new(Decimal::new(*precision, *scale))
+            decimal(*precision, *scale)
         }
         ArrowDataType::Binary => {
             let sql_type = query_metadata
