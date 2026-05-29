@@ -41,6 +41,8 @@ encoding_rs = "0.8.35"
 # We need divan as a direct dependency to the crate, so we can have benchmarks inline in the
 # modules.
 divan = { version = "0.1.21", optional = true }
+# We use rand to generate pseudo-random numbers for our benchmarks
+rand = { version = "0.9", optional = true }
 
 
 [dev-dependencies]
@@ -76,7 +78,7 @@ narrow = ["odbc-api/narrow"]
 # system you can set the `wide` feature flag to overwrite this behavior.
 wide = ["odbc-api/wide"]
 
-internal_benches = ["dep:divan"]
+internal_benches = ["dep:divan", "dep:rand"]
 
 [[bench]]
 name = "benches"
