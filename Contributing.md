@@ -31,3 +31,11 @@ We now can execute the tests in Rust typical fashion using:
 ```shell
 cargo test
 ```
+
+## Benchmarks
+
+Run benchmarks using:
+
+```shell
+cargo bench --features internal_benches
+```
