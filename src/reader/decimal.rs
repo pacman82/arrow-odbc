@@ -9,7 +9,7 @@ use odbc_api::{
 use super::{MappingError, ReadStrategy};
 
 pub fn decimal(precision: u8, scale: i8) -> Box<dyn ReadStrategy + Send> {
-    Box::new(Decimal{ precision, scale })
+    Box::new(Decimal { precision, scale })
 }
 
 struct Decimal {
@@ -50,4 +50,10 @@ impl ReadStrategy for Decimal {
                 .unwrap(),
         ))
     }
+}
+
+#[cfg(feature = "internal_benches")]
+mod bench {
+    #[divan::bench()]
+    fn empty() {}
 }
