@@ -54,6 +54,32 @@ impl ReadStrategy for Decimal {
 
 #[cfg(feature = "internal_benches")]
 mod bench {
+    use super::decimal;
+    use odbc_api::buffers::{BoxColumnBuffer, Slice, TextColumn};
+    use rand::{Rng, SeedableRng, rngs::StdRng};
+
+    const SEED: u64 = 0xDEAD_BEEF_F00D_CAFE;
+    const ROWS: usize = 1000;
+
     #[divan::bench()]
-    fn empty() {}
+    fn integer(bencher: divan::Bencher) {
+        let strategy = decimal(38, 0);
+        let input = random_integers_in_text_column();
+        bencher.bench_local(|| {
+            let view = input.slice(ROWS);
+            strategy.fill_arrow_array(view).unwrap()
+        });
+    }
+
+    fn random_integers_in_text_column() -> BoxColumnBuffer {
+        let mut buffer = TextColumn::<u8>::new(ROWS, 38 + 2);
+        let mut rng = StdRng::seed_from_u64(SEED);
+        let min = -(10i128.pow(38));
+        let max = 10i128.pow(38);
+        for i in 0..ROWS {
+            let value: i128 = rng.random_range(min..=max);
+            buffer.set_value(i, Some(value.to_string().as_bytes()));
+        }
+        Box::new(buffer)
+    }
 }
