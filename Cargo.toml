@@ -42,7 +42,7 @@ encoding_rs = "0.8.35"
 # modules.
 divan = { version = "0.1.21", optional = true }
 # We use rand to generate pseudo-random numbers for our benchmarks
-rand = { version = "0.9", optional = true }
+rand = { version = "0.10", optional = true }
 
 
 [dev-dependencies]
