@@ -56,7 +56,7 @@ impl ReadStrategy for Decimal {
 mod bench {
     use super::decimal;
     use odbc_api::buffers::{BoxColumnBuffer, Slice, TextColumn};
-    use rand::{Rng, SeedableRng, rngs::StdRng};
+    use rand::{RngExt, SeedableRng, rngs::StdRng};
 
     const SEED: u64 = 0xDEAD_BEEF_F00D_CAFE;
     const ROWS: usize = 1000;
