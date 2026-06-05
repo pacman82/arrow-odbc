@@ -67,7 +67,7 @@ impl ReadStrategy for TimeUsI64 {
         column_view: AnyColumnBufferSlice,
     ) -> Result<ArrayRef, MappingError> {
         let view = column_view.as_text().unwrap();
-        let mut builder = Time64MicrosecondBuilder::new();
+        let mut builder = Time64MicrosecondBuilder::with_capacity(view.len());
 
         for opt in view.iter() {
             if let Some(text) = opt {

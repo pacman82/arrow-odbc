@@ -31,7 +31,7 @@ impl ReadStrategy for Decimal {
         column_view: AnyColumnBufferSlice,
     ) -> Result<ArrayRef, MappingError> {
         let view = column_view.as_text().unwrap();
-        let mut builder = Decimal128Builder::new();
+        let mut builder = Decimal128Builder::with_capacity(view.len());
         let scale = self.scale as usize;
 
         for opt in view.iter() {
