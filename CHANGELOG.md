@@ -1,6 +1,17 @@
 # Changelog
 
-All notable changes to this project will be documented in this file. `arrow-odbc` adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+All notable changes to this project will be documented in this file. `arrow-odbc` adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).## [25.2.0](https://github.com/pacman82/odbc-api/compare/25.1.1...25.2.0) - 2026-06-10
+
+### 🚀 Features
+
+- Support arrow 60
+
+
+### ⚡ Performance
+
+- Initialize arrow array builder with capacity for decimal and time columns
+
+
 ## [25.1.1](https://github.com/pacman82/odbc-api/compare/25.1.0...25.1.1) - 2026-05-26
 
 ### ⚡ Performance
