@@ -32,7 +32,7 @@ chrono = "0.4.44"
 log = "0.4.29"
 thiserror = "2.0.18"
 
-odbc-api = ">= 27, < 29"
+odbc-api = ">= 27, < 30"
 atoi = "3.0.0"
 # For faster validation that narrow bytes are indeed valid UTF-8.
 simdutf8 = { version = "0.1.5" }
