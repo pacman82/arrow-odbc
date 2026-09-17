@@ -92,7 +92,7 @@ where
     Ok(())
 }
 
-#[cfg_attr(target_os = "linux", allow(dead_code))]
+#[cfg_attr(not(target_os = "windows"), allow(dead_code))]
 pub struct Utf8ToWide;
 
 impl WriteStrategy for Utf8ToWide {
@@ -113,7 +113,7 @@ impl WriteStrategy for Utf8ToWide {
     }
 }
 
-#[cfg_attr(target_os = "linux", allow(dead_code))]
+#[cfg_attr(not(target_os = "windows"), allow(dead_code))]
 pub struct LargeUtf8ToWide;
 
 impl WriteStrategy for LargeUtf8ToWide {
@@ -134,7 +134,7 @@ impl WriteStrategy for LargeUtf8ToWide {
     }
 }
 
-#[cfg_attr(target_os = "linux", allow(dead_code))]
+#[cfg_attr(not(target_os = "windows"), allow(dead_code))]
 fn insert_into_wide_slice<'a, O>(
     from: &GenericStringArray<O>,
     mut to: TextColumnSliceMut<u16>,
