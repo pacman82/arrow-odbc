@@ -22,7 +22,9 @@ use odbc_api::{
 use crate::{
     date_time::{NullableTimeAsText, epoch_to_date, sec_since_midnight_to_time},
     decimal::{NullableDecimal128AsText, NullableDecimal256AsText},
-    odbc_writer::timestamp::insert_timestamp_strategy,
+    odbc_writer::{
+        insert_statement::quoting_from_connection, timestamp::insert_timestamp_strategy,
+    },
 };
 
 use self::{
@@ -32,7 +34,9 @@ use self::{
     text::{LargeUtf8ToNativeText, Utf8ToNativeText},
 };
 
-pub use self::insert_statement::{insert_statement_from_schema, Quote, QuoteDefensively};
+pub use self::insert_statement::{
+    Quote, QuoteDefensively, QuoteOffensively, insert_statement_from_schema,
+};
 
 mod binary;
 mod boolean;
@@ -56,8 +60,13 @@ pub fn insert_into_table(
     batch_size: usize,
 ) -> Result<(), WriterError> {
     let schema = batches.schema();
-    let mut inserter =
-        OdbcWriter::with_connection(connection, schema.as_ref(), table_name, batch_size)?;
+    let quoting =
+        quoting_from_connection(connection).map_err(WriterError::QueryQuotingCharacter)?;
+    let sql = insert_statement_from_schema(&schema, table_name, quoting.as_ref());
+    let statement = connection
+        .prepare(&sql)
+        .map_err(|source| WriterError::PreparingInsertStatement { source, sql })?;
+    let mut inserter = OdbcWriter::new(batch_size, &schema, statement)?;
     inserter.write_all(batches)
 }
 
@@ -70,6 +79,8 @@ pub enum WriterError {
     ExecuteStatment(#[source] odbc_api::Error),
     #[error("An error occured rebinding a parameter buffer to the sql statement.\n{0}")]
     RebindBuffer(#[source] odbc_api::Error),
+    #[error("An error occured querying the character used to quote identifiers.\n{0}")]
+    QueryQuotingCharacter(#[source] odbc_api::Error),
     #[error("The arrow data type {0} is not supported for insertion.")]
     UnsupportedArrowDataType(DataType),
     #[error("An error occured extracting a record batch from an error reader.\n{0}")]
@@ -223,7 +234,7 @@ where
     where
         C2: ConnectionTransitions<StatementParent = C>,
     {
-        let sql = insert_statement_from_schema(schema, table_name, QuoteDefensively);
+        let sql = insert_statement_from_schema(schema, table_name, &QuoteDefensively);
         let statement = connection
             .into_prepared(&sql)
             .map_err(|source| WriterError::PreparingInsertStatement { source, sql })?;
@@ -246,7 +257,7 @@ impl<'o> OdbcWriter<StatementImpl<'o>> {
         table_name: &str,
         row_capacity: usize,
     ) -> Result<Self, WriterError> {
-        let sql = insert_statement_from_schema(schema, table_name, QuoteDefensively);
+        let sql = insert_statement_from_schema(schema, table_name, &QuoteDefensively);
         let statement = connection
             .prepare(&sql)
             .map_err(|source| WriterError::PreparingInsertStatement { source, sql })?;

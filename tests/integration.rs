@@ -28,10 +28,7 @@ use float_eq::assert_float_eq;
 type F16 = <Float16Type as ArrowPrimitiveType>::Native;
 
 use arrow_odbc::{
-    ColumnFailure, Error, OdbcReaderBuilder, OdbcWriter, TextEncoding, WriterError,
-    arrow::array::Float64Array,
-    arrow_schema_from, insert_into_table,
-    odbc_api::{
+    ColumnFailure, Error, OdbcReaderBuilder, OdbcWriter, TextEncoding, WriterError, arrow::array::Float64Array, arrow_schema_from, insert_into_table, odbc_api::{
         Connection, ConnectionOptions, Cursor, CursorImpl, Environment, IntoParameter,
         buffers::TextRowSet,
         handles::StatementConnection,
@@ -1582,6 +1579,40 @@ fn insert_text() {
     // Then
     let actual = table_to_string(&conn, table_name, &["a"]);
     let expected = "Hello\nNULL\nWorld";
+    assert_eq!(expected, actual);
+}
+
+/// Column names may collide with keywords of the SQL dialect at hand. E.g. `by` is a keyword in
+/// Transact-SQL. In order to insert into such a column, its name must be quoted within the insert
+/// statement.
+///
+/// See issue: <https://github.com/pacman82/arrow-odbc-py/issues/239>
+#[test]
+fn insert_into_column_named_like_keyword() {
+    // Given a table with a column named `by` and a record batch reader with a field of that name.
+    let table_name = function_name!().rsplit_once(':').unwrap().1;
+    let conn = env()
+        .connect_with_connection_string(MSSQL, Default::default())
+        .unwrap();
+    conn.execute(&format!("DROP TABLE IF EXISTS {table_name}"), (), None)
+        .unwrap();
+    conn.execute(
+        &format!("CREATE TABLE {table_name} (\"by\" VARCHAR(50));"),
+        (),
+        None,
+    )
+    .unwrap();
+    let array = StringArray::from(vec![Some("Hello")]);
+    let schema = Arc::new(Schema::new(vec![Field::new("by", DataType::Utf8, true)]));
+    let batch = RecordBatch::try_new(schema.clone(), vec![Arc::new(array)]).unwrap();
+    let mut reader = StubBatchReader::new(schema, vec![batch]);
+
+    // When
+    insert_into_table(&conn, &mut reader, table_name, 5).unwrap();
+
+    // Then
+    let actual = table_to_string(&conn, table_name, &["[by]"]);
+    let expected = "Hello";
     assert_eq!(expected, actual);
 }
 
