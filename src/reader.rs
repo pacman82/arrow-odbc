@@ -170,9 +170,7 @@ pub fn choose_column_strategy(
                 text_encoding,
             )?
         }
-        ArrowDataType::Decimal128(precision, scale @ 0..) => {
-            decimal(*precision, *scale)
-        }
+        ArrowDataType::Decimal128(precision, scale @ 0..) => decimal(*precision, *scale),
         ArrowDataType::Binary => {
             let sql_type = query_metadata
                 .col_data_type(col_index)

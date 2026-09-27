@@ -1,4 +1,4 @@
-use std::{borrow::Cow, cmp::min, sync::Arc};
+use std::{cmp::min, sync::Arc};
 
 use thiserror::Error;
 
@@ -22,7 +22,9 @@ use odbc_api::{
 use crate::{
     date_time::{NullableTimeAsText, epoch_to_date, sec_since_midnight_to_time},
     decimal::{NullableDecimal128AsText, NullableDecimal256AsText},
-    odbc_writer::timestamp::insert_timestamp_strategy,
+    odbc_writer::{
+        insert_statement::quoting_from_connection, timestamp::insert_timestamp_strategy,
+    },
 };
 
 use self::{
@@ -32,8 +34,13 @@ use self::{
     text::{LargeUtf8ToNativeText, Utf8ToNativeText},
 };
 
+pub use self::insert_statement::{
+    Quote, QuoteDefensively, QuoteOffensively, insert_statement_from_schema,
+};
+
 mod binary;
 mod boolean;
+mod insert_statement;
 mod map_arrow_to_odbc;
 mod text;
 mod timestamp;
@@ -53,97 +60,14 @@ pub fn insert_into_table(
     batch_size: usize,
 ) -> Result<(), WriterError> {
     let schema = batches.schema();
-    let mut inserter =
-        OdbcWriter::with_connection(connection, schema.as_ref(), table_name, batch_size)?;
+    let quoting =
+        quoting_from_connection(connection).map_err(WriterError::QueryQuotingCharacter)?;
+    let sql = insert_statement_from_schema(&schema, table_name, quoting.as_ref());
+    let statement = connection
+        .prepare(&sql)
+        .map_err(|source| WriterError::PreparingInsertStatement { source, sql })?;
+    let mut inserter = OdbcWriter::new(batch_size, &schema, statement)?;
     inserter.write_all(batches)
-}
-
-/// Generates an insert statement using the table and column names.
-///
-/// `INSERT INTO <table> (<column_names 0>, <column_names 1>, ...) VALUES (?, ?, ...)`
-fn insert_statement_text(table: &str, column_names: &[&'_ str]) -> String {
-    // Generate statement text from table name and headline
-    let column_names = column_names
-        .iter()
-        .map(|cn| quote_column_name(cn))
-        .collect::<Vec<_>>();
-    let columns = column_names.join(", ");
-    let values = column_names
-        .iter()
-        .map(|_| "?")
-        .collect::<Vec<_>>()
-        .join(", ");
-    // Do not finish the statement with a semicolon. There is anecodtical evidence of IBM db2 not
-    // allowing the command, because it expects now multiple statements.
-    // See: <https://github.com/pacman82/arrow-odbc/issues/63>
-    format!("INSERT INTO {table} ({columns}) VALUES ({values})")
-}
-
-/// Wraps column name in quotes, if need be.
-fn quote_column_name(column_name: &str) -> Cow<'_, str> {
-    // We do not want to apply quoting in case the string is already quoted. See:
-    // <https://github.com/pacman82/arrow-odbc-py/issues/162>
-    //
-    // Another approach would have been to apply quoting after detecting keywords. Yet the list of
-    // reserved keywords is large. There is also the issue with different databases having different
-    // quoting rules. So the strategy choosen here is to apply quoting in less situations and not
-    // more, so the user has more control over the final statement. This crate is about arrow and
-    // odbc, less so about SQL dialects and statement construction.
-    let is_already_quoted = || {
-        (column_name.starts_with('"') && column_name.ends_with('"'))
-            || column_name.starts_with('[') && column_name.ends_with(']')
-            || column_name.starts_with('`') && column_name.ends_with('`')
-    };
-    let contains_invalid_characters = || column_name.contains(|c| !valid_in_column_name(c));
-    let needs_quotes = contains_invalid_characters() && !is_already_quoted();
-    if needs_quotes {
-        Cow::Owned(format!("\"{column_name}\""))
-    } else {
-        Cow::Borrowed(column_name)
-    }
-}
-
-/// Check if this character is allowed in an unquoted column name
-fn valid_in_column_name(c: char) -> bool {
-    // See:
-    // <https://stackoverflow.com/questions/4200351/what-characters-are-valid-in-an-sql-server-database-name>
-    c.is_alphanumeric() || c == '@' || c == '$' || c == '#' || c == '_'
-}
-
-/// Creates an SQL insert statement from an arrow schema. The resulting statement will have one
-/// placeholer (`?`) for each column in the statement.
-///
-/// **Note:**
-///
-/// If the column name contains any character which would make it not a valid qualifier for transact
-/// SQL it will be wrapped in double quotes (`"`) within the insert schema. Valid names consist of
-/// alpha numeric characters, `@`, `$`, `#` and `_`.
-///
-/// # Example
-///
-/// ```
-/// use arrow_odbc::{
-///     insert_statement_from_schema,
-///     arrow::datatypes::{Field, DataType, Schema},
-/// };
-///
-/// let field_a = Field::new("a", DataType::Int64, false);
-/// let field_b = Field::new("b", DataType::Boolean, false);
-///
-/// let schema = Schema::new(vec![field_a, field_b]);
-/// let sql = insert_statement_from_schema(&schema, "MyTable");
-///
-/// assert_eq!("INSERT INTO MyTable (a, b) VALUES (?, ?)", sql)
-/// ```
-///
-/// This function is automatically invoked by [`crate::OdbcWriter::with_connection`].
-pub fn insert_statement_from_schema(schema: &Schema, table_name: &str) -> String {
-    let fields = schema.fields();
-    let num_columns = fields.len();
-    let column_names: Vec<_> = (0..num_columns)
-        .map(|i| fields[i].name().as_str())
-        .collect();
-    insert_statement_text(table_name, &column_names)
 }
 
 /// Emitted writing values from arror arrays into a table on the database
@@ -155,6 +79,8 @@ pub enum WriterError {
     ExecuteStatment(#[source] odbc_api::Error),
     #[error("An error occured rebinding a parameter buffer to the sql statement.\n{0}")]
     RebindBuffer(#[source] odbc_api::Error),
+    #[error("An error occured querying the character used to quote identifiers.\n{0}")]
+    QueryQuotingCharacter(#[source] odbc_api::Error),
     #[error("The arrow data type {0} is not supported for insertion.")]
     UnsupportedArrowDataType(DataType),
     #[error("An error occured extracting a record batch from an error reader.\n{0}")]
@@ -308,7 +234,7 @@ where
     where
         C2: ConnectionTransitions<StatementParent = C>,
     {
-        let sql = insert_statement_from_schema(schema, table_name);
+        let sql = insert_statement_from_schema(schema, table_name, &QuoteDefensively);
         let statement = connection
             .into_prepared(&sql)
             .map_err(|source| WriterError::PreparingInsertStatement { source, sql })?;
@@ -331,7 +257,7 @@ impl<'o> OdbcWriter<StatementImpl<'o>> {
         table_name: &str,
         row_capacity: usize,
     ) -> Result<Self, WriterError> {
-        let sql = insert_statement_from_schema(schema, table_name);
+        let sql = insert_statement_from_schema(schema, table_name, &QuoteDefensively);
         let statement = connection
             .prepare(&sql)
             .map_err(|source| WriterError::PreparingInsertStatement { source, sql })?;
