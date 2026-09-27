@@ -32,7 +32,7 @@ use self::{
     text::{LargeUtf8ToNativeText, Utf8ToNativeText},
 };
 
-pub use self::insert_statement::insert_statement_from_schema;
+pub use self::insert_statement::{insert_statement_from_schema, Quote, QuoteDefensively};
 
 mod binary;
 mod boolean;
@@ -223,7 +223,7 @@ where
     where
         C2: ConnectionTransitions<StatementParent = C>,
     {
-        let sql = insert_statement_from_schema(schema, table_name);
+        let sql = insert_statement_from_schema(schema, table_name, QuoteDefensively);
         let statement = connection
             .into_prepared(&sql)
             .map_err(|source| WriterError::PreparingInsertStatement { source, sql })?;
@@ -246,7 +246,7 @@ impl<'o> OdbcWriter<StatementImpl<'o>> {
         table_name: &str,
         row_capacity: usize,
     ) -> Result<Self, WriterError> {
-        let sql = insert_statement_from_schema(schema, table_name);
+        let sql = insert_statement_from_schema(schema, table_name, QuoteDefensively);
         let statement = connection
             .prepare(&sql)
             .map_err(|source| WriterError::PreparingInsertStatement { source, sql })?;
