@@ -17,7 +17,7 @@ use arrow::datatypes::Schema;
 ///
 /// ```
 /// use arrow_odbc::{
-///     insert_statement_from_schema,
+///     insert_statement_from_schema, QuoteDefensively,
 ///     arrow::datatypes::{Field, DataType, Schema},
 /// };
 ///
@@ -25,29 +25,45 @@ use arrow::datatypes::Schema;
 /// let field_b = Field::new("b", DataType::Boolean, false);
 ///
 /// let schema = Schema::new(vec![field_a, field_b]);
-/// let sql = insert_statement_from_schema(&schema, "MyTable");
+/// let sql = insert_statement_from_schema(&schema, "MyTable", QuoteDefensively);
 ///
 /// assert_eq!("INSERT INTO MyTable (a, b) VALUES (?, ?)", sql)
 /// ```
 ///
 /// This function is automatically invoked by [`crate::OdbcWriter::with_connection`].
-pub fn insert_statement_from_schema(schema: &Schema, table_name: &str) -> String {
+pub fn insert_statement_from_schema(schema: &Schema, table_name: &str, quoting: impl Quote) -> String {
     let fields = schema.fields();
     let num_columns = fields.len();
     let column_names: Vec<_> = (0..num_columns)
         .map(|i| fields[i].name().as_str())
         .collect();
-    insert_statement_text(table_name, &column_names)
+    insert_statement_text(table_name, &column_names, quoting)
+}
+
+/// Controls if and how column names are quoted during insert statement generation.
+pub trait Quote {
+    fn quote_column_name<'a>(&self, column_name: &'a str) -> Cow<'a, str>;
+}
+
+/// Quotes only if column name contains special characters (`@`, `$`, `#` and `_`). Will not quote
+/// column name for which quoting is already detected. I.e. the column name starts with is wrapped
+/// in quotes (`\``), double quotes (`"`) or square brackets (`[`, `]`).
+pub struct QuoteDefensively;
+
+impl Quote for QuoteDefensively{
+    fn quote_column_name<'a>(&self, column_name: &'a str) -> Cow<'a, str> {
+        quote_column_name(column_name)
+    }
 }
 
 /// Generates an insert statement using the table and column names.
 ///
 /// `INSERT INTO <table> (<column_names 0>, <column_names 1>, ...) VALUES (?, ?, ...)`
-fn insert_statement_text(table: &str, column_names: &[&'_ str]) -> String {
+fn insert_statement_text(table: &str, column_names: &[&'_ str], quoting: impl Quote) -> String {
     // Generate statement text from table name and headline
     let column_names = column_names
         .iter()
-        .map(|cn| quote_column_name(cn))
+        .map(|cn| quoting.quote_column_name(cn))
         .collect::<Vec<_>>();
     let columns = column_names.join(", ");
     let values = column_names
