@@ -1,6 +1,16 @@
 # Changelog
 
 All notable changes to this project will be documented in this file. `arrow-odbc` adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+## [26.0.0](https://github.com/pacman82/odbc-api/compare/25.3.0...26.0.0) - 2026-10-04
+
+### 🚀 Features
+
+- [**breaking**] Generated insert statments quote all column names
+
+  This enables use-cases there column names match SQL keywords. Quoting is omitted if, the column name is detected to already be quoted. It is also omitted if the database does not report a quoting character. This change is breaking for two reasons: `insert_statement_from_schema` now takes an additional parameter `quoting`. `QuoteDefensively` represents the old quoting strategy used by previous versions. It is still the fallback for databases which do not support a fallback character. The second breaking change is the `IdentifierQuoteChar` constraint on `OdbcWriter::from_connection`.
+
+- Insert_statement_from_schema allows for controlling qouting behavior via Quote trait
+
 
 ## [25.3.0](https://github.com/pacman82/odbc-api/compare/25.2.0...25.3.0) - 2026-07-20
 
