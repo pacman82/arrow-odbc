@@ -2474,6 +2474,51 @@ fn insert_binary() {
 }
 
 #[test]
+fn insert_binary_growing_during_later_batch() {
+    let table_name = function_name!().rsplit_once(':').unwrap().1;
+    let conn = env()
+        .connect_with_connection_string(MSSQL, Default::default())
+        .unwrap();
+    setup_empty_table_mssql(&conn, table_name, &["VARBINARY(10)"]).unwrap();
+    let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Binary, true)]));
+    let first_array = BinaryArray::from(vec![b"a".as_slice()]);
+    let first_batch = RecordBatch::try_new(schema.clone(), vec![Arc::new(first_array)]).unwrap();
+    let second_array = BinaryArray::from(vec![b"b".as_slice(), b"cc".as_slice()]);
+    let second_batch = RecordBatch::try_new(schema.clone(), vec![Arc::new(second_array)]).unwrap();
+    let mut reader = StubBatchReader::new(schema, vec![first_batch, second_batch]);
+
+    // Binary buffers start with one byte per value. Both batches fit in the
+    // five-row buffer, so growing for "cc" must preserve "a" and "b".
+    insert_into_table(&conn, &mut reader, table_name, 5).unwrap();
+
+    let query = format!("SELECT a FROM {table_name} ORDER BY id");
+    let cursor = conn.execute(&query, (), None).unwrap().unwrap();
+    assert_eq!("61\n62\n6363", cursor_to_string(cursor));
+}
+
+#[test]
+fn insert_binary_growing_at_start_of_later_batch_after_null() {
+    let table_name = function_name!().rsplit_once(':').unwrap().1;
+    let conn = env()
+        .connect_with_connection_string(MSSQL, Default::default())
+        .unwrap();
+    setup_empty_table_mssql(&conn, table_name, &["VARBINARY(10)"]).unwrap();
+    let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Binary, true)]));
+    let first_array = BinaryArray::from(vec![Some(b"a".as_slice()), None]);
+    let first_batch = RecordBatch::try_new(schema.clone(), vec![Arc::new(first_array)]).unwrap();
+    let second_array = BinaryArray::from(vec![b"cc".as_slice()]);
+    let second_batch = RecordBatch::try_new(schema.clone(), vec![Arc::new(second_array)]).unwrap();
+    let mut reader = StubBatchReader::new(schema, vec![first_batch, second_batch]);
+
+    // Growth at row zero must preserve the previous batch, including its null.
+    insert_into_table(&conn, &mut reader, table_name, 5).unwrap();
+
+    let query = format!("SELECT a FROM {table_name} ORDER BY id");
+    let cursor = conn.execute(&query, (), None).unwrap().unwrap();
+    assert_eq!("61\nNULL\n6363", cursor_to_string(cursor));
+}
+
+#[test]
 fn insert_fixed_binary() {
     // Given a table and a record batch reader returning a batch with a text column.
     let table_name = function_name!().rsplit_once(':').unwrap().1;
