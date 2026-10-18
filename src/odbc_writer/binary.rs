@@ -28,7 +28,7 @@ impl WriteStrategy for VariadicBinary {
         let mut to = to.as_binary().unwrap();
         for (row_index, element) in from.iter().enumerate() {
             if let Some(bytes) = element {
-                to.ensure_max_element_length(bytes.len(), row_index)
+                to.ensure_max_element_length(bytes.len(), param_offset + row_index)
                     .map_err(WriterError::RebindBuffer)?;
                 to.set_cell(param_offset + row_index, Some(bytes))
             } else {
