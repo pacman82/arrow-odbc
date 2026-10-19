@@ -4,7 +4,8 @@ All notable changes to this project will be documented in this file. `arrow-odbc
 
 ### 🐛 Bug Fixes
 
-- Preserve buffered binary values when resizing during append
+- Inserting values into binary columns had been suspect to corruption if the transport buffer needed to be dynamically resized.
+  Thanks to @jplauri for reporting and fixing the issue. 
 
 
 ## [26.0.0](https://github.com/pacman82/odbc-api/compare/25.3.0...26.0.0) - 2026-10-04
