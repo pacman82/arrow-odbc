@@ -164,11 +164,10 @@ impl Utf16ToUtf8Converter {
 
     fn utf16_to_utf8(&mut self, utf16: &[u16]) -> &str {
         let max_utf8_len = utf16.len() * 3;
-        // Clearing is necessary. Otherwise we may slice the stream in between two bytes of
-        // a multi-byte character which would violate the invariant of String and cause a
-        // panic.
-        self.buf_utf8.clear();
-        for _ in 0..max_utf8_len {
+        // Reuse the initialized string, growing only as needed. Pass the whole string to
+        // conversion: slicing at max_utf8_len could split a previous multibyte character.
+        // convert_utf16_to_str preserves UTF-8 validity, including after the written prefix.
+        while self.buf_utf8.len() < max_utf8_len {
             self.buf_utf8.push('\0');
         }
         let written = convert_utf16_to_str(utf16, &mut self.buf_utf8);
@@ -226,11 +225,12 @@ impl ReadStrategy for NarrowText {
 
 #[cfg(test)]
 mod tests {
+    use arrow::array::StringArray;
     use odbc_api::buffers::{AnyColumnBuffer, Slice, TextColumn};
 
     use crate::reader::{MappingError, ReadStrategy as _, text::Utf16ToUtf8Converter};
 
-    use super::NarrowText;
+    use super::{NarrowText, WideText};
 
     /// Then querying under windows (implying UTF-16 encoding) a column with value
     /// "Colt Telecom España S.A." was followed by a column if max_length with 18 bytes in UTF-8
@@ -264,6 +264,67 @@ mod tests {
     }
 
     #[test]
+    fn successive_utf16_conversions_match_lossy_reference() {
+        let mut inputs: Vec<Vec<u16>> = [
+            "é漢🙂".repeat(64),
+            "short ASCII".to_owned(),
+            "é漢".to_owned(),
+            String::new(),
+            "再び🚀".repeat(128),
+            "before\0after\0".to_owned(),
+            "🙂𝄞🚀".to_owned(),
+        ]
+        .iter()
+        .map(|text| text.encode_utf16().collect())
+        .collect();
+        inputs.extend([
+            vec![0xD800],
+            vec![0xDC00],
+            vec![0xD800, 0x0041, 0xDC00],
+            vec![0xDC00, 0xD800, 0xD800, 0xDC00, 0xDFFF],
+        ]);
+
+        let mut converter = Utf16ToUtf8Converter::new();
+        for input in inputs {
+            assert_eq!(
+                converter.utf16_to_utf8(&input),
+                String::from_utf16_lossy(&input)
+            );
+        }
+    }
+
+    #[test]
+    fn wide_text_preserves_values_nulls_and_trimming() {
+        let values = [
+            Some("  é漢🙂 \t"),
+            None,
+            Some(""),
+            Some(" \0middle\0 "),
+            Some(" \t "),
+        ];
+        let mut column = TextColumn::<u16>::new(values.len(), 16);
+        for (index, value) in values.iter().enumerate() {
+            let utf16 = value.map(|text| text.encode_utf16().collect::<Vec<_>>());
+            column.set_value(index, utf16.as_deref());
+        }
+        let column: Box<dyn AnyColumnBuffer> = Box::new(column);
+        for trim in [false, true] {
+            let actual = WideText::new(16, trim)
+                .fill_arrow_array(column.slice(values.len()))
+                .unwrap();
+            let expected = StringArray::from_iter(
+                values
+                    .iter()
+                    .map(|value| value.map(|text| if trim { text.trim() } else { text })),
+            );
+            assert_eq!(
+                actual.as_any().downcast_ref::<StringArray>().unwrap(),
+                &expected
+            );
+        }
+    }
+
+    #[test]
     fn must_return_error_for_invalid_utf8() {
         // Given a slice with invalid utf-8
         let mut column = TextColumn::new(1, 10);
@@ -281,5 +342,71 @@ mod tests {
             panic!("Not an InvalidUtf8 error")
         };
         assert_eq!(lossy_value, "Hello�");
+    }
+}
+
+#[cfg(feature = "internal_benches")]
+mod bench {
+    use arrow::array::StringArray;
+    use odbc_api::buffers::{BoxColumnBuffer, Slice, TextColumn};
+
+    use super::{ReadStrategy, WideText};
+
+    const ROWS: usize = 1024;
+
+    #[divan::bench(args = ["short_ascii", "mixed_unicode", "long_ascii"])]
+    fn fill_arrow_array(bencher: divan::Bencher, case: &str) {
+        let values: Vec<Option<String>> = (0..ROWS)
+            .map(|i| match i % 32 {
+                0 => None,
+                1 => Some(String::new()),
+                _ => Some(match case {
+                    // ASCII byte, character and UTF-16 code-unit counts coincide.
+                    "short_ascii" => format!("{i:04} {}", "a".repeat(11 + i * 37 % 113)),
+                    "mixed_unicode" => {
+                        format!(
+                            "  Café 漢字 🙂 {i:04} {} \t",
+                            "naïve 東京 🚀 ".repeat(1 + i * 17 % 8)
+                        )
+                    }
+                    "long_ascii" => format!("{i:04} {}", "x".repeat(1019 + i * 37 % 3073)),
+                    _ => unreachable!(),
+                }),
+            })
+            .collect();
+        let utf16: Vec<Option<Vec<u16>>> = values
+            .iter()
+            .map(|value| value.as_ref().map(|text| text.encode_utf16().collect()))
+            .collect();
+        // ODBC wide-text capacity is in UTF-16 code units, excluding the terminator.
+        let max_str_len = utf16.iter().flatten().map(Vec::len).max().unwrap();
+        let mut column = TextColumn::<u16>::new(ROWS, max_str_len);
+        for (index, value) in utf16.iter().enumerate() {
+            column.set_value(index, value.as_deref());
+        }
+        let column: BoxColumnBuffer = Box::new(column);
+
+        // Check every fixture's values and nulls, including trimming, outside timing.
+        for trim in [false, true] {
+            let actual = WideText::new(max_str_len, trim)
+                .fill_arrow_array(column.slice(ROWS))
+                .unwrap();
+            let expected = StringArray::from_iter(values.iter().map(|value| {
+                value
+                    .as_deref()
+                    .map(|text| if trim { text.trim() } else { text })
+            }));
+            assert_eq!(
+                actual.as_any().downcast_ref::<StringArray>().unwrap(),
+                &expected
+            );
+        }
+
+        let strategy = WideText::new(max_str_len, false);
+        bencher.bench_local(|| {
+            // Each call creates a fresh converter and Arrow array; also time destruction.
+            let array = strategy.fill_arrow_array(column.slice(ROWS)).unwrap();
+            drop(divan::black_box(array));
+        });
     }
 }
