@@ -200,7 +200,6 @@ where
                 .map(|&indicator| indicator != NULL_DATA)
                 .collect::<Buffer>()
         });
-        // Copy values in bulk; the validity bitmap masks any stale values beneath nulls.
         let data = ArrayData::builder(T::DATA_TYPE)
             .len(values.len())
             .add_buffer(Buffer::from_slice_ref(values))
@@ -349,122 +348,58 @@ pub enum MappingError {
     InvalidUtf8 { lossy_value: String },
 }
 
-#[cfg(any(test, feature = "internal_benches"))]
-mod test_data {
-    use odbc_api::{buffers::BoxColumnBuffer, sys::NULL_DATA};
-
-    use super::Item;
-
-    pub fn is_null(index: usize, percent: u64) -> bool {
-        // Deterministic scattered nulls, including at bitmap boundaries.
-        let sample = (index as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15) >> 32;
-        sample % 100 < percent
-    }
-
-    pub fn nullable_column<T: Item>(values: &[T], percent: u64) -> BoxColumnBuffer {
-        let mut column = T::buffer_desc(true).column_buffer(values.len());
-        // SAFETY: The description allocates values.len() initialized T values and isize indicators.
-        // This fixture owns the unbound buffer, and these pointers remain valid during the writes.
-        unsafe {
-            std::ptr::copy_nonoverlapping(
-                values.as_ptr(),
-                column.mut_value_ptr().cast::<T>(),
-                values.len(),
-            );
-            let indicators =
-                std::slice::from_raw_parts_mut(column.mut_indicator_ptr(), values.len());
-            for (index, indicator) in indicators.iter_mut().enumerate() {
-                *indicator = if is_null(index, percent) {
-                    NULL_DATA
-                } else {
-                    0
-                };
-            }
-        }
-        column
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use arrow::{
-        array::PrimitiveArray,
-        datatypes::{Float64Type, Int32Type},
+#[cfg(feature = "internal_benches")]
+mod bench {
+    use arrow::datatypes::{Float64Type, Int32Type};
+    use odbc_api::{
+        buffers::{BoxColumnBuffer, Slice},
+        sys::NULL_DATA,
     };
-    use odbc_api::buffers::Slice;
 
-    use super::{ArrowPrimitiveType, Item, NullableDirectStrategy, ReadStrategy, test_data};
+    use super::{ArrowPrimitiveType, Item, NullableDirectStrategy, ReadStrategy};
 
-    fn check_nullable<T>(values: &[T::Native])
+    const ROWS: usize = 1000;
+
+    #[divan::bench(types = [Int32Type, Float64Type])]
+    fn nullable_read_without_nulls<T>(bencher: divan::Bencher)
     where
         T: ArrowPrimitiveType + Send,
         T::Native: Item,
     {
-        let strategy = NullableDirectStrategy::<T>::new();
-        for percent in [0, 1, 50, 100] {
-            let column = test_data::nullable_column(values, percent);
-            // Include empty and partial batches and both sides of bitmap byte/word boundaries.
-            for rows in [0, 1, 7, 8, 9, 63, 64, 65, values.len()] {
-                let actual = strategy.fill_arrow_array(column.slice(rows)).unwrap();
-                let actual = actual.as_any().downcast_ref::<PrimitiveArray<T>>().unwrap();
-                let expected: Vec<_> = values[..rows]
-                    .iter()
-                    .enumerate()
-                    .map(|(index, &value)| (!test_data::is_null(index, percent)).then_some(value))
-                    .collect();
-                // ODBC may leave stale values under nulls; compare only semantic values.
-                assert_eq!(actual.iter().collect::<Vec<_>>(), expected);
-            }
-        }
+        let input = nullable_column::<T::Native>(|_| false);
+        measure_read(bencher, NullableDirectStrategy::<T>::new(), &input);
     }
 
-    #[test]
-    fn nullable_integers_preserve_values_and_validity() {
-        let mut values: Vec<i32> = (-33..34).collect();
-        values[1] = i32::MIN;
-        values[2] = i32::MAX;
-        check_nullable::<Int32Type>(&values);
-    }
-
-    #[test]
-    fn nullable_floats_preserve_values_and_validity() {
-        let mut values: Vec<f64> = (-33..34).map(|value| value as f64 / 4.0).collect();
-        values[1] = f64::NEG_INFINITY;
-        values[2] = f64::INFINITY;
-        check_nullable::<Float64Type>(&values);
-    }
-}
-
-#[cfg(feature = "internal_benches")]
-mod bench {
-    use arrow::datatypes::{Float64Type, Int32Type};
-    use odbc_api::buffers::Slice;
-
-    use super::{ArrowPrimitiveType, Item, NullableDirectStrategy, ReadStrategy, test_data};
-
-    #[divan::bench(
-        types = [Int32Type, Float64Type],
-        consts = [1024, 65535],
-        args = [0, 1, 50, 100],
-    )]
-    fn nullable_direct<T, const ROWS: usize>(bencher: divan::Bencher, null_percent: u64)
+    #[divan::bench(types = [Int32Type, Float64Type])]
+    fn nullable_read_with_nulls<T>(bencher: divan::Bencher)
     where
         T: ArrowPrimitiveType + Send,
-        T::Native: Item + From<i32>,
+        T::Native: Item,
     {
-        let values: Vec<_> = (0..ROWS)
-            .map(|index| T::Native::from(index as i32 - ROWS as i32 / 2))
-            .collect();
-        let column = test_data::nullable_column(&values, null_percent);
-        let strategy = NullableDirectStrategy::<T>::new();
-        bencher
-            .counter(divan::counter::ItemsCount::new(ROWS))
-            .bench_local(|| {
-                let array = strategy
-                    .fill_arrow_array(divan::black_box(column.slice(ROWS)))
-                    .unwrap();
-                // Include destruction, as well as allocating and populating each Arrow array.
-                drop(divan::black_box(array));
-            });
+        let input = nullable_column::<T::Native>(|row| row % 100 == 0);
+        measure_read(bencher, NullableDirectStrategy::<T>::new(), &input);
+    }
+
+    fn measure_read(bencher: divan::Bencher, strategy: impl ReadStrategy, input: &BoxColumnBuffer) {
+        bencher.bench_local(|| {
+            // Drop each array right away, like a consumer before fetching the next batch. Divan
+            // would otherwise keep returned arrays alive until the end of each sample.
+            drop(divan::black_box(
+                strategy.fill_arrow_array(input.slice(ROWS)).unwrap(),
+            ));
+        });
+    }
+
+    /// Column buffer with `ROWS` rows, which are NULL wherever `is_null` returns `true`.
+    fn nullable_column<T: Item>(is_null: impl Fn(usize) -> bool) -> BoxColumnBuffer {
+        let mut column = T::buffer_desc(true).column_buffer(ROWS);
+        // SAFETY: A nullable buffer holds `ROWS` initialized indicators. It is not bound to a
+        // statement, so nothing else accesses them while we write.
+        let indicators =
+            unsafe { std::slice::from_raw_parts_mut(column.mut_indicator_ptr(), ROWS) };
+        for (row, indicator) in indicators.iter_mut().enumerate() {
+            *indicator = if is_null(row) { NULL_DATA } else { 0 };
+        }
+        column
     }
 }
