@@ -164,11 +164,7 @@ impl Utf16ToUtf8Converter {
 
     fn utf16_to_utf8(&mut self, utf16: &[u16]) -> &str {
         let max_utf8_len = utf16.len() * 3;
-        // Clearing is necessary. Otherwise we may slice the stream in between two bytes of
-        // a multi-byte character which would violate the invariant of String and cause a
-        // panic.
-        self.buf_utf8.clear();
-        for _ in 0..max_utf8_len {
+        while self.buf_utf8.len() < max_utf8_len {
             self.buf_utf8.push('\0');
         }
         let written = convert_utf16_to_str(utf16, &mut self.buf_utf8);
@@ -281,5 +277,55 @@ mod tests {
             panic!("Not an InvalidUtf8 error")
         };
         assert_eq!(lossy_value, "Hello�");
+    }
+}
+
+#[cfg(feature = "internal_benches")]
+mod bench {
+    use odbc_api::buffers::{BoxColumnBuffer, Slice, TextColumn};
+
+    use super::{ReadStrategy, WideText};
+
+    const ROWS: usize = 1024;
+
+    #[divan::bench]
+    fn short_ascii(bencher: divan::Bencher) {
+        let values = (0..ROWS).map(|i| format!("{i:04} {}", "a".repeat(11 + i * 37 % 113)));
+        wide_text_to_arrow(bencher, values);
+    }
+
+    #[divan::bench]
+    fn mixed_unicode(bencher: divan::Bencher) {
+        let values = (0..ROWS).map(|i| {
+            format!(
+                "  Café 漢字 🙂 {i:04} {} \t",
+                "naïve 東京 🚀 ".repeat(1 + i * 17 % 8)
+            )
+        });
+        wide_text_to_arrow(bencher, values);
+    }
+
+    #[divan::bench]
+    fn long_ascii(bencher: divan::Bencher) {
+        let values = (0..ROWS).map(|i| format!("{i:04} {}", "x".repeat(1019 + i * 37 % 3073)));
+        wide_text_to_arrow(bencher, values);
+    }
+
+    /// Measures converting a wide text column holding `values` into an Arrow array.
+    fn wide_text_to_arrow(bencher: divan::Bencher, values: impl Iterator<Item = String>) {
+        let utf16: Vec<Vec<u16>> = values.map(|text| text.encode_utf16().collect()).collect();
+        let max_str_len = utf16.iter().map(Vec::len).max().unwrap();
+        let mut column = TextColumn::<u16>::new(ROWS, max_str_len);
+        for (index, value) in utf16.iter().enumerate() {
+            column.set_value(index, Some(value));
+        }
+        let column: BoxColumnBuffer = Box::new(column);
+        let strategy = WideText::new(max_str_len, false);
+
+        bencher.bench_local(|| {
+            // Drop within the timed closure, so destruction of the array is measured, too.
+            let array = strategy.fill_arrow_array(column.slice(ROWS)).unwrap();
+            drop(divan::black_box(array));
+        });
     }
 }

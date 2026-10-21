@@ -90,7 +90,8 @@ fn fetch_nullable_32bit_integer() {
     assert!(array_vals.is_valid(0));
     assert!(array_vals.is_null(1));
     assert!(array_vals.is_valid(2));
-    assert_eq!([1, 0, 3], *array_vals.values());
+    assert_eq!(1, array_vals.value(0));
+    assert_eq!(3, array_vals.value(2));
 }
 
 /// Fill a record batch with non nullable Integer 32 Bit directly from the datasource
@@ -2805,7 +2806,8 @@ fn fetch_integer_concurrently() {
     assert!(array_vals.is_valid(0));
     assert!(array_vals.is_null(1));
     assert!(array_vals.is_valid(2));
-    assert_eq!([1, 0, 3], *array_vals.values());
+    assert_eq!(1, array_vals.value(0));
+    assert_eq!(3, array_vals.value(2));
 }
 
 #[test]

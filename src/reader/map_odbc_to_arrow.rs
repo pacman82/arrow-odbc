@@ -1,13 +1,15 @@
 use std::{marker::PhantomData, sync::Arc};
 
 use arrow::{
-    array::{ArrayRef, PrimitiveBuilder},
+    array::{ArrayData, ArrayRef, PrimitiveArray, PrimitiveBuilder},
+    buffer::Buffer,
     datatypes::ArrowPrimitiveType,
 };
 use chrono::NaiveDateTime;
 use odbc_api::{
     Pod,
     buffers::{AnyColumnBufferSlice, BufferDesc, Item},
+    sys::NULL_DATA,
 };
 use thiserror::Error;
 
@@ -188,12 +190,23 @@ where
         &self,
         column_view: AnyColumnBufferSlice,
     ) -> Result<ArrayRef, MappingError> {
-        let values = column_view.as_nullable_slice().unwrap();
-        let mut builder = PrimitiveBuilder::<T>::with_capacity(values.len());
-        for value in values {
-            builder.append_option(value.copied());
-        }
-        Ok(Arc::new(builder.finish()))
+        let (values, indicators) = column_view
+            .as_nullable_slice::<T::Native>()
+            .unwrap()
+            .raw_values();
+        let validity = indicators.contains(&NULL_DATA).then(|| {
+            indicators
+                .iter()
+                .map(|&indicator| indicator != NULL_DATA)
+                .collect::<Buffer>()
+        });
+        let data = ArrayData::builder(T::DATA_TYPE)
+            .len(values.len())
+            .add_buffer(Buffer::from_slice_ref(values))
+            .null_bit_buffer(validity)
+            .build()
+            .unwrap();
+        Ok(Arc::new(PrimitiveArray::<T>::from(data)))
     }
 }
 
@@ -333,4 +346,60 @@ pub enum MappingError {
     OutOfRangeTimestampNs { value: NaiveDateTime },
     #[error("Datasource returned invalid UTF-8. Lossy representation of value: {lossy_value}")]
     InvalidUtf8 { lossy_value: String },
+}
+
+#[cfg(feature = "internal_benches")]
+mod bench {
+    use arrow::datatypes::{Float64Type, Int32Type};
+    use odbc_api::{
+        buffers::{BoxColumnBuffer, Slice},
+        sys::NULL_DATA,
+    };
+
+    use super::{ArrowPrimitiveType, Item, NullableDirectStrategy, ReadStrategy};
+
+    const ROWS: usize = 1000;
+
+    #[divan::bench(types = [Int32Type, Float64Type])]
+    fn nullable_read_without_nulls<T>(bencher: divan::Bencher)
+    where
+        T: ArrowPrimitiveType + Send,
+        T::Native: Item,
+    {
+        let input = nullable_column::<T::Native>(|_| false);
+        measure_read(bencher, NullableDirectStrategy::<T>::new(), &input);
+    }
+
+    #[divan::bench(types = [Int32Type, Float64Type])]
+    fn nullable_read_with_nulls<T>(bencher: divan::Bencher)
+    where
+        T: ArrowPrimitiveType + Send,
+        T::Native: Item,
+    {
+        let input = nullable_column::<T::Native>(|row| row % 100 == 0);
+        measure_read(bencher, NullableDirectStrategy::<T>::new(), &input);
+    }
+
+    fn measure_read(bencher: divan::Bencher, strategy: impl ReadStrategy, input: &BoxColumnBuffer) {
+        bencher.bench_local(|| {
+            // Drop each array right away, like a consumer before fetching the next batch. Divan
+            // would otherwise keep returned arrays alive until the end of each sample.
+            drop(divan::black_box(
+                strategy.fill_arrow_array(input.slice(ROWS)).unwrap(),
+            ));
+        });
+    }
+
+    /// Column buffer with `ROWS` rows, which are NULL wherever `is_null` returns `true`.
+    fn nullable_column<T: Item>(is_null: impl Fn(usize) -> bool) -> BoxColumnBuffer {
+        let mut column = T::buffer_desc(true).column_buffer(ROWS);
+        // SAFETY: A nullable buffer holds `ROWS` initialized indicators. It is not bound to a
+        // statement, so nothing else accesses them while we write.
+        let indicators =
+            unsafe { std::slice::from_raw_parts_mut(column.mut_indicator_ptr(), ROWS) };
+        for (row, indicator) in indicators.iter_mut().enumerate() {
+            *indicator = if is_null(row) { NULL_DATA } else { 0 };
+        }
+        column
+    }
 }
