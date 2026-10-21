@@ -26,10 +26,13 @@ impl WriteStrategy for VariadicBinary {
     ) -> Result<(), WriterError> {
         let from = from.as_any().downcast_ref::<BinaryArray>().unwrap();
         let mut to = to.as_binary().unwrap();
+        if from.null_count() != from.len() {
+            let max_element_len = from.iter().flatten().map(<[u8]>::len).max().unwrap_or(0);
+            to.ensure_max_element_length(max_element_len, param_offset)
+                .map_err(WriterError::RebindBuffer)?;
+        }
         for (row_index, element) in from.iter().enumerate() {
             if let Some(bytes) = element {
-                to.ensure_max_element_length(bytes.len(), param_offset + row_index)
-                    .map_err(WriterError::RebindBuffer)?;
                 to.set_cell(param_offset + row_index, Some(bytes))
             } else {
                 to.set_cell(param_offset + row_index, None);
