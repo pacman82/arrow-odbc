@@ -63,7 +63,8 @@ impl ReadStrategy for FixedSizedBinary {
         column_view: AnyColumnBufferSlice,
     ) -> Result<ArrayRef, MappingError> {
         let view = column_view.as_binary().unwrap();
-        let mut builder = FixedSizeBinaryBuilder::new(self.len.try_into().unwrap());
+        let mut builder =
+            FixedSizeBinaryBuilder::with_capacity(view.len(), self.len.try_into().unwrap());
         for value in view.iter() {
             if let Some(bytes) = value {
                 builder.append_value(bytes).unwrap();
