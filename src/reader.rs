@@ -1,7 +1,8 @@
 use std::{convert::TryInto, sync::Arc};
 
 use arrow::{
-    array::{ArrayRef, BooleanBuilder},
+    array::{ArrayData, ArrayRef, BooleanArray},
+    buffer::MutableBuffer,
     datatypes::{
         DataType as ArrowDataType, Date32Type, Field, Float32Type, Float64Type, Int8Type,
         Int16Type, Int32Type, Int64Type, Time32SecondType, TimeUnit, TimestampMicrosecondType,
@@ -13,6 +14,7 @@ use log::debug;
 use odbc_api::{
     Bit, DataType as OdbcDataType, ResultSetMetadata,
     buffers::{AnyColumnBufferSlice, BufferDesc},
+    sys::NULL_DATA,
 };
 use thiserror::Error;
 use time::{TimeMsI32, TimeNsI64, TimeUsI64, seconds_since_midnight};
@@ -61,11 +63,13 @@ impl ReadStrategy for NonNullableBoolean {
         column_view: AnyColumnBufferSlice,
     ) -> Result<ArrayRef, MappingError> {
         let values = column_view.as_slice::<Bit>().unwrap();
-        let mut builder = BooleanBuilder::new();
-        for bit in values {
-            builder.append_value(bit.as_bool());
-        }
-        Ok(Arc::new(builder.finish()))
+        let buffer = MutableBuffer::collect_bool(values.len(), |index| values[index].as_bool());
+        let array_data = ArrayData::builder(ArrowDataType::Boolean)
+            .len(values.len())
+            .add_buffer(buffer.into())
+            .build()
+            .unwrap();
+        Ok(Arc::new(BooleanArray::from(array_data)))
     }
 }
 
@@ -80,12 +84,20 @@ impl ReadStrategy for NullableBoolean {
         &self,
         column_view: AnyColumnBufferSlice,
     ) -> Result<ArrayRef, MappingError> {
-        let values = column_view.as_nullable_slice().unwrap();
-        let mut builder = BooleanBuilder::new();
-        for bit in values {
-            builder.append_option(bit.copied().map(Bit::as_bool))
-        }
-        Ok(Arc::new(builder.finish()))
+        let values = column_view.as_nullable_slice::<Bit>().unwrap();
+        let (values, indicators) = values.raw_values();
+        let buffer = MutableBuffer::collect_bool(values.len(), |index| {
+            indicators[index] != NULL_DATA && values[index].as_bool()
+        });
+        let validity =
+            MutableBuffer::collect_bool(values.len(), |index| indicators[index] != NULL_DATA);
+        let array_data = ArrayData::builder(ArrowDataType::Boolean)
+            .len(values.len())
+            .add_buffer(buffer.into())
+            .null_bit_buffer(Some(validity.into()))
+            .build()
+            .unwrap();
+        Ok(Arc::new(BooleanArray::from(array_data)))
     }
 }
 
