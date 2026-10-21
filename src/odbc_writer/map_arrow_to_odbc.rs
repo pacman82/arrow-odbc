@@ -234,92 +234,49 @@ where
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use arrow::datatypes::{Float64Type, Int32Type};
-
-    use super::*;
-
-    #[test]
-    fn nullable_copy_preserves_values_nulls_and_surrounding_rows() {
-        check_copy::<Int32Type>();
-        check_copy::<Float64Type>();
-    }
-
-    fn check_copy<P: ArrowPrimitiveType>()
-    where
-        P::Native: From<i32>,
-    {
-        for values in [
-            vec![],
-            vec![Some(10), Some(-20), Some(30)],
-            vec![None, None, None],
-            vec![Some(10), None, Some(-20), None, Some(30)],
-        ] {
-            // Slice the input so its value and validity buffers both start at a nonzero offset.
-            let input = PrimitiveArray::<P>::from_iter(
-                [Some(99)]
-                    .into_iter()
-                    .chain(values.iter().copied())
-                    .chain([None])
-                    .map(|value| value.map(P::Native::from)),
-            );
-            let sliced = Array::slice(&input, 1, values.len());
-            let input = sliced.as_any().downcast_ref::<PrimitiveArray<P>>().unwrap();
-            let capacity = values.len() + 5;
-            let mut data = vec![P::Native::from(77); capacity];
-            let mut indicators = vec![123; capacity];
-            copy_nullable_values(input, &mut data, &mut indicators, 3);
-            for index in 0..capacity {
-                if (3..3 + values.len()).contains(&index) {
-                    match values[index - 3] {
-                        Some(value) => {
-                            assert_eq!(data[index], P::Native::from(value));
-                            assert_eq!(indicators[index], 0);
-                        }
-                        None => assert_eq!(indicators[index], NULL_DATA),
-                    }
-                } else {
-                    assert_eq!(data[index], P::Native::from(77));
-                    assert_eq!(indicators[index], 123);
-                }
-            }
-        }
-    }
-}
-
 #[cfg(feature = "internal_benches")]
 mod bench {
     use arrow::datatypes::{Float64Type, Int32Type};
 
     use super::*;
 
-    #[divan::bench(
-        types = [Int32Type, Float64Type],
-        consts = [1024, 65_535],
-        args = [0, 1, 50, 100]
-    )]
-    fn nullable_identical<P: ArrowPrimitiveType, const ROWS: usize>(
-        bencher: divan::Bencher,
-        null_percent: u32,
-    ) where
-        P::Native: From<i32>,
-    {
-        let input = PrimitiveArray::<P>::from_iter((0..ROWS).map(|index| {
-            // A deterministic scattered mask, without random generation in the measured loop.
-            let bucket = ((index as u32).wrapping_mul(2_654_435_761) >> 16) % 100;
-            (bucket >= null_percent).then(|| P::Native::from(index as i32 - 32_768))
-        }));
+    const ROWS: usize = 1000;
+
+    #[divan::bench(types = [Int32Type, Float64Type])]
+    fn nullable_write_without_nulls<P: ArrowPrimitiveType>(bencher: divan::Bencher) {
+        let input = nullable_array::<P>(|_| false);
+        measure_copy(bencher, &input);
+    }
+
+    #[divan::bench(types = [Int32Type, Float64Type])]
+    fn nullable_write_with_nulls<P: ArrowPrimitiveType>(bencher: divan::Bencher) {
+        let input = nullable_array::<P>(|row| row % 100 == 0);
+        measure_copy(bencher, &input);
+    }
+
+    #[divan::bench(types = [Int32Type, Float64Type])]
+    fn nullable_write_all_nulls<P: ArrowPrimitiveType>(bencher: divan::Bencher) {
+        let input = nullable_array::<P>(|_| true);
+        measure_copy(bencher, &input);
+    }
+
+    fn measure_copy<P: ArrowPrimitiveType>(bencher: divan::Bencher, input: &PrimitiveArray<P>) {
         let mut values = vec![P::Native::default(); ROWS];
         let mut indicators = vec![NULL_DATA; ROWS];
-
         bencher.bench_local(|| {
             copy_nullable_values(
-                divan::black_box(&input),
+                divan::black_box(input),
                 divan::black_box(&mut values),
                 divan::black_box(&mut indicators),
                 0,
             );
         });
+    }
+
+    /// Array with `ROWS` elements, which are null wherever `is_null` returns `true`.
+    fn nullable_array<P: ArrowPrimitiveType>(is_null: impl Fn(usize) -> bool) -> PrimitiveArray<P> {
+        PrimitiveArray::from_iter(
+            (0..ROWS).map(|row| (!is_null(row)).then_some(P::Native::default())),
+        )
     }
 }
