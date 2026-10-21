@@ -1,4 +1,5 @@
 use arrow::array::{Array, GenericStringArray, LargeStringArray, OffsetSizeTrait, StringArray};
+use encoding_rs::mem::convert_str_to_utf16;
 use odbc_api::{
     BindParamDesc,
     buffers::{BoxColumBufferRefMut, TextColumnSliceMut},
@@ -143,9 +144,6 @@ fn insert_into_wide_slice<'a, O>(
 where
     O: OffsetSizeTrait,
 {
-    // We must first encode the utf8 input to utf16. We reuse this buffer for that in order to avoid
-    // allocations.
-    let mut utf_16 = Vec::new();
     let max_utf_8_byte_len = max_element_byte_len(from);
     // We use the fact that the size in bytes of a utf-8 encoded character is >= the code points of
     // the same character in utf-16. We use this estimated upper bound to avoid reallocations, mid
@@ -161,9 +159,9 @@ where
         // element we currently want to write.
         let num_rows_written_so_far = at + row_index;
         if let Some(text) = element {
-            utf_16.extend(text.encode_utf16());
-            to.set_cell(num_rows_written_so_far, Some(&utf_16));
-            utf_16.clear();
+            let utf16_len =
+                convert_str_to_utf16(text, to.set_mut(num_rows_written_so_far, text.len()));
+            to.set_mut(num_rows_written_so_far, utf16_len);
         } else {
             to.set_cell(num_rows_written_so_far, None);
         }
