@@ -1,10 +1,13 @@
 use std::{cmp::min, num::NonZeroUsize, sync::Arc};
 
-use arrow::array::{ArrayRef, StringBuilder};
+use arrow::{
+    array::{Array, ArrayRef, BinaryBuilder, StringArray, StringBuilder},
+    datatypes::DataType,
+};
 use encoding_rs::mem::convert_utf16_to_str;
 use odbc_api::{
     DataType as OdbcDataType,
-    buffers::{AnyColumnBufferSlice, BufferDesc},
+    buffers::{AnyColumnBufferSlice, BufferDesc, TextColumnSlice},
 };
 
 use super::{ColumnFailure, MappingError, ReadStrategy};
@@ -197,31 +200,73 @@ impl ReadStrategy for NarrowText {
         column_view: AnyColumnBufferSlice,
     ) -> Result<ArrayRef, MappingError> {
         let view = column_view.as_text().unwrap();
-        let mut builder = StringBuilder::with_capacity(view.len(), self.max_str_len * view.len());
-        for value in view.iter() {
-            builder.append_option(
-                value
-                    .map(|bytes| {
-                        let untrimmed = simdutf8::basic::from_utf8(bytes).map_err(|_| {
-                            MappingError::InvalidUtf8 {
-                                lossy_value: String::from_utf8_lossy(bytes).into_owned(),
-                            }
-                        })?;
-                        Ok(if self.trim {
-                            untrimmed.trim()
-                        } else {
-                            untrimmed
-                        })
-                    })
-                    .transpose()?,
-            );
+        let (total, non_null) = view
+            .iter()
+            .flatten()
+            .fold((0, 0usize), |(total, count), bytes| {
+                (total + bytes.len(), count + 1)
+            });
+        // simdutf8 uses scalar validation below 64 bytes; batch these short values together.
+        if !self.trim && total < non_null.saturating_mul(64) {
+            narrow_text_validated_in_bulk(view, total)
+        } else {
+            narrow_text_validated_per_value(view, total, self.trim)
         }
-        Ok(Arc::new(builder.finish()))
+    }
+}
+
+/// Copies all values first, then validates the whole buffer as UTF-8 at once.
+fn narrow_text_validated_in_bulk(
+    view: TextColumnSlice<u8>,
+    total: usize,
+) -> Result<ArrayRef, MappingError> {
+    let mut builder = BinaryBuilder::with_capacity(view.len(), total);
+    for value in view.iter() {
+        builder.append_option(value);
+    }
+    let data = builder
+        .finish()
+        .into_data()
+        .into_builder()
+        .data_type(DataType::Utf8);
+    match data.build() {
+        Ok(data) => Ok(Arc::new(StringArray::from(data))),
+        Err(error) => {
+            let first_invalid = view
+                .iter()
+                .flatten()
+                .find(|bytes| simdutf8::basic::from_utf8(bytes).is_err())
+                .unwrap_or_else(|| panic!("{error}"));
+            Err(invalid_utf8(first_invalid))
+        }
+    }
+}
+
+/// Validates each value on its own. Needed for trimming, and faster for long values.
+fn narrow_text_validated_per_value(
+    view: TextColumnSlice<u8>,
+    total: usize,
+    trim: bool,
+) -> Result<ArrayRef, MappingError> {
+    let mut builder = StringBuilder::with_capacity(view.len(), total);
+    for value in view.iter() {
+        let text = value
+            .map(|bytes| simdutf8::basic::from_utf8(bytes).map_err(|_| invalid_utf8(bytes)))
+            .transpose()?;
+        builder.append_option(if trim { text.map(str::trim) } else { text });
+    }
+    Ok(Arc::new(builder.finish()))
+}
+
+fn invalid_utf8(bytes: &[u8]) -> MappingError {
+    MappingError::InvalidUtf8 {
+        lossy_value: String::from_utf8_lossy(bytes).into_owned(),
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use arrow::array::{ArrayRef, StringArray};
     use odbc_api::buffers::{AnyColumnBuffer, Slice, TextColumn};
 
     use crate::reader::{MappingError, ReadStrategy as _, text::Utf16ToUtf8Converter};
@@ -278,13 +323,83 @@ mod tests {
         };
         assert_eq!(lossy_value, "Hello�");
     }
+
+    fn read_narrow(values: &[Option<&[u8]>], trim: bool) -> Result<ArrayRef, MappingError> {
+        let max_len = values
+            .iter()
+            .flatten()
+            .map(|bytes| bytes.len())
+            .max()
+            .unwrap_or(0);
+        let mut column = TextColumn::<u8>::new(values.len(), max_len);
+        for (index, value) in values.iter().enumerate() {
+            column.set_value(index, *value);
+        }
+        let column: Box<dyn AnyColumnBuffer> = Box::new(column);
+        NarrowText::new(max_len, trim).fill_arrow_array(column.slice(values.len()))
+    }
+
+    #[test]
+    fn invalid_utf8_in_middle_returns_first_invalid_value() {
+        let error =
+            read_narrow(&[Some(b"valid"), Some(b"Bad\xff"), Some(b"\xfe")], false).unwrap_err();
+        let MappingError::InvalidUtf8 { lossy_value } = error else {
+            panic!("Not an InvalidUtf8 error")
+        };
+        assert_eq!(lossy_value, "Bad�");
+    }
+
+    #[test]
+    fn utf8_character_must_not_span_values() {
+        let error = read_narrow(&[Some(&[0xc3]), Some(&[0xb1])], false).unwrap_err();
+        let MappingError::InvalidUtf8 { lossy_value } = error else {
+            panic!("Not an InvalidUtf8 error")
+        };
+        assert_eq!(lossy_value, "�");
+    }
+
+    #[test]
+    fn narrow_text_preserves_nulls_and_empty_strings() {
+        let array = read_narrow(&[None, Some(b""), Some("ñ".as_bytes()), None], false).unwrap();
+        let array = array.as_any().downcast_ref::<StringArray>().unwrap();
+        assert_eq!(
+            array.iter().collect::<Vec<_>>(),
+            [None, Some(""), Some("ñ"), None]
+        );
+    }
+
+    #[test]
+    fn narrow_text_trims_values_and_rejects_invalid_utf8() {
+        let array = read_narrow(&[Some(" \tñ \n".as_bytes()), Some(b"  ")], true).unwrap();
+        let array = array.as_any().downcast_ref::<StringArray>().unwrap();
+        assert_eq!(array.iter().collect::<Vec<_>>(), [Some("ñ"), Some("")]);
+
+        let error = read_narrow(&[Some(b"good"), Some(b" \xff ")], true).unwrap_err();
+        let MappingError::InvalidUtf8 { lossy_value } = error else {
+            panic!("Not an InvalidUtf8 error")
+        };
+        assert_eq!(lossy_value, " � ");
+    }
+
+    #[test]
+    fn invalid_utf8_in_long_value_returns_error() {
+        let valid = [b'a'; 64];
+        let mut invalid = [b'b'; 64];
+        invalid[63] = 0xff;
+        let error = read_narrow(&[Some(&valid), None, Some(&invalid)], false).unwrap_err();
+        let MappingError::InvalidUtf8 { lossy_value } = error else {
+            panic!("Not an InvalidUtf8 error")
+        };
+        assert_eq!(lossy_value, format!("{}�", "b".repeat(63)));
+    }
 }
 
 #[cfg(feature = "internal_benches")]
 mod bench {
     use odbc_api::buffers::{BoxColumnBuffer, Slice, TextColumn};
+    use rand::{RngExt, SeedableRng, rngs::StdRng};
 
-    use super::{ReadStrategy, WideText};
+    use super::{NarrowText, ReadStrategy, WideText};
 
     const ROWS: usize = 1024;
 
@@ -324,6 +439,78 @@ mod bench {
 
         bencher.bench_local(|| {
             // Drop within the timed closure, so destruction of the array is measured, too.
+            let array = strategy.fill_arrow_array(column.slice(ROWS)).unwrap();
+            drop(divan::black_box(array));
+        });
+    }
+
+    #[divan::bench]
+    fn narrow_short_ascii(bencher: divan::Bencher) {
+        narrow_text_to_arrow(bencher, 255, false, |rng| {
+            "a".repeat(rng.random_range(5..=40))
+        });
+    }
+
+    #[divan::bench]
+    fn narrow_long_ascii(bencher: divan::Bencher) {
+        narrow_text_to_arrow(bencher, 4096, false, |rng| {
+            "a".repeat(rng.random_range(1024..=4096))
+        });
+    }
+
+    #[divan::bench]
+    fn narrow_mixed_unicode(bencher: divan::Bencher) {
+        narrow_text_to_arrow(bencher, 255, false, |rng| {
+            "Café 漢字 🙂 ".repeat(rng.random_range(1..=8))
+        });
+    }
+
+    #[divan::bench]
+    fn narrow_short_multibyte(bencher: divan::Bencher) {
+        narrow_text_to_arrow(bencher, 255, false, |rng| {
+            "Café 漢字 🙂 ".repeat(rng.random_range(1..=2))
+        });
+    }
+
+    #[divan::bench]
+    fn narrow_skewed(bencher: divan::Bencher) {
+        narrow_text_to_arrow(bencher, 2000, false, |rng| {
+            let len = if rng.random_range(0..100) < 2 {
+                rng.random_range(1000..=2000)
+            } else {
+                rng.random_range(5..=40)
+            };
+            "a".repeat(len)
+        });
+    }
+
+    #[divan::bench]
+    fn narrow_trimmed(bencher: divan::Bencher) {
+        narrow_text_to_arrow(bencher, 255, true, |rng| {
+            format!(" \t{} \n", "a".repeat(rng.random_range(5..=40)))
+        });
+    }
+
+    fn narrow_text_to_arrow(
+        bencher: divan::Bencher,
+        max_str_len: usize,
+        trim: bool,
+        value: impl Fn(&mut StdRng) -> String,
+    ) {
+        const ROWS: usize = 10_000;
+        let mut rng = StdRng::seed_from_u64(42);
+        let mut column = TextColumn::<u8>::new(ROWS, max_str_len);
+        for index in 0..ROWS {
+            let text = value(&mut rng);
+            column.set_value(
+                index,
+                (rng.random_range(0..100) != 0).then_some(text.as_bytes()),
+            );
+        }
+        let column: BoxColumnBuffer = Box::new(column);
+        let strategy = NarrowText::new(max_str_len, trim);
+
+        bencher.bench_local(|| {
             let array = strategy.fill_arrow_array(column.slice(ROWS)).unwrap();
             drop(divan::black_box(array));
         });
