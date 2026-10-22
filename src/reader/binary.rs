@@ -28,7 +28,8 @@ impl ReadStrategy for Binary {
         column_view: AnyColumnBufferSlice,
     ) -> Result<ArrayRef, MappingError> {
         let view = column_view.as_binary().unwrap();
-        let mut builder = BinaryBuilder::new();
+        let total = view.iter().flatten().map(<[u8]>::len).sum();
+        let mut builder = BinaryBuilder::with_capacity(view.len(), total);
         for value in view.iter() {
             if let Some(bytes) = value {
                 builder.append_value(bytes);
@@ -73,5 +74,44 @@ impl ReadStrategy for FixedSizedBinary {
             }
         }
         Ok(Arc::new(builder.finish()))
+    }
+}
+
+#[cfg(feature = "internal_benches")]
+mod bench {
+    use odbc_api::buffers::{BinColumn, BoxColumnBuffer, Slice};
+    use rand::{RngExt, SeedableRng, rngs::StdRng};
+
+    use super::{Binary, ReadStrategy};
+
+    #[divan::bench]
+    fn rows_10_000(bencher: divan::Bencher) {
+        binary_to_arrow(bencher, 10_000);
+    }
+
+    #[divan::bench]
+    fn rows_65_535(bencher: divan::Bencher) {
+        binary_to_arrow(bencher, 65_535);
+    }
+
+    fn binary_to_arrow(bencher: divan::Bencher, rows: usize) {
+        let mut rng = StdRng::seed_from_u64(42);
+        let mut column = BinColumn::new(rows, 200);
+        for index in 0..rows {
+            let value: Vec<u8> = (0..rng.random_range(0..=200))
+                .map(|_| rng.random())
+                .collect();
+            column.set_value(
+                index,
+                (rng.random_range(0..100) != 0).then_some(value.as_slice()),
+            );
+        }
+        let column: BoxColumnBuffer = Box::new(column);
+        let strategy = Binary::new(200);
+
+        bencher.bench_local(|| {
+            let array = strategy.fill_arrow_array(column.slice(rows)).unwrap();
+            drop(divan::black_box(array));
+        });
     }
 }
