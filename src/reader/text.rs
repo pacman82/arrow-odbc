@@ -139,9 +139,10 @@ impl ReadStrategy for WideText {
         let mut builder = StringBuilder::with_capacity(item_capacity, data_capacity);
 
         let mut converter = Utf16ToUtf8Converter::new();
-        for value in view.iter() {
-            let opt = if let Some(utf16) = value {
-                let slice = converter.utf16_to_utf8(utf16.as_slice());
+        // Use raw access; encoding_rs handles invalid UTF-16 during conversion.
+        for index in 0..view.len() {
+            let opt = if let Some(utf16) = view.get(index) {
+                let slice = converter.utf16_to_utf8(utf16);
                 let slice = if self.trim { slice.trim() } else { slice };
                 Some(slice)
             } else {
