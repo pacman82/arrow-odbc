@@ -29,7 +29,7 @@ use crate::{
 };
 
 use self::{
-    binary::VariadicBinary,
+    binary::{FixedSizeBinary, VariadicBinary},
     boolean::boolean_to_bit,
     map_arrow_to_odbc::MapArrowToOdbc,
     text::{LargeUtf8ToNativeText, Utf8ToNativeText},
@@ -321,7 +321,7 @@ fn field_to_write_strategy(field: &Field) -> Result<Box<dyn WriteStrategy>, Writ
         }
         DataType::Binary => Box::new(VariadicBinary::new(1)),
         DataType::FixedSizeBinary(length) => {
-            Box::new(VariadicBinary::new((*length).try_into().unwrap()))
+            Box::new(FixedSizeBinary::new((*length).try_into().unwrap()))
         }
         DataType::Decimal128(precision, scale) => {
             Box::new(NullableDecimal128AsText::new(*precision, *scale))

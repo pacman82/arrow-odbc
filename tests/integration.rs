@@ -2521,18 +2521,22 @@ fn insert_binary_growing_at_start_of_later_batch_after_null() {
 
 #[test]
 fn insert_fixed_binary() {
-    // Given a table and a record batch reader returning a batch with a text column.
+    // Given a table and a record batch reader returning a batch with a fixed-size binary column.
     let table_name = function_name!().rsplit_once(':').unwrap().1;
     let conn = env()
         .connect_with_connection_string(MSSQL, Default::default())
         .unwrap();
-    setup_empty_table_mssql(&conn, table_name, &["VARBINARY(4096)"]).unwrap();
-    let array = BinaryArray::from(vec![
-        Some([1, 2].as_slice()),
-        None,
-        Some([3, 4, 5, 6, 7].as_slice()),
-    ]);
-    let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Binary, true)]));
+    setup_empty_table_mssql(&conn, table_name, &["BINARY(2)"]).unwrap();
+    let array = FixedSizeBinaryArray::try_from_sparse_iter_with_size(
+        [Some([1, 2]), None, Some([3, 4])].into_iter(),
+        2,
+    )
+    .unwrap();
+    let schema = Arc::new(Schema::new(vec![Field::new(
+        "a",
+        DataType::FixedSizeBinary(2),
+        true,
+    )]));
     let batch = RecordBatch::try_new(schema.clone(), vec![Arc::new(array)]).unwrap();
     let mut reader = StubBatchReader::new(schema, vec![batch]);
 
@@ -2541,7 +2545,7 @@ fn insert_fixed_binary() {
 
     // Then
     let actual = table_to_string(&conn, table_name, &["a"]);
-    let expected = "0102\nNULL\n0304050607";
+    let expected = "0102\nNULL\n0304";
     assert_eq!(expected, actual);
 }
 
