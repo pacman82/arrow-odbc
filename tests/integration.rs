@@ -2325,8 +2325,10 @@ fn insert_date64_array() {
         .unwrap();
     setup_empty_table_mssql(&conn, table_name, &["DATE"]).unwrap();
     let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Date64, false)]));
-    // Corresponds to single element array with entry 1970-01-01
-    let array: Date64Array = [Some(0)].into_iter().collect();
+    // Corresponds to 1970-01-01, 2023-01-01 and 1969-12-31.
+    let array: Date64Array = [Some(0), Some(1_672_531_200_000), Some(-86_400_000)]
+        .into_iter()
+        .collect();
     let batch = RecordBatch::try_new(schema.clone(), vec![Arc::new(array)]).unwrap();
     let mut reader = StubBatchReader::new(schema, vec![batch]);
 
@@ -2335,7 +2337,7 @@ fn insert_date64_array() {
 
     // Then
     let actual = table_to_string(&conn, table_name, &["a"]);
-    let expected = "1970-01-01";
+    let expected = "1970-01-01\n2023-01-01\n1969-12-31";
     assert_eq!(expected, actual);
 }
 
