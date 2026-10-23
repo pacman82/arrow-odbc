@@ -304,8 +304,8 @@ fn field_to_write_strategy(field: &Field) -> Result<Box<dyn WriteStrategy>, Writ
             insert_timestamp_strategy(is_nullable, &time_unit, time_zone.clone())?
         }
         DataType::Date32 => Date32Type::map_with(is_nullable, epoch_to_date),
-        DataType::Date64 => Date64Type::map_with(is_nullable, |days_since_epoch| {
-            epoch_to_date(days_since_epoch.try_into().unwrap())
+        DataType::Date64 => Date64Type::map_with(is_nullable, |ms_since_epoch| {
+            epoch_to_date(ms_since_epoch.div_euclid(86_400_000).try_into().unwrap())
         }),
         DataType::Time32(TimeUnit::Second) => {
             Time32SecondType::map_with(is_nullable, sec_since_midnight_to_time)
