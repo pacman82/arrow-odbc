@@ -127,13 +127,7 @@ where
         match self.batch_stream.fetch_into(&mut self.buffer) {
             // We successfully fetched a batch from the database. Try to copy it into a record batch
             // and forward errors if any.
-            Ok(true) => {
-                let result_record_batch = self
-                    .converter
-                    .buffer_to_record_batch(&self.buffer)
-                    .map_err(|mapping_error| ArrowError::ExternalError(Box::new(mapping_error)));
-                Some(result_record_batch)
-            }
+            Ok(true) => Some(self.converter.buffer_to_record_batch(&self.buffer)),
             // We ran out of batches in the result set. End the iterator.
             Ok(false) => None,
             // We had an error fetching the next batch from the database, let's report it as an

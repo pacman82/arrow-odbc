@@ -323,6 +323,24 @@ fn fetch_varchar() {
     assert!(array_vals.is_null(2));
 }
 
+/// A NULL in a field the schema declares non-nullable is reported as an error, not a panic.
+#[test]
+fn null_in_non_nullable_field_is_an_error() {
+    let table_name = function_name!().rsplit_once(':').unwrap().1;
+    let cursor = cursor_over_literals(table_name, "VARCHAR(10)", "(NULL)");
+    let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Utf8, false)]));
+    let mut reader = OdbcReaderBuilder::new()
+        .with_schema(schema)
+        .build(cursor)
+        .unwrap();
+
+    let error = reader.next().unwrap().unwrap_err();
+    assert_eq!(
+        "Invalid argument error: Column 'a' is declared as non-nullable but contains null values",
+        error.to_string()
+    );
+}
+
 /// Fill a record batch of Strings from a varchar source column
 #[test]
 fn trim_fixed_sized_character_data() {
