@@ -2056,6 +2056,32 @@ fn insert_berlin_time_to_daytime_offset_ms_precision() {
 }
 
 #[test]
+fn insert_utc_time_before_epoch_to_datetime_offset_ms_precision() {
+    // Given
+    let table_name = function_name!().rsplit_once(':').unwrap().1;
+    let conn = env()
+        .connect_with_connection_string(MSSQL, Default::default())
+        .unwrap();
+    setup_empty_table_mssql(&conn, table_name, &["DATETIMEOFFSET(3)"]).unwrap();
+    let schema = Arc::new(Schema::new(vec![Field::new(
+        "a",
+        DataType::Timestamp(TimeUnit::Millisecond, Some(Arc::from("UTC"))),
+        false,
+    )]));
+    let array = TimestampMillisecondArray::from(vec![-1]).with_timezone("UTC");
+    let batch = RecordBatch::try_new(schema.clone(), vec![Arc::new(array)]).unwrap();
+    let mut reader = StubBatchReader::new(schema, vec![batch]);
+
+    // When
+    insert_into_table(&conn, &mut reader, table_name, 5).unwrap();
+
+    // Then
+    let actual = table_to_string(&conn, table_name, &["a"]);
+    let expected = "1969-12-31 23:59:59.999 +00:00";
+    assert_eq!(expected, actual);
+}
+
+#[test]
 fn insert_berlin_time_to_daytime_offset_us_precision() {
     // Given
     let table_name = function_name!().rsplit_once(':').unwrap().1;
