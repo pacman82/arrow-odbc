@@ -2018,6 +2018,36 @@ fn insert_berlin_time_to_daytime_offset_sec_precision() {
 }
 
 #[test]
+fn insert_paris_time_with_offset_seconds_to_varchar() {
+    // Given
+    let table_name = function_name!().rsplit_once(':').unwrap().1;
+    let conn = env()
+        .connect_with_connection_string(MSSQL, Default::default())
+        .unwrap();
+    setup_empty_table_mssql(&conn, table_name, &["VARCHAR(40)"]).unwrap();
+    let schema = Arc::new(Schema::new(vec![Field::new(
+        "a",
+        DataType::Timestamp(TimeUnit::Second, Some(Arc::from("Europe/Paris"))),
+        false,
+    )]));
+    let dt = chrono::Utc
+        .with_ymd_and_hms(1900, 6, 1, 12, 0, 0)
+        .single()
+        .unwrap();
+    let array = TimestampSecondArray::from(vec![dt.timestamp()]).with_timezone("Europe/Paris");
+    let batch = RecordBatch::try_new(schema.clone(), vec![Arc::new(array)]).unwrap();
+    let mut reader = StubBatchReader::new(schema, vec![batch]);
+
+    // When
+    insert_into_table(&conn, &mut reader, table_name, 5).unwrap();
+
+    // Then
+    let actual = table_to_string(&conn, table_name, &["a"]);
+    let expected = "1900-06-01 12:09:21+00:09:21";
+    assert_eq!(expected, actual);
+}
+
+#[test]
 fn insert_berlin_time_to_daytime_offset_ms_precision() {
     // Given
     let table_name = function_name!().rsplit_once(':').unwrap().1;
