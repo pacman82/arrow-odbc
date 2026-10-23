@@ -1,7 +1,8 @@
 use std::sync::Arc;
 
 use arrow::{
-    datatypes::{Schema, SchemaRef},
+    array::{Array, make_array},
+    datatypes::{DataType, Schema, SchemaRef},
     error::ArrowError,
     record_batch::RecordBatch,
 };
@@ -110,14 +111,25 @@ impl ToRecordBatch {
         let arrow_columns = self
             .column_strategies
             .iter()
+            .zip(self.schema.fields())
             .enumerate()
-            .map(|(index, strat)| {
+            .map(|(index, (strat, field))| {
                 let column_view = odbc_buffer.column(index);
-                strat
+                let array = strat
                     .fill_arrow_array(column_view)
-                    .map_err(|error| ArrowError::ExternalError(Box::new(error)))
+                    .map_err(|error| ArrowError::ExternalError(Box::new(error)))?;
+                // Timestamp strategies build arrays without a time zone. Attach the one from the
+                // schema without changing the values.
+                if let DataType::Timestamp(_, Some(_)) = field.data_type() {
+                    let data = array
+                        .into_data()
+                        .into_builder()
+                        .data_type(field.data_type().clone());
+                    return Ok(make_array(data.build()?));
+                }
+                Ok(array)
             })
-            .collect::<Result<Vec<_>, _>>()?;
+            .collect::<Result<Vec<_>, ArrowError>>()?;
         RecordBatch::try_new(self.schema.clone(), arrow_columns)
     }
 }
