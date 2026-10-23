@@ -127,12 +127,10 @@ where
         for (index, timestamp) in from.iter().enumerate() {
             if let Some(timestamp) = timestamp {
                 let dt = P::to_regional_datetime(timestamp, &self.time_zone);
-                write!(
-                    to.set_mut(index + param_offset, P::FORMAT_WITH_TIME_ZONE_LEN),
-                    "{}",
-                    dt.format(P::FORMAT_STRING),
-                )
-                .unwrap();
+                let mut unwritten = to.set_mut(index + param_offset, P::FORMAT_WITH_TIME_ZONE_LEN);
+                write!(unwritten, "{}", dt.format(P::FORMAT_STRING)).unwrap();
+                let written = P::FORMAT_WITH_TIME_ZONE_LEN - unwritten.len();
+                to.set_mut(index + param_offset, written);
             } else {
                 to.set_cell(index + param_offset, None)
             }
@@ -142,14 +140,15 @@ where
 }
 
 trait InserableAsTimestampWithTimeZone {
-    /// Length of the string representation of a timestamp with time zone, e.g. "2023-10-01 12:34:56.789+02:00"
+    /// Maximum length of a timestamp with time zone, including offsets with seconds,
+    /// e.g. "1900-06-01 12:09:21.000+00:09:21".
     const FORMAT_WITH_TIME_ZONE_LEN: usize;
     const FORMAT_STRING: &'static str;
     fn to_regional_datetime(epoch: i64, time_zone: &Tz) -> DateTime<Tz>;
 }
 
 impl InserableAsTimestampWithTimeZone for TimestampSecondType {
-    const FORMAT_WITH_TIME_ZONE_LEN: usize = 25; // "YYYY-MM-DD HH:MM:SS+00:00"
+    const FORMAT_WITH_TIME_ZONE_LEN: usize = 28; // "YYYY-MM-DD HH:MM:SS+00:00:00"
     const FORMAT_STRING: &'static str = "%Y-%m-%d %H:%M:%S%Z";
 
     fn to_regional_datetime(epoch: i64, time_zone: &Tz) -> DateTime<Tz> {
@@ -161,12 +160,12 @@ impl InserableAsTimestampWithTimeZone for TimestampSecondType {
 }
 
 impl InserableAsTimestampWithTimeZone for TimestampMillisecondType {
-    const FORMAT_WITH_TIME_ZONE_LEN: usize = 29; // "YYYY-MM-DD HH:MM:SS.fff+00:00"
+    const FORMAT_WITH_TIME_ZONE_LEN: usize = 32; // "YYYY-MM-DD HH:MM:SS.fff+00:00:00"
     const FORMAT_STRING: &'static str = "%Y-%m-%d %H:%M:%S.%3f%Z";
 
     fn to_regional_datetime(epoch: i64, time_zone: &Tz) -> DateTime<Tz> {
-        let epoch_sec = epoch / 1_000;
-        let nano = (epoch % 1_000) * 1_000_000; // Convert milliseconds to nanoseconds
+        let epoch_sec = epoch.div_euclid(1_000);
+        let nano = epoch.rem_euclid(1_000) * 1_000_000; // Convert milliseconds to nanoseconds
         time_zone
             .timestamp_opt(epoch_sec, nano as u32)
             .earliest()
@@ -175,12 +174,12 @@ impl InserableAsTimestampWithTimeZone for TimestampMillisecondType {
 }
 
 impl InserableAsTimestampWithTimeZone for TimestampMicrosecondType {
-    const FORMAT_WITH_TIME_ZONE_LEN: usize = 32; // "YYYY-MM-DD HH:MM:SS.fff+00:00"
+    const FORMAT_WITH_TIME_ZONE_LEN: usize = 35; // "YYYY-MM-DD HH:MM:SS.ffffff+00:00:00"
     const FORMAT_STRING: &'static str = "%Y-%m-%d %H:%M:%S.%6f%Z";
 
     fn to_regional_datetime(epoch: i64, time_zone: &Tz) -> DateTime<Tz> {
-        let epoch_sec = epoch / 1_000_000;
-        let nano = (epoch % 1_000_000) * 1_000; // Convert milliseconds to nanoseconds
+        let epoch_sec = epoch.div_euclid(1_000_000);
+        let nano = epoch.rem_euclid(1_000_000) * 1_000; // Convert microseconds to nanoseconds
         time_zone
             .timestamp_opt(epoch_sec, nano as u32)
             .earliest()
@@ -189,12 +188,12 @@ impl InserableAsTimestampWithTimeZone for TimestampMicrosecondType {
 }
 
 impl InserableAsTimestampWithTimeZone for TimestampNanosecondType {
-    const FORMAT_WITH_TIME_ZONE_LEN: usize = 35; // "YYYY-MM-DD HH:MM:SS.fff+00:00"
+    const FORMAT_WITH_TIME_ZONE_LEN: usize = 38; // "YYYY-MM-DD HH:MM:SS.fffffffff+00:00:00"
     const FORMAT_STRING: &'static str = "%Y-%m-%d %H:%M:%S.%9f%Z";
 
     fn to_regional_datetime(epoch: i64, time_zone: &Tz) -> DateTime<Tz> {
-        let epoch_sec = epoch / 1_000_000_000;
-        let nano = epoch % 1_000_000_000; // Convert milliseconds to nanoseconds
+        let epoch_sec = epoch.div_euclid(1_000_000_000);
+        let nano = epoch.rem_euclid(1_000_000_000);
         time_zone
             .timestamp_opt(epoch_sec, nano as u32)
             .earliest()
