@@ -1,6 +1,43 @@
 # Changelog
 
 All notable changes to this project will be documented in this file. `arrow-odbc` adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+## [26.0.2](https://github.com/pacman82/odbc-api/compare/26.0.1...26.0.2) - 2026-10-24
+
+### 🐛 Bug Fixes
+
+- Insert Date64 values as milliseconds since epoch
+- Insert FixedSizeBinary columns
+
+
+### ⚡ Performance
+
+- Speed up UTF-16 validation in the wide text reader
+- Format decimal parameters with 64-bit arithmetic
+- Validate short narrow text values in bulk
+
+  Narrow (UTF-8) text was validated one value at a time. Below 64 bytes,
+  simdutf8 falls back to scalar validation, so short values paid a function
+  call each for scalar work. When the average value is shorter than 64
+  bytes, copy the batch as binary and validate the whole buffer once via
+  arrow. Longer values keep per-value simdutf8 validation, and trimmed
+  columns keep the per-value path.
+
+  Both paths now size the output to the actual payload instead of
+  max_str_len * rows. For 65,535 rows of VARCHAR(4000) this cuts the
+  reserved values buffer from 262 MB to 1.5 MB per batch.
+
+  Errors are unchanged: the first invalid value is still reported as
+  InvalidUtf8 with its lossy representation.
+
+- Preallocate binary output
+- Pack boolean reads into bitmaps
+- Pre-size binary writer buffers per chunk
+- Simplify Date32 conversion
+- Preallocate fixed-size binary output
+- Write UTF-16 directly into ODBC buffers
+- Bulk copy nullable numeric values
+- Reuse initialized UTF-16 conversion scratch buffer
+
 
 ## [26.0.1](https://github.com/pacman82/odbc-api/compare/26.0.0...26.0.1) - 2026-10-19
 
