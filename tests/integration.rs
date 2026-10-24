@@ -735,6 +735,30 @@ fn fetch_negative_decimal() {
     assert_eq!("-123.45", array_vals.value_as_string(0));
 }
 
+/// Fetch a negative decimal with scale equal to precision from PostgreSQL
+#[test]
+fn fetch_negative_decimal_below_one_psql() {
+    let table_name = function_name!().rsplit_once(':').unwrap().1;
+    let conn = env()
+        .connect_with_connection_string(POSTGRES, Default::default())
+        .unwrap();
+    setup_empty_table::<PostgreSql>(&conn, table_name, &["NUMERIC(2,2) NOT NULL"]).unwrap();
+    let sql = format!("INSERT INTO {table_name} (a) VALUES (-0.12)");
+    conn.execute(&sql, (), None).unwrap();
+
+    let sql = format!("SELECT a FROM {table_name} ORDER BY id");
+    let cursor = conn.execute(&sql, (), None).unwrap().unwrap();
+    let mut reader = OdbcReaderBuilder::new().build(cursor).unwrap();
+    let record_batch = reader.next().unwrap().unwrap();
+
+    let array_vals = record_batch
+        .column(0)
+        .as_any()
+        .downcast_ref::<Decimal128Array>()
+        .unwrap();
+    assert_eq!("-0.12", array_vals.value_as_string(0));
+}
+
 /// Fetch variable sized binary data binary data
 #[test]
 fn fetch_varbinary_data() {
