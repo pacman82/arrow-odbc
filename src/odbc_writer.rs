@@ -5,9 +5,9 @@ use thiserror::Error;
 use arrow::{
     array::Array,
     datatypes::{
-        DataType, Date32Type, Date64Type, Field, Float16Type, Float32Type, Float64Type, Int8Type,
-        Int16Type, Int32Type, Int64Type, Schema, Time32MillisecondType, Time32SecondType,
-        Time64MicrosecondType, Time64NanosecondType, TimeUnit, UInt8Type,
+        DataType, Field, Float16Type, Float32Type, Float64Type, Int8Type, Int16Type, Int32Type,
+        Int64Type, Schema, Time32MillisecondType, Time32SecondType, Time64MicrosecondType,
+        Time64NanosecondType, TimeUnit, UInt8Type,
     },
     error::ArrowError,
     record_batch::{RecordBatch, RecordBatchReader},
@@ -21,10 +21,12 @@ use odbc_api::{
 };
 
 use crate::{
-    date_time::{NullableTimeAsText, epoch_to_date, sec_since_midnight_to_time},
+    date_time::{NullableTimeAsText, sec_since_midnight_to_time},
     decimal::{NullableDecimal128AsText, NullableDecimal256AsText},
     odbc_writer::{
-        insert_statement::quoting_from_connection, timestamp::insert_timestamp_strategy,
+        date::{date_32, date_64},
+        insert_statement::quoting_from_connection,
+        timestamp::insert_timestamp_strategy,
     },
 };
 
@@ -41,6 +43,7 @@ pub use self::insert_statement::{
 
 mod binary;
 mod boolean;
+mod date;
 mod insert_statement;
 mod map_arrow_to_odbc;
 mod text;
@@ -303,10 +306,8 @@ fn field_to_write_strategy(field: &Field) -> Result<Box<dyn WriteStrategy>, Writ
         DataType::Timestamp(time_unit, time_zone) => {
             insert_timestamp_strategy(is_nullable, &time_unit, time_zone.clone())?
         }
-        DataType::Date32 => Date32Type::map_with(is_nullable, epoch_to_date),
-        DataType::Date64 => Date64Type::map_with(is_nullable, |ms_since_epoch| {
-            epoch_to_date(ms_since_epoch.div_euclid(86_400_000).try_into().unwrap())
-        }),
+        DataType::Date32 => date_32(is_nullable),
+        DataType::Date64 => date_64(is_nullable),
         DataType::Time32(TimeUnit::Second) => {
             Time32SecondType::map_with(is_nullable, sec_since_midnight_to_time)
         }
