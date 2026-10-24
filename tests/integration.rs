@@ -5,14 +5,15 @@ use std::{
 
 use arrow::{
     array::{
-        Array, ArrayData, ArrayRef, BinaryArray, BooleanArray, Date32Array, Date64Array,
-        Decimal128Array, Decimal256Builder, FixedSizeBinaryArray, Float16Array, Float32Array,
-        Int8Array, Int16Array, Int32Array, Int64Array, LargeStringArray, StringArray,
-        Time32MillisecondArray, Time32SecondArray, Time64MicrosecondArray, Time64NanosecondArray,
+        Array, ArrayData, ArrayRef, BinaryArray, BooleanArray, Date32Array, Decimal128Array,
+        Decimal256Builder, FixedSizeBinaryArray, Float16Array, Float32Array, Int8Array, Int16Array,
+        Int32Array, Int64Array, LargeStringArray, StringArray, Time32MillisecondArray,
+        Time32SecondArray, Time64MicrosecondArray, Time64NanosecondArray,
         TimestampMicrosecondArray, TimestampMillisecondArray, TimestampNanosecondArray,
-        TimestampSecondArray, UInt8Array, timezone::Tz,
+        TimestampSecondArray, UInt8Array,
     },
     buffer::Buffer,
+    compute::cast,
     datatypes::{
         ArrowPrimitiveType, DataType, Decimal256Type, Field, Float16Type, Schema, SchemaRef,
         TimeUnit,
@@ -20,7 +21,7 @@ use arrow::{
     error::ArrowError,
     record_batch::{RecordBatch, RecordBatchReader},
 };
-use chrono::{NaiveDate, NaiveTime, TimeZone};
+use chrono::{NaiveDate, NaiveTime};
 use float_eq::assert_float_eq;
 
 /// This declaration is equivalent to `use half::f16`, yet it does have the benefit, that we do not
@@ -28,7 +29,11 @@ use float_eq::assert_float_eq;
 type F16 = <Float16Type as ArrowPrimitiveType>::Native;
 
 use arrow_odbc::{
-    ColumnFailure, Error, OdbcReaderBuilder, OdbcWriter, QuoteDefensively, TextEncoding, WriterError, arrow::array::Float64Array, arrow_schema_from, insert_into_table, insert_statement_from_schema, odbc_api::{
+    ColumnFailure, Error, OdbcReaderBuilder, OdbcWriter, QuoteDefensively, TextEncoding,
+    WriterError,
+    arrow::array::Float64Array,
+    arrow_schema_from, insert_into_table, insert_statement_from_schema,
+    odbc_api::{
         Connection, ConnectionOptions, Cursor, CursorImpl, Environment, IntoParameter,
         buffers::TextRowSet,
         handles::StatementConnection,
@@ -1962,9 +1967,9 @@ fn insert_timestamp_with_seconds_precisions() {
         DataType::Timestamp(TimeUnit::Second, None),
         false,
     )]));
-    // Corresponds to single element array with entry 1970-05-09T14:25:11+0:00
-    let array = TimestampSecondArray::from(vec![11111111]);
-    let batch = RecordBatch::try_new(schema.clone(), vec![Arc::new(array)]).unwrap();
+    let input = StringArray::from(vec!["1970-05-09 14:25:11"]);
+    let array = cast(&input, schema.field(0).data_type()).unwrap();
+    let batch = RecordBatch::try_new(schema.clone(), vec![array]).unwrap();
     let mut reader = StubBatchReader::new(schema, vec![batch]);
 
     // When
@@ -1989,23 +1994,11 @@ fn insert_berlin_time_to_daytime_offset_sec_precision() {
         DataType::Timestamp(TimeUnit::Second, Some(Arc::from("Europe/Berlin"))),
         false,
     )]));
-    let tz: Tz = "Europe/Berlin".parse().unwrap();
-    // For this timestamp daylight saving time is active
-    let dt = tz.with_ymd_and_hms(2025, 6, 22, 12, 0, 0).single().unwrap();
-    // For this timestamp daylight saving time is inactive
-    let dt2 = tz.with_ymd_and_hms(2025, 2, 1, 12, 0, 0).single().unwrap();
-    let timestamp = [dt.timestamp(), dt2.timestamp()];
-    let buffer = Buffer::from_slice_ref(&timestamp);
-    let data = ArrayData::builder(DataType::Timestamp(
-        TimeUnit::Second,
-        Some(Arc::from("Europe/Berlin")),
-    ))
-    .len(2)
-    .add_buffer(buffer)
-    .build()
-    .unwrap();
-    let array = TimestampSecondArray::from(data);
-    let batch = RecordBatch::try_new(schema.clone(), vec![Arc::new(array)]).unwrap();
+    // Timestamps without offset are interpreted as local time in the time zone of the target type.
+    // Daylight saving time is active for the first timestamp and inactive for the second one.
+    let input = StringArray::from(vec!["2025-06-22 12:00:00", "2025-02-01 12:00:00"]);
+    let array = cast(&input, schema.field(0).data_type()).unwrap();
+    let batch = RecordBatch::try_new(schema.clone(), vec![array]).unwrap();
     let mut reader = StubBatchReader::new(schema, vec![batch]);
 
     // When
@@ -2030,20 +2023,10 @@ fn insert_berlin_time_to_daytime_offset_ms_precision() {
         DataType::Timestamp(TimeUnit::Millisecond, Some(Arc::from("Europe/Berlin"))),
         false,
     )]));
-    let tz: Tz = "Europe/Berlin".parse().unwrap();
-    let dt = tz.with_ymd_and_hms(2025, 6, 22, 12, 0, 0).single().unwrap();
-    let timestamp = [dt.timestamp() * 1000i64 + 123i64];
-    let buffer = Buffer::from_slice_ref(&timestamp);
-    let data = ArrayData::builder(DataType::Timestamp(
-        TimeUnit::Millisecond,
-        Some(Arc::from("Europe/Berlin")),
-    ))
-    .len(1)
-    .add_buffer(buffer)
-    .build()
-    .unwrap();
-    let array = TimestampMillisecondArray::from(data);
-    let batch = RecordBatch::try_new(schema.clone(), vec![Arc::new(array)]).unwrap();
+    // Interpreted as local time in Europe/Berlin
+    let input = StringArray::from(vec!["2025-06-22 12:00:00.123"]);
+    let array = cast(&input, schema.field(0).data_type()).unwrap();
+    let batch = RecordBatch::try_new(schema.clone(), vec![array]).unwrap();
     let mut reader = StubBatchReader::new(schema, vec![batch]);
 
     // When
@@ -2068,20 +2051,10 @@ fn insert_berlin_time_to_daytime_offset_us_precision() {
         DataType::Timestamp(TimeUnit::Microsecond, Some(Arc::from("Europe/Berlin"))),
         false,
     )]));
-    let tz: Tz = "Europe/Berlin".parse().unwrap();
-    let dt = tz.with_ymd_and_hms(2025, 6, 22, 12, 0, 0).single().unwrap();
-    let timestamp = [dt.timestamp() * 1_000_000i64 + 123456i64];
-    let buffer = Buffer::from_slice_ref(&timestamp);
-    let data = ArrayData::builder(DataType::Timestamp(
-        TimeUnit::Microsecond,
-        Some(Arc::from("Europe/Berlin")),
-    ))
-    .len(1)
-    .add_buffer(buffer)
-    .build()
-    .unwrap();
-    let array = TimestampMicrosecondArray::from(data);
-    let batch = RecordBatch::try_new(schema.clone(), vec![Arc::new(array)]).unwrap();
+    // Interpreted as local time in Europe/Berlin
+    let input = StringArray::from(vec!["2025-06-22 12:00:00.123456"]);
+    let array = cast(&input, schema.field(0).data_type()).unwrap();
+    let batch = RecordBatch::try_new(schema.clone(), vec![array]).unwrap();
     let mut reader = StubBatchReader::new(schema, vec![batch]);
 
     // When
@@ -2107,20 +2080,10 @@ fn insert_berlin_time_to_daytime_offset_ns_precision() {
         DataType::Timestamp(TimeUnit::Nanosecond, Some(Arc::from("Europe/Berlin"))),
         false,
     )]));
-    let tz: Tz = "Europe/Berlin".parse().unwrap();
-    let dt = tz.with_ymd_and_hms(2025, 6, 22, 12, 0, 0).single().unwrap();
-    let timestamp = [dt.timestamp() * 1_000_000_000i64 + 123456789i64];
-    let buffer = Buffer::from_slice_ref(&timestamp);
-    let data = ArrayData::builder(DataType::Timestamp(
-        TimeUnit::Nanosecond,
-        Some(Arc::from("Europe/Berlin")),
-    ))
-    .len(1)
-    .add_buffer(buffer)
-    .build()
-    .unwrap();
-    let array = TimestampNanosecondArray::from(data);
-    let batch = RecordBatch::try_new(schema.clone(), vec![Arc::new(array)]).unwrap();
+    // Interpreted as local time in Europe/Berlin
+    let input = StringArray::from(vec!["2025-06-22 12:00:00.123456789"]);
+    let array = cast(&input, schema.field(0).data_type()).unwrap();
+    let batch = RecordBatch::try_new(schema.clone(), vec![array]).unwrap();
     let mut reader = StubBatchReader::new(schema, vec![batch]);
 
     // When
@@ -2188,9 +2151,9 @@ fn insert_timestamp_with_milliseconds_precisions() {
         DataType::Timestamp(TimeUnit::Millisecond, None),
         false,
     )]));
-    // Corresponds to single element array with entry 1970-05-09T14:25:11.111
-    let array = TimestampMillisecondArray::from(vec![11111111111]);
-    let batch = RecordBatch::try_new(schema.clone(), vec![Arc::new(array)]).unwrap();
+    let input = StringArray::from(vec!["1970-05-09 14:25:11.111"]);
+    let array = cast(&input, schema.field(0).data_type()).unwrap();
+    let batch = RecordBatch::try_new(schema.clone(), vec![array]).unwrap();
     let mut reader = StubBatchReader::new(schema, vec![batch]);
 
     // When
@@ -2220,14 +2183,9 @@ fn insert_timestamp_with_milliseconds_precisions_which_is_not_representable_as_i
         DataType::Timestamp(TimeUnit::Millisecond, None),
         false,
     )]));
-    // Corresponds to single element array with entry 1970-05-09T14:25:11.111
-    let ndt = NaiveDate::from_ymd_opt(1600, 6, 18)
-        .unwrap()
-        .and_hms_milli_opt(23, 12, 44, 123)
-        .unwrap();
-    let epoch_ms = ndt.and_utc().timestamp_millis();
-    let array = TimestampMillisecondArray::from(vec![epoch_ms]);
-    let batch = RecordBatch::try_new(schema.clone(), vec![Arc::new(array)]).unwrap();
+    let input = StringArray::from(vec!["1600-06-18 23:12:44.123"]);
+    let array = cast(&input, schema.field(0).data_type()).unwrap();
+    let batch = RecordBatch::try_new(schema.clone(), vec![array]).unwrap();
     let mut reader = StubBatchReader::new(schema, vec![batch]);
 
     // When
@@ -2252,9 +2210,9 @@ fn insert_timestamp_with_microseconds_precisions() {
         DataType::Timestamp(TimeUnit::Microsecond, None),
         false,
     )]));
-    // Corresponds to single element array with entry 1970-05-09T14:25:11.111111
-    let array = TimestampMicrosecondArray::from(vec![11111111111111]);
-    let batch = RecordBatch::try_new(schema.clone(), vec![Arc::new(array)]).unwrap();
+    let input = StringArray::from(vec!["1970-05-09 14:25:11.111111"]);
+    let array = cast(&input, schema.field(0).data_type()).unwrap();
+    let batch = RecordBatch::try_new(schema.clone(), vec![array]).unwrap();
     let mut reader = StubBatchReader::new(schema, vec![batch]);
 
     // When
@@ -2279,9 +2237,9 @@ fn insert_timestamp_with_nanoseconds_precisions() {
         DataType::Timestamp(TimeUnit::Nanosecond, None),
         false,
     )]));
-    // Corresponds to single element array with entry 1970-05-09T14:25:11.111111111
-    let array = TimestampNanosecondArray::from(vec![11111111111111111]);
-    let batch = RecordBatch::try_new(schema.clone(), vec![Arc::new(array)]).unwrap();
+    let input = StringArray::from(vec!["1970-05-09 14:25:11.111111111"]);
+    let array = cast(&input, schema.field(0).data_type()).unwrap();
+    let batch = RecordBatch::try_new(schema.clone(), vec![array]).unwrap();
     let mut reader = StubBatchReader::new(schema, vec![batch]);
 
     // When
@@ -2302,9 +2260,9 @@ fn insert_date32_array() {
         .unwrap();
     setup_empty_table_mssql(&conn, table_name, &["DATE"]).unwrap();
     let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Date32, false)]));
-    // Corresponds to single element array with entry 1970-01-01
-    let array: Date32Array = [Some(0)].into_iter().collect();
-    let batch = RecordBatch::try_new(schema.clone(), vec![Arc::new(array)]).unwrap();
+    let input = StringArray::from(vec!["1970-01-01", "2023-01-01", "1969-12-31"]);
+    let array = cast(&input, schema.field(0).data_type()).unwrap();
+    let batch = RecordBatch::try_new(schema.clone(), vec![array]).unwrap();
     let mut reader = StubBatchReader::new(schema, vec![batch]);
 
     // When
@@ -2312,7 +2270,7 @@ fn insert_date32_array() {
 
     // Then
     let actual = table_to_string(&conn, table_name, &["a"]);
-    let expected = "1970-01-01";
+    let expected = "1970-01-01\n2023-01-01\n1969-12-31";
     assert_eq!(expected, actual);
 }
 
@@ -2325,11 +2283,9 @@ fn insert_date64_array() {
         .unwrap();
     setup_empty_table_mssql(&conn, table_name, &["DATE"]).unwrap();
     let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Date64, false)]));
-    // Corresponds to 1970-01-01, 2023-01-01 and 1969-12-31.
-    let array: Date64Array = [Some(0), Some(1_672_531_200_000), Some(-86_400_000)]
-        .into_iter()
-        .collect();
-    let batch = RecordBatch::try_new(schema.clone(), vec![Arc::new(array)]).unwrap();
+    let input = StringArray::from(vec!["1970-01-01", "2023-01-01", "1969-12-31"]);
+    let array = cast(&input, schema.field(0).data_type()).unwrap();
+    let batch = RecordBatch::try_new(schema.clone(), vec![array]).unwrap();
     let mut reader = StubBatchReader::new(schema, vec![batch]);
 
     // When
@@ -2354,9 +2310,9 @@ fn insert_time32_second_array() {
         DataType::Time32(TimeUnit::Second),
         false,
     )]));
-    // Corresponds to single element array with entry 03:05:11
-    let array: Time32SecondArray = [Some(11_111)].into_iter().collect();
-    let batch = RecordBatch::try_new(schema.clone(), vec![Arc::new(array)]).unwrap();
+    let input = StringArray::from(vec!["03:05:11"]);
+    let array = cast(&input, schema.field(0).data_type()).unwrap();
+    let batch = RecordBatch::try_new(schema.clone(), vec![array]).unwrap();
     let mut reader = StubBatchReader::new(schema, vec![batch]);
 
     // When
@@ -2381,9 +2337,9 @@ fn insert_time32_ms_array() {
         DataType::Time32(TimeUnit::Millisecond),
         false,
     )]));
-    // Corresponds to single element array with entry 03:05:11.111
-    let array: Time32MillisecondArray = [Some(11_111_111)].into_iter().collect();
-    let batch = RecordBatch::try_new(schema.clone(), vec![Arc::new(array)]).unwrap();
+    let input = StringArray::from(vec!["03:05:11.111"]);
+    let array = cast(&input, schema.field(0).data_type()).unwrap();
+    let batch = RecordBatch::try_new(schema.clone(), vec![array]).unwrap();
     let mut reader = StubBatchReader::new(schema, vec![batch]);
 
     // When
@@ -2408,9 +2364,9 @@ fn insert_time64_us_array() {
         DataType::Time64(TimeUnit::Microsecond),
         false,
     )]));
-    // Corresponds to single element array with entry 03:05:11.111111
-    let array: Time64MicrosecondArray = [Some(11_111_111_111)].into_iter().collect();
-    let batch = RecordBatch::try_new(schema.clone(), vec![Arc::new(array)]).unwrap();
+    let input = StringArray::from(vec!["03:05:11.111111"]);
+    let array = cast(&input, schema.field(0).data_type()).unwrap();
+    let batch = RecordBatch::try_new(schema.clone(), vec![array]).unwrap();
     let mut reader = StubBatchReader::new(schema, vec![batch]);
 
     // When
@@ -2435,9 +2391,9 @@ fn insert_time64_ns_array() {
         DataType::Time64(TimeUnit::Nanosecond),
         false,
     )]));
-    // Corresponds to single element array with entry 03:05:11.111111111
-    let array: Time64NanosecondArray = [Some(11_111_111_111_111)].into_iter().collect();
-    let batch = RecordBatch::try_new(schema.clone(), vec![Arc::new(array)]).unwrap();
+    let input = StringArray::from(vec!["03:05:11.111111111"]);
+    let array = cast(&input, schema.field(0).data_type()).unwrap();
+    let batch = RecordBatch::try_new(schema.clone(), vec![array]).unwrap();
     let mut reader = StubBatchReader::new(schema, vec![batch]);
 
     // When

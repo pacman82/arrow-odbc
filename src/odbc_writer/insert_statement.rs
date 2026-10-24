@@ -51,7 +51,9 @@ pub trait Quote {
     fn quote_column_name<'a>(&self, column_name: &'a str) -> Cow<'a, str>;
 }
 
-pub fn quoting_from_connection(conn: &impl IdentifierQuoteChar) -> Result<Box<dyn Quote>, odbc_api::Error> {
+pub fn quoting_from_connection(
+    conn: &impl IdentifierQuoteChar,
+) -> Result<Box<dyn Quote>, odbc_api::Error> {
     let quoting: Box<dyn Quote> = if let Some(char) = conn.identifier_quote_char()? {
         Box::new(QuoteOffensively::new(char))
     } else {
