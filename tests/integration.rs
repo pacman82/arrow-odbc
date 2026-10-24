@@ -323,6 +323,24 @@ fn fetch_varchar() {
     assert!(array_vals.is_null(2));
 }
 
+/// A NULL in a field the schema declares non-nullable is reported as an error, not a panic.
+#[test]
+fn null_in_non_nullable_field_is_an_error() {
+    let table_name = function_name!().rsplit_once(':').unwrap().1;
+    let cursor = cursor_over_literals(table_name, "VARCHAR(10)", "(NULL)");
+    let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Utf8, false)]));
+    let mut reader = OdbcReaderBuilder::new()
+        .with_schema(schema)
+        .build(cursor)
+        .unwrap();
+
+    let error = reader.next().unwrap().unwrap_err();
+    assert_eq!(
+        "Invalid argument error: Column 'a' is declared as non-nullable but contains null values",
+        error.to_string()
+    );
+}
+
 /// Fill a record batch of Strings from a varchar source column
 #[test]
 fn trim_fixed_sized_character_data() {
@@ -521,6 +539,31 @@ fn fetch_date_time_ms() {
         ),
         array_vals.value_as_datetime(2)
     );
+}
+
+/// A time zone on a timestamp field in the schema is kept. Values are read as UTC, as before.
+#[test]
+fn fetch_timestamp_with_time_zone() {
+    let table_name = function_name!().rsplit_once(':').unwrap().1;
+    let cursor = cursor_over_literals(table_name, "DATETIME2(3)", "('2025-06-22 12:00:00.123')");
+    let schema = Arc::new(Schema::new(vec![Field::new(
+        "a",
+        DataType::Timestamp(TimeUnit::Millisecond, Some(Arc::from("UTC"))),
+        false,
+    )]));
+    let mut reader = OdbcReaderBuilder::new()
+        .with_schema(schema.clone())
+        .build(cursor)
+        .unwrap();
+
+    let batch = reader.next().unwrap().unwrap();
+    let column = batch.column(0);
+    assert_eq!(schema.field(0).data_type(), column.data_type());
+    let array = column
+        .as_any()
+        .downcast_ref::<TimestampMillisecondArray>()
+        .unwrap();
+    assert_eq!(1_750_593_600_123, array.value(0));
 }
 
 /// Fetch a timestamp older than unix epoch, i.e 1970-01-01 00:00:00. See issue:

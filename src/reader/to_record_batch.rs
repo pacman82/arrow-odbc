@@ -1,7 +1,9 @@
 use std::sync::Arc;
 
 use arrow::{
-    datatypes::{Schema, SchemaRef},
+    array::{Array, make_array},
+    datatypes::{DataType, Schema, SchemaRef},
+    error::ArrowError,
     record_batch::RecordBatch,
 };
 use log::info;
@@ -9,7 +11,7 @@ use odbc_api::{ResultSetMetadata, buffers::ColumnarDynBuffer};
 
 use crate::{BufferAllocationOptions, ColumnFailure, Error, arrow_schema_from};
 
-use super::{MappingError, ReadStrategy, TextEncoding, choose_column_strategy};
+use super::{ReadStrategy, TextEncoding, choose_column_strategy};
 
 /// Transforms batches fetched from an ODBC data source in a
 /// [`odbc_api::bufferers::ColumnarAnyBuffer`] into arrow tables of the specified schemas. It also
@@ -105,18 +107,30 @@ impl ToRecordBatch {
     pub fn buffer_to_record_batch(
         &self,
         odbc_buffer: &ColumnarDynBuffer,
-    ) -> Result<RecordBatch, MappingError> {
+    ) -> Result<RecordBatch, ArrowError> {
         let arrow_columns = self
             .column_strategies
             .iter()
+            .zip(self.schema.fields())
             .enumerate()
-            .map(|(index, strat)| {
+            .map(|(index, (strat, field))| {
                 let column_view = odbc_buffer.column(index);
-                strat.fill_arrow_array(column_view)
+                let array = strat
+                    .fill_arrow_array(column_view)
+                    .map_err(|error| ArrowError::ExternalError(Box::new(error)))?;
+                // Timestamp strategies build arrays without a time zone. Attach the one from the
+                // schema without changing the values.
+                if let DataType::Timestamp(_, Some(_)) = field.data_type() {
+                    let data = array
+                        .into_data()
+                        .into_builder()
+                        .data_type(field.data_type().clone());
+                    return Ok(make_array(data.build()?));
+                }
+                Ok(array)
             })
-            .collect::<Result<Vec<_>, _>>()?;
-        let record_batch = RecordBatch::try_new(self.schema.clone(), arrow_columns).unwrap();
-        Ok(record_batch)
+            .collect::<Result<Vec<_>, ArrowError>>()?;
+        RecordBatch::try_new(self.schema.clone(), arrow_columns)
     }
 }
 
