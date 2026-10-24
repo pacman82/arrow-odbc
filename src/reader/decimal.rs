@@ -21,8 +21,8 @@ struct Decimal {
 impl ReadStrategy for Decimal {
     fn buffer_desc(&self) -> BufferDesc {
         BufferDesc::Text {
-            // Must be able to hold num precision digits a sign and a decimal point
-            max_str_len: self.precision as usize + 2,
+            // Must be able to hold num precision digits, a sign, a decimal point and a leading zero
+            max_str_len: self.precision as usize + 3,
         }
     }
 
