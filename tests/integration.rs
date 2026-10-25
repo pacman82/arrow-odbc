@@ -759,6 +759,33 @@ fn fetch_negative_decimal_below_one_psql() {
     assert_eq!("-0.12", array_vals.value_as_string(0));
 }
 
+/// Fetch decimals with a scale above their precision from PostgreSQL, e.g. 0.00012 in NUMERIC(2,5)
+#[test]
+fn fetch_decimal_with_scale_above_precision_psql() {
+    let table_name = function_name!().rsplit_once(':').unwrap().1;
+    let conn = env()
+        .connect_with_connection_string(POSTGRES, Default::default())
+        .unwrap();
+    setup_empty_table::<PostgreSql>(&conn, table_name, &["NUMERIC(2,5)"]).unwrap();
+    let sql = format!("INSERT INTO {table_name} (a) VALUES (0.00012), (-0.00012), (NULL)");
+    conn.execute(&sql, (), None).unwrap();
+
+    let sql = format!("SELECT a FROM {table_name} ORDER BY id");
+    let cursor = conn.execute(&sql, (), None).unwrap().unwrap();
+    let mut reader = OdbcReaderBuilder::new().build(cursor).unwrap();
+    let record_batch = reader.next().unwrap().unwrap();
+
+    let array_vals = record_batch
+        .column(0)
+        .as_any()
+        .downcast_ref::<Decimal128Array>()
+        .unwrap();
+    assert_eq!(&DataType::Decimal128(5, 5), array_vals.data_type());
+    assert_eq!("0.00012", array_vals.value_as_string(0));
+    assert_eq!("-0.00012", array_vals.value_as_string(1));
+    assert!(array_vals.is_null(2));
+}
+
 /// Fetch variable sized binary data binary data
 #[test]
 fn fetch_varbinary_data() {
