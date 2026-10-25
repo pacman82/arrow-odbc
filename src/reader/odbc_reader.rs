@@ -333,6 +333,9 @@ impl OdbcReaderBuilder {
 
     /// If set to `true` text in fixed sized character columns like e.g. CHAR are trimmed of
     /// whitespaces before converted into Arrow UTF-8 arrays. Default is `false`.
+    ///
+    /// Performance minded user are adviced to only activate trimming if needed. Activating trimming
+    /// prevents validating many small text fields in bulk.
     pub fn trim_fixed_sized_characters(
         &mut self,
         fixed_sized_character_strings_are_trimmed: bool,
