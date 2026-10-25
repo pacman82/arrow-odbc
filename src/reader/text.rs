@@ -132,10 +132,12 @@ impl ReadStrategy for WideText {
     ) -> Result<ArrayRef, MappingError> {
         let view = column_view.as_wide_text().unwrap();
         let item_capacity = view.len();
-        // Any utf-16 character could take up to 4 Bytes if represented as utf-8, but since mostly
-        // this is 1 to one, and also not every string is likeyl to use its maximum capacity, we
-        // rather accept the reallocation in these scenarios.
-        let data_capacity = self.max_str_len * item_capacity;
+        // A UTF-16 unit takes at most three bytes in UTF-8. Capping the reservation at that keeps
+        // short values in wide columns from reserving, and keeping, the full declared width.
+        let utf16_len: usize = (0..view.len())
+            .map(|i| view.get(i).map_or(0, <[u16]>::len))
+            .sum();
+        let data_capacity = min(self.max_str_len * item_capacity, 3 * utf16_len);
         let mut builder = StringBuilder::with_capacity(item_capacity, data_capacity);
 
         let mut converter = Utf16ToUtf8Converter::new();
@@ -425,6 +427,28 @@ mod bench {
     fn long_ascii(bencher: divan::Bencher) {
         let values = (0..ROWS).map(|i| format!("{i:04} {}", "x".repeat(1019 + i * 37 % 3073)));
         wide_text_to_arrow(bencher, values);
+    }
+
+    #[divan::bench]
+    fn short_ascii_in_wide_column(bencher: divan::Bencher) {
+        let utf16: Vec<Vec<u16>> = (0..ROWS)
+            .map(|i| {
+                format!("{i:05} {}", "a".repeat(14))
+                    .encode_utf16()
+                    .collect()
+            })
+            .collect();
+        let mut column = TextColumn::<u16>::new(ROWS, 4000);
+        for (index, value) in utf16.iter().enumerate() {
+            column.set_value(index, Some(value));
+        }
+        let column: BoxColumnBuffer = Box::new(column);
+        let strategy = WideText::new(4000, false);
+
+        bencher.bench_local(|| {
+            let array = strategy.fill_arrow_array(column.slice(ROWS)).unwrap();
+            drop(divan::black_box(array));
+        });
     }
 
     /// Measures converting a wide text column holding `values` into an Arrow array.
