@@ -95,7 +95,13 @@ fn arrow_field_from(
         | OdbcDataType::Decimal {
             precision: p @ 0..=38,
             scale,
-        } => ArrowDataType::Decimal128(p as u8, scale.try_into().unwrap()),
+        } => {
+            // PostgreSQL and Oracle allow a scale above the precision, e.g. NUMERIC(2,5) holds
+            // 0.00012. Arrow requires the precision to be at least the scale.
+            let scale: i8 = scale.try_into().unwrap();
+            let precision = p.max(scale.max(0) as usize) as u8;
+            ArrowDataType::Decimal128(precision, scale)
+        }
         OdbcDataType::Integer => ArrowDataType::Int32,
         OdbcDataType::SmallInt => ArrowDataType::Int16,
         OdbcDataType::Real | OdbcDataType::Float { precision: 0..=24 } => ArrowDataType::Float32,
