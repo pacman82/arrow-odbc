@@ -128,7 +128,7 @@ where
     /// # Parameters
     ///
     /// * `row_capacity`: The amount of rows send to the database in each chunk. With the exception
-    ///   of the last chunk, which may be smaller.
+    ///   of the last chunk, which may be smaller. Must be at least 1, otherwise this panics.
     /// * `schema`: Schema needs to have one column for each positional parameter of the statement
     ///   and match the data which will be supplied to the instance later. Otherwise your code will
     ///   panic.
@@ -140,6 +140,7 @@ where
         schema: &Schema,
         statement: Prepared<S>,
     ) -> Result<Self, WriterError> {
+        assert!(row_capacity > 0, "row_capacity must be at least 1");
         let strategies: Vec<_> = schema
             .fields()
             .iter()

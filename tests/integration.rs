@@ -1843,6 +1843,23 @@ fn insert_nullable_int16() {
     assert_eq!(expected, actual);
 }
 
+/// Inserting with a row capacity of zero panics instead of looping forever.
+#[test]
+#[should_panic(expected = "row_capacity must be at least 1")]
+fn insert_with_zero_row_capacity_panics() {
+    let table_name = function_name!().rsplit_once(':').unwrap().1;
+    let conn = env()
+        .connect_with_connection_string(MSSQL, Default::default())
+        .unwrap();
+    setup_empty_table_mssql(&conn, table_name, &["INTEGER"]).unwrap();
+    let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Int32, true)]));
+    let array = Int32Array::from(vec![Some(1)]);
+    let batch = RecordBatch::try_new(schema.clone(), vec![Arc::new(array)]).unwrap();
+    let mut reader = StubBatchReader::new(schema, vec![batch]);
+
+    insert_into_table(&conn, &mut reader, table_name, 0).unwrap();
+}
+
 #[test]
 fn insert_nullable_int32() {
     // Given a table and a record batch reader returning a batch with a text column.
