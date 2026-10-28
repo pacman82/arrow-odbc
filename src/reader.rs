@@ -202,16 +202,16 @@ pub fn choose_column_strategy(
             };
             Box::new(Binary::new(length))
         }
-        ArrowDataType::Timestamp(TimeUnit::Second, _) => {
+        ArrowDataType::Timestamp(TimeUnit::Second, None) => {
             TimestampSecondType::map_infalliable(field.is_nullable(), seconds_since_epoch)
         }
-        ArrowDataType::Timestamp(TimeUnit::Millisecond, _) => {
+        ArrowDataType::Timestamp(TimeUnit::Millisecond, None) => {
             TimestampMillisecondType::map_infalliable(field.is_nullable(), ms_since_epoch)
         }
-        ArrowDataType::Timestamp(TimeUnit::Microsecond, _) => {
+        ArrowDataType::Timestamp(TimeUnit::Microsecond, None) => {
             TimestampMicrosecondType::map_infalliable(field.is_nullable(), us_since_epoch)
         }
-        ArrowDataType::Timestamp(TimeUnit::Nanosecond, _) => {
+        ArrowDataType::Timestamp(TimeUnit::Nanosecond, None) => {
             TimestampNanosecondType::map_falliable(
                 field.is_nullable(),
                 map_value_errors_to_null,
