@@ -554,6 +554,30 @@ fn fetch_date_time_ms_before_epoch() {
     );
 }
 
+/// ODBC timestamps carry no time zone, so reading them into an arrow timestamp with a time zone
+/// would require guessing how to interpret them. We report this as unsupported rather than guess.
+#[test]
+fn fetch_timestamp_with_time_zone_is_unsupported() {
+    // Given
+    let table_name = function_name!().rsplit_once(':').unwrap().1;
+    let cursor = cursor_over_literals(table_name, "DATETIME2(3)", "('2025-06-22 12:00:00.123')");
+    let data_type = DataType::Timestamp(TimeUnit::Millisecond, Some(Arc::from("UTC")));
+    let schema = Arc::new(Schema::new(vec![Field::new("a", data_type.clone(), false)]));
+
+    // When
+    let result = OdbcReaderBuilder::new().with_schema(schema).build(cursor);
+
+    // Then
+    assert!(matches!(
+        result,
+        Err(Error::ColumnFailure {
+            source: ColumnFailure::UnsupportedArrowType(unsupported),
+            index: 0,
+            name: _
+        }) if unsupported == data_type
+    ))
+}
+
 /// Overflows could occur if reusing the same conversion logic across different time units (e.g. ns
 /// and ms) due to the difference in time ranges an i64 associated with each unit might be able
 /// to represent.
