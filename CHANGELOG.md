@@ -1,6 +1,21 @@
 # Changelog
 
 All notable changes to this project will be documented in this file. `arrow-odbc` adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+## [26.0.3](https://github.com/pacman82/odbc-api/compare/26.0.2...26.0.3) - 2026-10-28
+
+### 🐛 Bug Fixes
+
+- Arrow Arrays with time zone information are reported as unsupported instead of causing a panic
+- Panic instead of looping forever on a row capacity of 0
+- Read decimals with a scale above their precision
+- Read negative decimals with scale equal to precision
+
+
+### ⚡ Performance
+
+- Size wide text output by the fetched values, not the column width
+- Allocate one less byte per row than reading decimals with p > s
+
 
 ## [26.0.2](https://github.com/pacman82/odbc-api/compare/26.0.1...26.0.2) - 2026-10-24
 
