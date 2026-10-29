@@ -2102,6 +2102,35 @@ fn insert_berlin_time_to_daytime_offset_sec_precision() {
     assert_eq!(expected, actual);
 }
 
+/// RFC 3339 offsets are whole minutes, so a historic offset with seconds is written as UTC.
+#[test]
+fn insert_paris_time_with_offset_seconds_as_utc() {
+    // Given
+    let table_name = function_name!().rsplit_once(':').unwrap().1;
+    let conn = env()
+        .connect_with_connection_string(MSSQL, Default::default())
+        .unwrap();
+    setup_empty_table_mssql(&conn, table_name, &["DATETIMEOFFSET(0)"]).unwrap();
+    let schema = Arc::new(Schema::new(vec![Field::new(
+        "a",
+        DataType::Timestamp(TimeUnit::Second, Some(Arc::from("Europe/Paris"))),
+        false,
+    )]));
+    // Interpreted as local time in Europe/Paris, which in 1900 was UTC+00:09:21
+    let input = StringArray::from(vec!["1900-06-01 12:09:21"]);
+    let array = cast(&input, schema.field(0).data_type()).unwrap();
+    let batch = RecordBatch::try_new(schema.clone(), vec![array]).unwrap();
+    let mut reader = StubBatchReader::new(schema, vec![batch]);
+
+    // When
+    insert_into_table(&conn, &mut reader, table_name, 5).unwrap();
+
+    // Then
+    let actual = table_to_string(&conn, table_name, &["a"]);
+    let expected = "1900-06-01 12:00:00 +00:00";
+    assert_eq!(expected, actual);
+}
+
 #[test]
 fn insert_berlin_time_to_daytime_offset_ms_precision() {
     // Given
