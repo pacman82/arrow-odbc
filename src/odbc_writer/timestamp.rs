@@ -9,7 +9,7 @@ use arrow::{
         TimestampSecondType,
     },
 };
-use chrono::{DateTime, Datelike, TimeZone, Timelike};
+use chrono::{DateTime, Datelike, Offset, TimeZone, Timelike, Utc};
 use log::debug;
 use odbc_api::{BindParamDesc, buffers::BoxColumBufferRefMut, sys::Timestamp};
 
@@ -126,7 +126,14 @@ where
         let mut to = column_buf.as_text().unwrap();
         for (index, timestamp) in from.iter().enumerate() {
             if let Some(timestamp) = timestamp {
-                let dt = P::to_regional_datetime(timestamp, &self.time_zone);
+                let dt = P::to_regional_datetime(timestamp, &self.time_zone).fixed_offset();
+                // RFC 3339 offsets are whole minutes. Historic offsets with seconds, e.g. Paris
+                // before 1911, are written as UTC instead, which keeps the instant.
+                let dt = if dt.offset().local_minus_utc() % 60 == 0 {
+                    dt
+                } else {
+                    dt.with_timezone(&Utc.fix())
+                };
                 write!(
                     to.set_mut(index + param_offset, P::FORMAT_WITH_TIME_ZONE_LEN),
                     "{}",
