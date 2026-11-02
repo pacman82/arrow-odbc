@@ -1,6 +1,13 @@
 # Changelog
 
 All notable changes to this project will be documented in this file. `arrow-odbc` adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+## [26.0.4](https://github.com/pacman82/odbc-api/compare/26.0.3...26.0.4) - 2026-11-02
+
+### 🐛 Bug Fixes
+
+- Write historic offsets with seconds as UTC
+- Insert timezone-aware timestamps before 1970 with fractional seconds
+
 
 ## [26.0.3](https://github.com/pacman82/odbc-api/compare/26.0.2...26.0.3) - 2026-10-28
 
