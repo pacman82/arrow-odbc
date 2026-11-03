@@ -5,7 +5,9 @@ All notable changes to this project will be documented in this file. `arrow-odbc
 
 ### 🐛 Bug Fixes
 
-- Write historic offsets with seconds as UTC
+Thanks again to @jplauri for his contributions.
+
+- Write historic timestamps with offsets in seconds as UTC
 - Insert timezone-aware timestamps before 1970 with fractional seconds
 
 
