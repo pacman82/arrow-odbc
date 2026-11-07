@@ -16,7 +16,7 @@ use odbc_api::{
     BindParamDesc, ColumnarBulkInserter, Connection, ConnectionTransitions, IdentifierQuoteChar,
     Prepared,
     buffers::{BoxColumBufferRefMut, BoxColumnBuffer},
-    handles::{AsStatementRef, StatementConnection, StatementImpl, StatementParent},
+    handles::{AsStatementRef, KeepConnectionOpen, StatementConnection, StatementImpl},
     parameter::WithDataType,
 };
 
@@ -220,7 +220,7 @@ where
 
 impl<C> OdbcWriter<StatementConnection<C>>
 where
-    C: StatementParent,
+    C: KeepConnectionOpen,
 {
     /// A writer which takes ownership of the connection and inserts the given schema into a table
     /// with matching column names.

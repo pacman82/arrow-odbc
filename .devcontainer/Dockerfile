@@ -1,5 +1,5 @@
 # Docker image intended for local development using vscode/zed
-FROM mcr.microsoft.com/devcontainers/rust:2-1-trixie
+FROM mcr.microsoft.com/devcontainers/rust:1-trixie
 
 # Download the package to configure the Microsoft repo
 RUN curl -sSL -O https://packages.microsoft.com/config/debian/13/packages-microsoft-prod.deb

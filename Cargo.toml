@@ -28,15 +28,15 @@ arrow = { version = ">= 29, < 61", default-features = false, features = [
     "chrono-tz",
 ] }
 # We use chrono for date conversions.
-chrono = "0.4.44"
-log = "0.4.29"
-thiserror = "2.0.18"
+chrono = "0.4.45"
+log = "0.4.35"
+thiserror = "2.0.21"
 
-odbc-api = ">= 29.2, < 30"
-atoi = "3.0.0"
+odbc-api = ">= 30, < 31"
+atoi = "3.1.1"
 # For faster validation that narrow bytes are indeed valid UTF-8.
 simdutf8 = { version = "0.1.5" }
-encoding_rs = "0.8.35"
+encoding_rs = "0.8.44"
 
 # We need divan as a direct dependency to the crate, so we can have benchmarks inline in the
 # modules.
@@ -46,7 +46,7 @@ rand = { version = "0.10", optional = true }
 
 
 [dev-dependencies]
-anyhow = "1.0.102"
+anyhow = "1.0.104"
 # Function name macro is used to ensure unique table names in test
 stdext = "0.3.3"
 float_eq = "1.0.1"

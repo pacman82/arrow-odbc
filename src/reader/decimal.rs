@@ -27,9 +27,7 @@ impl ReadStrategy for Decimal {
             // Must be able to hold num precision digits, a sign, a decimal point and a leading zero
             self.precision as usize + 3
         };
-        BufferDesc::Text {
-            max_str_len,
-        }
+        BufferDesc::Text { max_str_len }
     }
 
     fn fill_arrow_array(
