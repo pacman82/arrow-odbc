@@ -1,6 +1,12 @@
 # Changelog
 
-All notable changes to this project will be documented in this file. `arrow-odbc` adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+All notable changes to this project will be documented in this file. `arrow-odbc` adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).## [26.0.5](https://github.com/pacman82/odbc-api/compare/26.0.4...26.0.5) - 2026-11-07
+
+### 🚀 Features
+
+- Feat! Support odbc-api 30
+
+
 ## [26.0.4](https://github.com/pacman82/odbc-api/compare/26.0.3...26.0.4) - 2026-11-02
 
 ### 🐛 Bug Fixes
