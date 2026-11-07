@@ -1,5 +1,6 @@
 use arrow::{
-    datatypes::{Date32Type, Date64Type}, temporal_conversions::MILLISECONDS_IN_DAY,
+    datatypes::{Date32Type, Date64Type},
+    temporal_conversions::MILLISECONDS_IN_DAY,
 };
 
 use crate::date_time::epoch_to_date;

@@ -1,5 +1,5 @@
 use std::{
-    sync::{Arc, Mutex, OnceLock},
+    sync::{Arc, OnceLock},
     thread,
 };
 
@@ -34,14 +34,14 @@ use arrow_odbc::{
     arrow::array::Float64Array,
     arrow_schema_from, insert_into_table, insert_statement_from_schema,
     odbc_api::{
-        Connection, ConnectionOptions, Cursor, CursorImpl, Environment, IntoParameter,
+        Connection, ConnectionOptions, ConnectionTransitions as _, Cursor, CursorImpl, Environment,
+        IntoParameter, Shared,
         buffers::TextRowSet,
         handles::StatementConnection,
         sys::{AttrConnectionPooling, AttrCpMatch},
     },
 };
 
-use odbc_api::ConnectionTransitions;
 use stdext::function_name;
 
 /// Connection string to our Microsoft SQL Database. Boot it up with docker-compose up
@@ -3113,10 +3113,10 @@ fn support_shared_ownership_of_connections_for_writer() {
         let conn = env()
             .connect_with_connection_string(MSSQL, Default::default())
             .unwrap();
-        let shared_connection = Arc::new(Mutex::new(conn));
+        let shared_connection = Shared::new(conn);
         let row_capacity = 50;
         let sql = insert_statement_from_schema(&schema, table_name, &QuoteDefensively);
-        let statement = shared_connection.into_prepared(&sql).unwrap();
+        let statement = shared_connection.lock().into_prepared(&sql).unwrap();
         OdbcWriter::new(row_capacity, &schema, statement).unwrap()
     };
     inserter.write_all(reader).unwrap();
