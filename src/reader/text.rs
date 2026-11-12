@@ -22,6 +22,7 @@ pub fn choose_text_strategy(
     max_text_size: Option<usize>,
     trim_fixed_sized_character_strings: bool,
     text_encoding: TextEncoding,
+    nullable: bool,
 ) -> Result<Box<dyn ReadStrategy + Send>, ColumnFailure> {
     let apply_buffer_limit = |len| match (len, max_text_size) {
         (None, None) => Err(ColumnFailure::ZeroSizedColumn { sql_type }),
@@ -54,7 +55,7 @@ pub fn choose_text_strategy(
         // So far only Linux users seemed to have complained about panics due to garbage indices?
         // Linux usually would use UTF-8, so we only invest work in working around this for narrow
         // strategies
-        narrow_text_strategy(octet_len, trim)
+        narrow_text_strategy(octet_len, trim, nullable)
     };
 
     Ok(strategy)
@@ -99,8 +100,12 @@ fn wide_text_strategy(u16_len: usize, trim: bool) -> Box<dyn ReadStrategy + Send
     Box::new(WideText::new(u16_len, trim))
 }
 
-fn narrow_text_strategy(octet_len: usize, trim: bool) -> Box<dyn ReadStrategy + Send> {
-    Box::new(NarrowText::new(octet_len, trim))
+fn narrow_text_strategy(
+    octet_len: usize,
+    trim: bool,
+    nullable: bool,
+) -> Box<dyn ReadStrategy + Send> {
+    Box::new(NarrowText::new(octet_len, trim, nullable))
 }
 
 /// Strategy requesting the text from the database as UTF-16 (Wide characters) and emmitting it as
@@ -183,11 +188,17 @@ pub struct NarrowText {
     max_str_len: usize,
     /// Wether the string should be trimmed.
     trim: bool,
+    /// Wether the arrow field may contain NULL. If `false`, encountering NULL is an error.
+    nullable: bool,
 }
 
 impl NarrowText {
-    pub fn new(max_str_len: usize, trim: bool) -> Self {
-        Self { max_str_len, trim }
+    pub fn new(max_str_len: usize, trim: bool, nullable: bool) -> Self {
+        Self {
+            max_str_len,
+            trim,
+            nullable,
+        }
     }
 }
 
@@ -209,6 +220,9 @@ impl ReadStrategy for NarrowText {
             .fold((0, 0usize), |(total, count), bytes| {
                 (total + bytes.len(), count + 1)
             });
+        if !self.nullable && non_null != view.len() {
+            return Err(MappingError::NullInNonNullableField);
+        }
         // simdutf8 uses scalar validation below 64 bytes; batch these short values together.
         if !self.trim && total < non_null.saturating_mul(64) {
             narrow_text_validated_in_bulk(view, total)
@@ -316,7 +330,7 @@ mod tests {
         let column_view = column.slice(1);
 
         // When
-        let strategy = NarrowText::new(5, false);
+        let strategy = NarrowText::new(5, false, true);
         let result = strategy.fill_arrow_array(column_view);
 
         // Then
@@ -339,7 +353,7 @@ mod tests {
             column.set_value(index, *value);
         }
         let column: Box<dyn AnyColumnBuffer> = Box::new(column);
-        NarrowText::new(max_len, trim).fill_arrow_array(column.slice(values.len()))
+        NarrowText::new(max_len, trim, true).fill_arrow_array(column.slice(values.len()))
     }
 
     #[test]
@@ -533,7 +547,7 @@ mod bench {
             );
         }
         let column: BoxColumnBuffer = Box::new(column);
-        let strategy = NarrowText::new(max_str_len, trim);
+        let strategy = NarrowText::new(max_str_len, trim, true);
 
         bencher.bench_local(|| {
             let array = strategy.fill_arrow_array(column.slice(ROWS)).unwrap();

@@ -180,6 +180,7 @@ pub fn choose_column_strategy(
                 buffer_allocation_options.max_text_size,
                 trim_fixed_sized_character_strings,
                 text_encoding,
+                field.is_nullable(),
             )?
         }
         ArrowDataType::Decimal128(precision, scale @ 0..) => decimal(*precision, *scale),
