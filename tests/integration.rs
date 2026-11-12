@@ -174,6 +174,29 @@ fn fetch_8bit_unsigned_integer_explicit_schema() {
     assert_eq!([1, 2, 3], *array_vals.values());
 }
 
+/// A user may specify a non-nullable arrow field for a column which contains NULL. We expect an
+/// error rather than a panic.
+#[test]
+fn fetch_null_into_non_nullable_narrow_text() {
+    let table_name = function_name!().rsplit_once(':').unwrap().1;
+    let cursor = cursor_over_literals(table_name, "VARCHAR(10)", "('a'),(NULL)");
+    let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Utf8, false)]));
+    let mut reader = OdbcReaderBuilder::new()
+        .with_schema(schema)
+        .with_payload_text_encoding(TextEncoding::Utf8)
+        .build(cursor)
+        .unwrap();
+
+    let result = reader.next().unwrap();
+
+    let error = result.unwrap_err();
+    assert_eq!(
+        "External error: Failed to map values into arrow field 'a':\n\
+        The arrow field is declared non-nullable, yet the data source returned NULL.",
+        error.to_string()
+    );
+}
+
 /// Fill a record batch with non nullable Integer 8 Bit usigned integer. Since that type would never
 /// interferred from the Database automatically it must be specified explicitly in a schema
 #[test]
