@@ -201,7 +201,7 @@ pub fn choose_column_strategy(
                     }
                 }
             };
-            Box::new(Binary::new(length))
+            Box::new(Binary::new(length, field.is_nullable()))
         }
         ArrowDataType::Timestamp(TimeUnit::Second, None) => {
             TimestampSecondType::map_infalliable(field.is_nullable(), seconds_since_epoch)
