@@ -280,6 +280,36 @@ fn fetch_null_into_non_nullable_fixed_sized_binary() {
     );
 }
 
+/// The values of a variadic binary column may be shorter than the length of a fixed sized binary
+/// arrow field. We expect an error rather than a panic.
+#[test]
+fn fetch_too_short_value_into_fixed_sized_binary() {
+    // Given a variadic binary column on the database containing a value with only one byte
+    let table_name = function_name!().rsplit_once(':').unwrap().1;
+    let cursor = cursor_over_literals(table_name, "VARBINARY(2)", "(0x01)");
+
+    // When mapping these to an arrow fixed sized binary array with a length of two bytes
+    let schema = Arc::new(Schema::new(vec![Field::new(
+        "a",
+        DataType::FixedSizeBinary(2),
+        true,
+    )]));
+    let mut reader = OdbcReaderBuilder::new()
+        .with_schema(schema)
+        .build(cursor)
+        .unwrap();
+
+    // Then fetching a batch with these values returns a readable error
+    let result = reader.next().unwrap();
+    let error = result.unwrap_err();
+    assert_eq!(
+        "External error: Failed to map values into arrow field 'a':\n\
+        The arrow field is declared as fixed sized binary with a length of 2 bytes, yet the data \
+        source returned a value with a length of 1 bytes.",
+        error.to_string()
+    );
+}
+
 /// Fill a record batch with non nullable Integer 8 Bit usigned integer. Since that type would never
 /// interferred from the Database automatically it must be specified explicitly in a schema
 #[test]

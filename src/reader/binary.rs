@@ -75,7 +75,12 @@ impl ReadStrategy for FixedSizedBinary {
             FixedSizeBinaryBuilder::with_capacity(view.len(), self.len.try_into().unwrap());
         for value in view.iter() {
             if let Some(bytes) = value {
-                builder.append_value(bytes).unwrap();
+                builder.append_value(bytes).map_err(|_| {
+                    MappingError::FixedSizeBinaryLengthMismatch {
+                        expected: self.len as usize,
+                        actual: bytes.len(),
+                    }
+                })?;
             } else {
                 if !self.nullable {
                     return Err(MappingError::NullInNonNullableField);
