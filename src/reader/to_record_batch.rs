@@ -9,7 +9,7 @@ use odbc_api::{ResultSetMetadata, buffers::ColumnarDynBuffer};
 
 use crate::{BufferAllocationOptions, ColumnFailure, Error, arrow_schema_from};
 
-use super::{MappingError, ReadStrategy, TextEncoding, choose_column_strategy};
+use super::{ColumnMappingError, ReadStrategy, TextEncoding, choose_column_strategy};
 
 /// Transforms batches fetched from an ODBC data source in a
 /// [`odbc_api::bufferers::ColumnarAnyBuffer`] into arrow tables of the specified schemas. It also
@@ -105,14 +105,17 @@ impl ToRecordBatch {
     pub fn buffer_to_record_batch(
         &self,
         odbc_buffer: &ColumnarDynBuffer,
-    ) -> Result<RecordBatch, MappingError> {
+    ) -> Result<RecordBatch, ColumnMappingError> {
         let arrow_columns = self
             .column_strategies
             .iter()
+            .zip(self.schema.fields())
             .enumerate()
-            .map(|(index, strat)| {
+            .map(|(index, (strat, field))| {
                 let column_view = odbc_buffer.column(index);
-                strat.fill_arrow_array(column_view)
+                strat
+                    .fill_arrow_array(column_view)
+                    .map_err(|error| error.attach_arrow_field_name(field.name().clone()))
             })
             .collect::<Result<Vec<_>, _>>()?;
         let record_batch = RecordBatch::try_new(self.schema.clone(), arrow_columns).unwrap();

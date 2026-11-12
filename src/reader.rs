@@ -36,7 +36,7 @@ pub use self::{
     binary::{Binary, FixedSizedBinary},
     concurrent_odbc_reader::ConcurrentOdbcReader,
     decimal::decimal,
-    map_odbc_to_arrow::{MapOdbcToArrow, MappingError},
+    map_odbc_to_arrow::{ColumnMappingError, MapOdbcToArrow, MappingError},
     odbc_reader::{OdbcReader, OdbcReaderBuilder},
     text::{TextEncoding, choose_text_strategy},
 };
