@@ -251,6 +251,35 @@ fn fetch_null_into_non_nullable_binary() {
     );
 }
 
+/// A user may specify a non-nullable arrow field for a column which contains NULL. We expect an
+/// error rather than a panic.
+#[test]
+fn fetch_null_into_non_nullable_fixed_sized_binary() {
+    // Given a fixed sized binary column on the database containing NULL values
+    let table_name = function_name!().rsplit_once(':').unwrap().1;
+    let cursor = cursor_over_literals(table_name, "BINARY(2)", "(NULL)");
+
+    // When mapping these to a non-nullable arrow fixed sized binary array
+    let schema = Arc::new(Schema::new(vec![Field::new(
+        "a",
+        DataType::FixedSizeBinary(2),
+        false,
+    )]));
+    let mut reader = OdbcReaderBuilder::new()
+        .with_schema(schema)
+        .build(cursor)
+        .unwrap();
+
+    // Then fetching a batch with these values returns a readable error
+    let result = reader.next().unwrap();
+    let error = result.unwrap_err();
+    assert_eq!(
+        "External error: Failed to map values into arrow field 'a':\n\
+        The arrow field is declared non-nullable, yet the data source returned NULL.",
+        error.to_string()
+    );
+}
+
 /// Fill a record batch with non nullable Integer 8 Bit usigned integer. Since that type would never
 /// interferred from the Database automatically it must be specified explicitly in a schema
 #[test]

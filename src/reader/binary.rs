@@ -49,11 +49,13 @@ impl ReadStrategy for Binary {
 pub struct FixedSizedBinary {
     /// Length in bytes of elements
     len: u32,
+    /// Wether the arrow field may contain NULL. If `false`, encountering NULL is an error.
+    nullable: bool,
 }
 
 impl FixedSizedBinary {
-    pub fn new(len: u32) -> Self {
-        Self { len }
+    pub fn new(len: u32, nullable: bool) -> Self {
+        Self { len, nullable }
     }
 }
 
@@ -75,6 +77,9 @@ impl ReadStrategy for FixedSizedBinary {
             if let Some(bytes) = value {
                 builder.append_value(bytes).unwrap();
             } else {
+                if !self.nullable {
+                    return Err(MappingError::NullInNonNullableField);
+                }
                 builder.append_null();
             }
         }
