@@ -219,9 +219,10 @@ pub fn choose_column_strategy(
                 ns_since_epoch,
             )
         }
-        ArrowDataType::FixedSizeBinary(length) => {
-            Box::new(FixedSizedBinary::new((*length).try_into().unwrap()))
-        }
+        ArrowDataType::FixedSizeBinary(length) => Box::new(FixedSizedBinary::new(
+            (*length).try_into().unwrap(),
+            field.is_nullable(),
+        )),
         unsupported_arrow_type => {
             return Err(ColumnFailure::UnsupportedArrowType(
                 unsupported_arrow_type.clone(),
