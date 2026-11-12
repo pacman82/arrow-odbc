@@ -660,7 +660,8 @@ fn fetch_out_of_range_date_time_ns() {
     .unwrap_err();
 
     assert_eq!(
-        "External error: Timestamp is not representable in arrow: 2300-01-01 00:00:00.123456700\n\
+        "External error: Failed to map values into arrow field 'a':\n\
+        Timestamp is not representable in arrow: 2300-01-01 00:00:00.123456700\n\
         Timestamps with nanoseconds precision are represented using a signed 64 Bit integer. This \
         limits their range to values between 1677-09-21 00:12:44 and \
         2262-04-11 23:47:16.854775807. The value returned from the database is outside of this \

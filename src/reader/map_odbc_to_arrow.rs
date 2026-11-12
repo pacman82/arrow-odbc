@@ -348,6 +348,26 @@ pub enum MappingError {
     InvalidUtf8 { lossy_value: String },
 }
 
+impl MappingError {
+    /// Provides the error with the context of the arrow field it occurred in.
+    pub fn attach_arrow_field_name(self, field_name: String) -> ColumnMappingError {
+        ColumnMappingError {
+            field_name,
+            source: self,
+        }
+    }
+}
+
+/// A [`MappingError`] with the context of the column it occurred in.
+#[derive(Error, Debug)]
+#[error("Failed to map values into arrow field '{field_name}':\n{source}")]
+pub struct ColumnMappingError {
+    /// Name of the arrow field the values have been mapped into. This is the name in the arrow
+    /// schema, which may differ from the column name in the data source.
+    pub field_name: String,
+    pub source: MappingError,
+}
+
 #[cfg(feature = "internal_benches")]
 mod bench {
     use arrow::datatypes::{Float64Type, Int32Type};
