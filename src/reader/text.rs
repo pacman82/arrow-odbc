@@ -43,7 +43,7 @@ pub fn choose_text_strategy(
             .transpose()
             .map_err(|source| ColumnFailure::UnknownStringLength { sql_type, source })?;
         let hex_len = apply_buffer_limit(hex_len.map(NonZeroUsize::get))?;
-        wide_text_strategy(hex_len, trim)
+        wide_text_strategy(hex_len, trim, nullable)
     } else {
         let octet_len = sql_type
             .utf8_len()
@@ -96,8 +96,8 @@ impl TextEncoding {
     }
 }
 
-fn wide_text_strategy(u16_len: usize, trim: bool) -> Box<dyn ReadStrategy + Send> {
-    Box::new(WideText::new(u16_len, trim))
+fn wide_text_strategy(u16_len: usize, trim: bool, nullable: bool) -> Box<dyn ReadStrategy + Send> {
+    Box::new(WideText::new(u16_len, trim, nullable))
 }
 
 fn narrow_text_strategy(
@@ -116,11 +116,17 @@ pub struct WideText {
     max_str_len: usize,
     /// Wether the string should be trimmed.
     trim: bool,
+    /// Wether the arrow field may contain NULL. If `false`, encountering NULL is an error.
+    nullable: bool,
 }
 
 impl WideText {
-    pub fn new(max_str_len: usize, trim: bool) -> Self {
-        Self { max_str_len, trim }
+    pub fn new(max_str_len: usize, trim: bool, nullable: bool) -> Self {
+        Self {
+            max_str_len,
+            trim,
+            nullable,
+        }
     }
 }
 
@@ -153,6 +159,9 @@ impl ReadStrategy for WideText {
                 let slice = if self.trim { slice.trim() } else { slice };
                 Some(slice)
             } else {
+                if !self.nullable {
+                    return Err(MappingError::NullInNonNullableField);
+                }
                 None
             };
             builder.append_option(opt);
@@ -457,7 +466,7 @@ mod bench {
             column.set_value(index, Some(value));
         }
         let column: BoxColumnBuffer = Box::new(column);
-        let strategy = WideText::new(4000, false);
+        let strategy = WideText::new(4000, false, true);
 
         bencher.bench_local(|| {
             let array = strategy.fill_arrow_array(column.slice(ROWS)).unwrap();
@@ -474,7 +483,7 @@ mod bench {
             column.set_value(index, Some(value));
         }
         let column: BoxColumnBuffer = Box::new(column);
-        let strategy = WideText::new(max_str_len, false);
+        let strategy = WideText::new(max_str_len, false, true);
 
         bencher.bench_local(|| {
             // Drop within the timed closure, so destruction of the array is measured, too.
