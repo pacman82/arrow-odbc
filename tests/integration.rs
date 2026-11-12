@@ -174,6 +174,142 @@ fn fetch_8bit_unsigned_integer_explicit_schema() {
     assert_eq!([1, 2, 3], *array_vals.values());
 }
 
+/// A user may specify a non-nullable arrow field for a column which contains NULL. We expect an
+/// error rather than a panic.
+#[test]
+fn fetch_null_into_non_nullable_narrow_text() {
+    // Given a text column on the database containing NULL values
+    let table_name = function_name!().rsplit_once(':').unwrap().1;
+    let cursor = cursor_over_literals(table_name, "VARCHAR(10)", "(NULL)");
+
+    // When mapping these to a non-nullable arrow utf8 array via an UTF-8 transport buffer
+    let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Utf8, false)]));
+    let mut reader = OdbcReaderBuilder::new()
+        .with_schema(schema)
+        .with_payload_text_encoding(TextEncoding::Utf8)
+        .build(cursor)
+        .unwrap();
+
+    // Then fetching a batch with these values returns a readable error
+    let result = reader.next().unwrap();
+    let error = result.unwrap_err();
+    assert_eq!(
+        "External error: Failed to map values into arrow field 'a':\n\
+        The arrow field is declared non-nullable, yet the data source returned NULL.",
+        error.to_string()
+    );
+}
+
+/// A user may specify a non-nullable arrow field for a column which contains NULL. We expect an
+/// error rather than a panic.
+#[test]
+fn fetch_null_into_non_nullable_wide_text() {
+    // Given a text column on the database containing NULL values
+    let table_name = function_name!().rsplit_once(':').unwrap().1;
+    let cursor = cursor_over_literals(table_name, "NVARCHAR(10)", "(NULL)");
+
+    // When mapping these to a non-nullable arrow utf8 array via an UTF-16 transport buffer
+    let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Utf8, false)]));
+    let mut reader = OdbcReaderBuilder::new()
+        .with_schema(schema)
+        .with_payload_text_encoding(TextEncoding::Utf16)
+        .build(cursor)
+        .unwrap();
+
+    // Then fetching a batch with these values returns a readable error
+    let result = reader.next().unwrap();
+    let error = result.unwrap_err();
+    assert_eq!(
+        "External error: Failed to map values into arrow field 'a':\n\
+        The arrow field is declared non-nullable, yet the data source returned NULL.",
+        error.to_string()
+    );
+}
+
+/// A user may specify a non-nullable arrow field for a column which contains NULL. We expect an
+/// error rather than a panic.
+#[test]
+fn fetch_null_into_non_nullable_binary() {
+    // Given a binary column on the database containing NULL values
+    let table_name = function_name!().rsplit_once(':').unwrap().1;
+    let cursor = cursor_over_literals(table_name, "VARBINARY(10)", "(NULL)");
+
+    // When fetching these mapping these to a non-nullable arrow binary array
+    let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Binary, false)]));
+    let mut reader = OdbcReaderBuilder::new()
+        .with_schema(schema)
+        .build(cursor)
+        .unwrap();
+
+    // Then fetching a batch with these values returns a readable error
+    let result = reader.next().unwrap();
+    let error = result.unwrap_err();
+    assert_eq!(
+        "External error: Failed to map values into arrow field 'a':\n\
+        The arrow field is declared non-nullable, yet the data source returned NULL.",
+        error.to_string()
+    );
+}
+
+/// A user may specify a non-nullable arrow field for a column which contains NULL. We expect an
+/// error rather than a panic.
+#[test]
+fn fetch_null_into_non_nullable_fixed_sized_binary() {
+    // Given a fixed sized binary column on the database containing NULL values
+    let table_name = function_name!().rsplit_once(':').unwrap().1;
+    let cursor = cursor_over_literals(table_name, "BINARY(2)", "(NULL)");
+
+    // When mapping these to a non-nullable arrow fixed sized binary array
+    let schema = Arc::new(Schema::new(vec![Field::new(
+        "a",
+        DataType::FixedSizeBinary(2),
+        false,
+    )]));
+    let mut reader = OdbcReaderBuilder::new()
+        .with_schema(schema)
+        .build(cursor)
+        .unwrap();
+
+    // Then fetching a batch with these values returns a readable error
+    let result = reader.next().unwrap();
+    let error = result.unwrap_err();
+    assert_eq!(
+        "External error: Failed to map values into arrow field 'a':\n\
+        The arrow field is declared non-nullable, yet the data source returned NULL.",
+        error.to_string()
+    );
+}
+
+/// The values of a variadic binary column may be shorter than the length of a fixed sized binary
+/// arrow field. We expect an error rather than a panic.
+#[test]
+fn fetch_too_short_value_into_fixed_sized_binary() {
+    // Given a variadic binary column on the database containing a value with only one byte
+    let table_name = function_name!().rsplit_once(':').unwrap().1;
+    let cursor = cursor_over_literals(table_name, "VARBINARY(2)", "(0x01)");
+
+    // When mapping these to an arrow fixed sized binary array with a length of two bytes
+    let schema = Arc::new(Schema::new(vec![Field::new(
+        "a",
+        DataType::FixedSizeBinary(2),
+        true,
+    )]));
+    let mut reader = OdbcReaderBuilder::new()
+        .with_schema(schema)
+        .build(cursor)
+        .unwrap();
+
+    // Then fetching a batch with these values returns a readable error
+    let result = reader.next().unwrap();
+    let error = result.unwrap_err();
+    assert_eq!(
+        "External error: Failed to map values into arrow field 'a':\n\
+        The arrow field is declared as fixed sized binary with a length of 2 bytes, yet the data \
+        source returned a value with a length of 1 bytes.",
+        error.to_string()
+    );
+}
+
 /// Fill a record batch with non nullable Integer 8 Bit usigned integer. Since that type would never
 /// interferred from the Database automatically it must be specified explicitly in a schema
 #[test]

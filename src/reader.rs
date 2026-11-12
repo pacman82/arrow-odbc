@@ -180,6 +180,7 @@ pub fn choose_column_strategy(
                 buffer_allocation_options.max_text_size,
                 trim_fixed_sized_character_strings,
                 text_encoding,
+                field.is_nullable(),
             )?
         }
         ArrowDataType::Decimal128(precision, scale @ 0..) => decimal(*precision, *scale),
@@ -200,7 +201,7 @@ pub fn choose_column_strategy(
                     }
                 }
             };
-            Box::new(Binary::new(length))
+            Box::new(Binary::new(length, field.is_nullable()))
         }
         ArrowDataType::Timestamp(TimeUnit::Second, None) => {
             TimestampSecondType::map_infalliable(field.is_nullable(), seconds_since_epoch)
@@ -218,9 +219,10 @@ pub fn choose_column_strategy(
                 ns_since_epoch,
             )
         }
-        ArrowDataType::FixedSizeBinary(length) => {
-            Box::new(FixedSizedBinary::new((*length).try_into().unwrap()))
-        }
+        ArrowDataType::FixedSizeBinary(length) => Box::new(FixedSizedBinary::new(
+            (*length).try_into().unwrap(),
+            field.is_nullable(),
+        )),
         unsupported_arrow_type => {
             return Err(ColumnFailure::UnsupportedArrowType(
                 unsupported_arrow_type.clone(),

@@ -8,11 +8,13 @@ use super::{MappingError, ReadStrategy};
 pub struct Binary {
     /// Maximum length in bytes of elements
     max_len: usize,
+    /// Wether the arrow field may contain NULL. If `false`, encountering NULL is an error.
+    nullable: bool,
 }
 
 impl Binary {
-    pub fn new(max_len: usize) -> Self {
-        Self { max_len }
+    pub fn new(max_len: usize, nullable: bool) -> Self {
+        Self { max_len, nullable }
     }
 }
 
@@ -34,6 +36,9 @@ impl ReadStrategy for Binary {
             if let Some(bytes) = value {
                 builder.append_value(bytes);
             } else {
+                if !self.nullable {
+                    return Err(MappingError::NullInNonNullableField);
+                }
                 builder.append_null();
             }
         }
@@ -44,11 +49,13 @@ impl ReadStrategy for Binary {
 pub struct FixedSizedBinary {
     /// Length in bytes of elements
     len: u32,
+    /// Wether the arrow field may contain NULL. If `false`, encountering NULL is an error.
+    nullable: bool,
 }
 
 impl FixedSizedBinary {
-    pub fn new(len: u32) -> Self {
-        Self { len }
+    pub fn new(len: u32, nullable: bool) -> Self {
+        Self { len, nullable }
     }
 }
 
@@ -68,8 +75,16 @@ impl ReadStrategy for FixedSizedBinary {
             FixedSizeBinaryBuilder::with_capacity(view.len(), self.len.try_into().unwrap());
         for value in view.iter() {
             if let Some(bytes) = value {
-                builder.append_value(bytes).unwrap();
+                builder.append_value(bytes).map_err(|_| {
+                    MappingError::FixedSizeBinaryLengthMismatch {
+                        expected: self.len as usize,
+                        actual: bytes.len(),
+                    }
+                })?;
             } else {
+                if !self.nullable {
+                    return Err(MappingError::NullInNonNullableField);
+                }
                 builder.append_null();
             }
         }
@@ -107,7 +122,7 @@ mod bench {
             );
         }
         let column: BoxColumnBuffer = Box::new(column);
-        let strategy = Binary::new(200);
+        let strategy = Binary::new(200, true);
 
         bencher.bench_local(|| {
             let array = strategy.fill_arrow_array(column.slice(rows)).unwrap();

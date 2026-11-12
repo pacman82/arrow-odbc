@@ -346,6 +346,13 @@ pub enum MappingError {
     OutOfRangeTimestampNs { value: NaiveDateTime },
     #[error("Datasource returned invalid UTF-8. Lossy representation of value: {lossy_value}")]
     InvalidUtf8 { lossy_value: String },
+    #[error("The arrow field is declared non-nullable, yet the data source returned NULL.")]
+    NullInNonNullableField,
+    #[error(
+        "The arrow field is declared as fixed sized binary with a length of {expected} bytes, yet \
+        the data source returned a value with a length of {actual} bytes."
+    )]
+    FixedSizeBinaryLengthMismatch { expected: usize, actual: usize },
 }
 
 impl MappingError {
