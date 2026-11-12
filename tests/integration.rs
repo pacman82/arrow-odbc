@@ -178,8 +178,11 @@ fn fetch_8bit_unsigned_integer_explicit_schema() {
 /// error rather than a panic.
 #[test]
 fn fetch_null_into_non_nullable_narrow_text() {
+    // Given a text column on the database containing NULL values
     let table_name = function_name!().rsplit_once(':').unwrap().1;
-    let cursor = cursor_over_literals(table_name, "VARCHAR(10)", "('a'),(NULL)");
+    let cursor = cursor_over_literals(table_name, "VARCHAR(10)", "(NULL)");
+
+    // When mapping these to a non-nullable arrow utf8 array via an UTF-8 transport buffer
     let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Utf8, false)]));
     let mut reader = OdbcReaderBuilder::new()
         .with_schema(schema)
@@ -187,8 +190,8 @@ fn fetch_null_into_non_nullable_narrow_text() {
         .build(cursor)
         .unwrap();
 
+    // Then fetching a batch with these values returns a readable error
     let result = reader.next().unwrap();
-
     let error = result.unwrap_err();
     assert_eq!(
         "External error: Failed to map values into arrow field 'a':\n\
@@ -201,8 +204,11 @@ fn fetch_null_into_non_nullable_narrow_text() {
 /// error rather than a panic.
 #[test]
 fn fetch_null_into_non_nullable_wide_text() {
+    // Given a text column on the database containing NULL values
     let table_name = function_name!().rsplit_once(':').unwrap().1;
-    let cursor = cursor_over_literals(table_name, "NVARCHAR(10)", "('a'),(NULL)");
+    let cursor = cursor_over_literals(table_name, "NVARCHAR(10)", "(NULL)");
+
+    // When mapping these to a non-nullable arrow utf8 array via an UTF-16 transport buffer
     let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Utf8, false)]));
     let mut reader = OdbcReaderBuilder::new()
         .with_schema(schema)
@@ -210,8 +216,33 @@ fn fetch_null_into_non_nullable_wide_text() {
         .build(cursor)
         .unwrap();
 
+    // Then fetching a batch with these values returns a readable error
     let result = reader.next().unwrap();
+    let error = result.unwrap_err();
+    assert_eq!(
+        "External error: Failed to map values into arrow field 'a':\n\
+        The arrow field is declared non-nullable, yet the data source returned NULL.",
+        error.to_string()
+    );
+}
 
+/// A user may specify a non-nullable arrow field for a column which contains NULL. We expect an
+/// error rather than a panic.
+#[test]
+fn fetch_null_into_non_nullable_binary() {
+    // Given a binary column on the database containing NULL values
+    let table_name = function_name!().rsplit_once(':').unwrap().1;
+    let cursor = cursor_over_literals(table_name, "VARBINARY(10)", "(NULL)");
+
+    // When fetching these mapping these to a non-nullable arrow binary array
+    let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Binary, false)]));
+    let mut reader = OdbcReaderBuilder::new()
+        .with_schema(schema)
+        .build(cursor)
+        .unwrap();
+
+    // Then fetching a batch with these values returns a readable error
+    let result = reader.next().unwrap();
     let error = result.unwrap_err();
     assert_eq!(
         "External error: Failed to map values into arrow field 'a':\n\
