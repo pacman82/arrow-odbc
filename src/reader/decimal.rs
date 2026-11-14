@@ -8,14 +8,20 @@ use odbc_api::{
 
 use super::{MappingError, ReadStrategy};
 
-pub fn decimal(precision: u8, scale: i8) -> Box<dyn ReadStrategy + Send> {
-    Box::new(Decimal { precision, scale })
+pub fn decimal(precision: u8, scale: i8, nullable: bool) -> Box<dyn ReadStrategy + Send> {
+    Box::new(Decimal {
+        precision,
+        scale,
+        nullable,
+    })
 }
 
 struct Decimal {
     precision: u8,
     /// We know scale to be non-negative, yet we can save us some conversions storing it as i8.
     scale: i8,
+    /// Wether the arrow field may contain NULL. If `false`, encountering NULL is an error.
+    nullable: bool,
 }
 
 impl ReadStrategy for Decimal {
@@ -43,6 +49,9 @@ impl ReadStrategy for Decimal {
                 let num = decimal_text_to_i128(text, scale);
                 builder.append_value(num);
             } else {
+                if !self.nullable {
+                    return Err(MappingError::NullInNonNullableField);
+                }
                 builder.append_null();
             }
         }
@@ -67,7 +76,7 @@ mod bench {
 
     #[divan::bench()]
     fn integer(bencher: divan::Bencher) {
-        let strategy = decimal(38, 0);
+        let strategy = decimal(38, 0, true);
         let input = random_integers_in_text_column();
         bencher.bench_local(|| {
             let view = input.slice(ROWS);

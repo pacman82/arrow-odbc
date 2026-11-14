@@ -310,6 +310,122 @@ fn fetch_too_short_value_into_fixed_sized_binary() {
     );
 }
 
+/// A user may specify a non-nullable arrow field for a column which contains NULL. We expect an
+/// error rather than a panic.
+#[test]
+fn fetch_null_into_non_nullable_decimal() {
+    // Given a decimal column on the database containing NULL values
+    let table_name = function_name!().rsplit_once(':').unwrap().1;
+    let cursor = cursor_over_literals(table_name, "DECIMAL(5,2)", "(NULL)");
+
+    // When mapping these to a non-nullable arrow decimal array
+    let schema = Arc::new(Schema::new(vec![Field::new(
+        "a",
+        DataType::Decimal128(5, 2),
+        false,
+    )]));
+    let mut reader = OdbcReaderBuilder::new()
+        .with_schema(schema)
+        .build(cursor)
+        .unwrap();
+
+    // Then fetching a batch with these values returns a readable error
+    let result = reader.next().unwrap();
+    let error = result.unwrap_err();
+    assert_eq!(
+        "External error: Failed to map values into arrow field 'a':\n\
+        The arrow field is declared non-nullable, yet the data source returned NULL.",
+        error.to_string()
+    );
+}
+
+/// A user may specify a non-nullable arrow field for a column which contains NULL. We expect an
+/// error rather than a panic.
+#[test]
+fn fetch_null_into_non_nullable_time_ms() {
+    // Given a time column on the database containing NULL values
+    let table_name = function_name!().rsplit_once(':').unwrap().1;
+    let cursor = cursor_over_literals(table_name, "TIME(3)", "(NULL)");
+
+    // When mapping these to a non-nullable arrow time array with millisecond precision
+    let schema = Arc::new(Schema::new(vec![Field::new(
+        "a",
+        DataType::Time32(TimeUnit::Millisecond),
+        false,
+    )]));
+    let mut reader = OdbcReaderBuilder::new()
+        .with_schema(schema)
+        .build(cursor)
+        .unwrap();
+
+    // Then fetching a batch with these values returns a readable error
+    let result = reader.next().unwrap();
+    let error = result.unwrap_err();
+    assert_eq!(
+        "External error: Failed to map values into arrow field 'a':\n\
+        The arrow field is declared non-nullable, yet the data source returned NULL.",
+        error.to_string()
+    );
+}
+
+/// A user may specify a non-nullable arrow field for a column which contains NULL. We expect an
+/// error rather than a panic.
+#[test]
+fn fetch_null_into_non_nullable_time_us() {
+    // Given a time column on the database containing NULL values
+    let table_name = function_name!().rsplit_once(':').unwrap().1;
+    let cursor = cursor_over_literals(table_name, "TIME(6)", "(NULL)");
+
+    // When mapping these to a non-nullable arrow time array with microsecond precision
+    let schema = Arc::new(Schema::new(vec![Field::new(
+        "a",
+        DataType::Time64(TimeUnit::Microsecond),
+        false,
+    )]));
+    let mut reader = OdbcReaderBuilder::new()
+        .with_schema(schema)
+        .build(cursor)
+        .unwrap();
+
+    // Then fetching a batch with these values returns a readable error
+    let result = reader.next().unwrap();
+    let error = result.unwrap_err();
+    assert_eq!(
+        "External error: Failed to map values into arrow field 'a':\n\
+        The arrow field is declared non-nullable, yet the data source returned NULL.",
+        error.to_string()
+    );
+}
+
+/// A user may specify a non-nullable arrow field for a column which contains NULL. We expect an
+/// error rather than a panic.
+#[test]
+fn fetch_null_into_non_nullable_time_ns() {
+    // Given a time column on the database containing NULL values
+    let table_name = function_name!().rsplit_once(':').unwrap().1;
+    let cursor = cursor_over_literals(table_name, "TIME(7)", "(NULL)");
+
+    // When mapping these to a non-nullable arrow time array with nanosecond precision
+    let schema = Arc::new(Schema::new(vec![Field::new(
+        "a",
+        DataType::Time64(TimeUnit::Nanosecond),
+        false,
+    )]));
+    let mut reader = OdbcReaderBuilder::new()
+        .with_schema(schema)
+        .build(cursor)
+        .unwrap();
+
+    // Then fetching a batch with these values returns a readable error
+    let result = reader.next().unwrap();
+    let error = result.unwrap_err();
+    assert_eq!(
+        "External error: Failed to map values into arrow field 'a':\n\
+        The arrow field is declared non-nullable, yet the data source returned NULL.",
+        error.to_string()
+    );
+}
+
 /// Fill a record batch with non nullable Integer 8 Bit usigned integer. Since that type would never
 /// interferred from the Database automatically it must be specified explicitly in a schema
 #[test]
