@@ -162,9 +162,15 @@ pub fn choose_column_strategy(
         ArrowDataType::Time32(TimeUnit::Second) => {
             Time32SecondType::map_infalliable(field.is_nullable(), seconds_since_midnight)
         }
-        ArrowDataType::Time32(TimeUnit::Millisecond) => Box::new(TimeMsI32),
-        ArrowDataType::Time64(TimeUnit::Microsecond) => Box::new(TimeUsI64),
-        ArrowDataType::Time64(TimeUnit::Nanosecond) => Box::new(TimeNsI64),
+        ArrowDataType::Time32(TimeUnit::Millisecond) => {
+            Box::new(TimeMsI32::new(field.is_nullable()))
+        }
+        ArrowDataType::Time64(TimeUnit::Microsecond) => {
+            Box::new(TimeUsI64::new(field.is_nullable()))
+        }
+        ArrowDataType::Time64(TimeUnit::Nanosecond) => {
+            Box::new(TimeNsI64::new(field.is_nullable()))
+        }
         ArrowDataType::Utf8 => {
             let sql_type = query_metadata
                 .col_data_type(col_index)
@@ -183,7 +189,9 @@ pub fn choose_column_strategy(
                 field.is_nullable(),
             )?
         }
-        ArrowDataType::Decimal128(precision, scale @ 0..) => decimal(*precision, *scale),
+        ArrowDataType::Decimal128(precision, scale @ 0..) => {
+            decimal(*precision, *scale, field.is_nullable())
+        }
         ArrowDataType::Binary => {
             let sql_type = query_metadata
                 .col_data_type(col_index)

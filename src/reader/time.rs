@@ -20,7 +20,16 @@ pub fn seconds_since_midnight(time: &Time) -> i32 {
 
 /// Strategy for fetching the time as text and parsing it into an `i32` which represents
 /// milliseconds after midnight.
-pub struct TimeMsI32;
+pub struct TimeMsI32 {
+    /// Wether the arrow field may contain NULL. If `false`, encountering NULL is an error.
+    nullable: bool,
+}
+
+impl TimeMsI32 {
+    pub fn new(nullable: bool) -> Self {
+        Self { nullable }
+    }
+}
 
 impl ReadStrategy for TimeMsI32 {
     fn buffer_desc(&self) -> BufferDesc {
@@ -42,6 +51,9 @@ impl ReadStrategy for TimeMsI32 {
                 let num = ticks_since_midnights_from_text::<i32>(text, 3);
                 builder.append_value(num);
             } else {
+                if !self.nullable {
+                    return Err(MappingError::NullInNonNullableField);
+                }
                 builder.append_null();
             }
         }
@@ -52,7 +64,16 @@ impl ReadStrategy for TimeMsI32 {
 
 /// Strategy for fetching the time as text and parsing it into an `i32` which represents
 /// milliseconds after midnight.
-pub struct TimeUsI64;
+pub struct TimeUsI64 {
+    /// Wether the arrow field may contain NULL. If `false`, encountering NULL is an error.
+    nullable: bool,
+}
+
+impl TimeUsI64 {
+    pub fn new(nullable: bool) -> Self {
+        Self { nullable }
+    }
+}
 
 impl ReadStrategy for TimeUsI64 {
     fn buffer_desc(&self) -> BufferDesc {
@@ -74,6 +95,9 @@ impl ReadStrategy for TimeUsI64 {
                 let num = ticks_since_midnights_from_text::<i64>(text, 6);
                 builder.append_value(num);
             } else {
+                if !self.nullable {
+                    return Err(MappingError::NullInNonNullableField);
+                }
                 builder.append_null();
             }
         }
@@ -84,7 +108,16 @@ impl ReadStrategy for TimeUsI64 {
 
 /// Strategy for fetching the time as text and parsing it into an `i32` which represents
 /// milliseconds after midnight.
-pub struct TimeNsI64;
+pub struct TimeNsI64 {
+    /// Wether the arrow field may contain NULL. If `false`, encountering NULL is an error.
+    nullable: bool,
+}
+
+impl TimeNsI64 {
+    pub fn new(nullable: bool) -> Self {
+        Self { nullable }
+    }
+}
 
 impl ReadStrategy for TimeNsI64 {
     fn buffer_desc(&self) -> BufferDesc {
@@ -106,6 +139,9 @@ impl ReadStrategy for TimeNsI64 {
                 let num = ticks_since_midnights_from_text::<i64>(text, 9);
                 builder.append_value(num);
             } else {
+                if !self.nullable {
+                    return Err(MappingError::NullInNonNullableField);
+                }
                 builder.append_null();
             }
         }
