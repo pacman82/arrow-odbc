@@ -59,15 +59,11 @@ where
     where
         U: Item + Pod + 'static + Send,
     {
-        if map_errors_to_null {
-            return Box::new(ErrorToNullStrategy::<Self, U, _>::new(odbc_to_arrow));
+        if map_errors_to_null && nullable {
+            Box::new(ErrorToNullStrategy::<Self, U, _>::new(odbc_to_arrow))
+        } else {
+            Box::new(NullableStrategy::<Self, U, _>::new(odbc_to_arrow))
         }
-
-        if nullable {
-            return Box::new(NullableStrategy::<Self, U, _>::new(odbc_to_arrow));
-        }
-
-        Box::new(NonNullableStrategy::<Self, U, _>::new(odbc_to_arrow))
     }
 
     fn map_infalliable<U>(
