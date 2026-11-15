@@ -1,22 +1,17 @@
 # Changelog
 
 All notable changes to this project will be documented in this file. `arrow-odbc` adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
 ## [27.1.0](https://github.com/pacman82/odbc-api/compare/27.0.0...27.1.0) - 2026-11-15
 
 ### 🚀 Features
 
-- Arrow Field name attached to mapping errors
+- Arrow Field name attached to errors caused by individual values not mapping to their target types
 
 
 ### 🐛 Bug Fixes
 
-- Don't panic for mapping errors to null in non-nullable columns
-- Mapping null values into non-null timestamps fields no longer panics
-- Don't panick if mapping values of incorrect length into fixed sized binary columns
-- Mapping null values into non-null fixed binary fields no longer panics
-- Mapping null values into non-null binary fields no longer panics
-- Mapping null values from wide transport buffer to non-null fields no longer panics
-- Mapping null values from narrow transport buffer to non-null fields no longer panics
+- Error instead of panic attempting to write a NULL value into a non-null arrow field.
 
 
 ## [27.0.0](https://github.com/pacman82/odbc-api/compare/26.0.4...27.0.0) - 2026-11-07
