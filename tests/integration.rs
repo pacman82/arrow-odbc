@@ -397,6 +397,47 @@ fn fetch_null_into_non_nullable_time_us() {
     );
 }
 
+/// Mapping value errors to NULL only applies to nullable arrow fields. If the user explicitly
+/// declares the field non-nullable, the value error is reported rather than causing a panic.
+#[test]
+fn value_errors_as_null_ignored_for_non_nullable_fields() {
+    // Given a timestamp column on the database containing a value which is out of range for
+    // nanosecond precision
+    let table_name = function_name!().rsplit_once(':').unwrap().1;
+    let cursor = cursor_over_literals(
+        table_name,
+        "DATETIME2(7)",
+        "('2300-01-01 00:00:00.1234567')",
+    );
+
+    // When mapping these to a non-nullable arrow timestamp array with nanosecond precision, while
+    // mapping value errors to NULL
+    let schema = Arc::new(Schema::new(vec![Field::new(
+        "a",
+        DataType::Timestamp(TimeUnit::Nanosecond, None),
+        false,
+    )]));
+    let mut reader = OdbcReaderBuilder::new()
+        .with_schema(schema)
+        .value_errors_as_null(true)
+        .build(cursor)
+        .unwrap();
+
+    // Then fetching a batch with these values reports the value error
+    let result = reader.next().unwrap();
+    let error = result.unwrap_err();
+    assert_eq!(
+        "External error: Failed to map values into arrow field 'a':\n\
+        Timestamp is not representable in arrow: 2300-01-01 00:00:00.123456700\n\
+        Timestamps with nanoseconds precision are represented using a signed 64 Bit integer. This \
+        limits their range to values between 1677-09-21 00:12:44 and \
+        2262-04-11 23:47:16.854775807. The value returned from the database is outside of this \
+        range. Suggestions to fix this error either reduce the precision or fetch the values as \
+        text.",
+        error.to_string()
+    );
+}
+
 /// A user may specify a non-nullable arrow field for a column which contains NULL. We expect an
 /// error rather than a panic.
 #[test]
